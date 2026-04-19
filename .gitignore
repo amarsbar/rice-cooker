@@ -7,12 +7,3 @@ dist
 .DS_Store
 .env
 .env.local
-backend/target
-backend/screenshots/
-.claude/
-
-# makepkg build artifacts
-packaging/aur/*/pkg/
-packaging/aur/*/src/
-packaging/aur/*/*.pkg.tar.zst
-packaging/aur/rice-cooker-backend-git/rice-cooker/
