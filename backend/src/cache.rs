@@ -42,10 +42,6 @@ impl Cache {
         read_line_file(&self.root.join("active"))
     }
 
-    pub fn previous(&self) -> Result<Option<String>> {
-        read_line_file(&self.root.join("previous"))
-    }
-
     pub fn original(&self) -> Result<Option<String>> {
         read_line_file(&self.root.join("original"))
     }
@@ -58,39 +54,17 @@ impl Cache {
         write_line_file(&self.root.join("active"), name)
     }
 
-    pub fn set_previous(&self, name: &str) -> Result<()> {
-        write_line_file(&self.root.join("previous"), name)
-    }
-
     pub fn set_original(&self, entry: Option<&str>) -> Result<()> {
         write_line_file(&self.root.join("original"), entry.unwrap_or(""))
     }
 
-    pub fn swap_active_previous(&self) -> Result<()> {
-        let a = self.active()?;
-        let p = self.previous()?;
-        match (a, p) {
-            (Some(a), Some(p)) => {
-                self.set_active(&p)?;
-                self.set_previous(&a)?;
-            }
-            (Some(_), None) | (None, Some(_)) | (None, None) => {
-                return Err(anyhow!("cannot swap: missing active or previous"));
-            }
+    pub fn clear_active(&self) -> Result<()> {
+        let p = self.root.join("active");
+        match fs::remove_file(&p) {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(e).with_context(|| format!("removing {}", p.display())),
         }
-        Ok(())
-    }
-
-    pub fn clear_active_previous(&self) -> Result<()> {
-        for name in ["active", "previous"] {
-            let p = self.root.join(name);
-            match fs::remove_file(&p) {
-                Ok(()) => {}
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                Err(e) => return Err(e).with_context(|| format!("removing {}", p.display())),
-            }
-        }
-        Ok(())
     }
 }
 
@@ -242,22 +216,12 @@ mod tests {
     }
 
     #[test]
-    fn swap_exchanges_active_and_previous() {
-        let (_dir, cache) = tmp_cache();
-        cache.set_active("b").unwrap();
-        cache.set_previous("a").unwrap();
-        cache.swap_active_previous().unwrap();
-        assert_eq!(cache.active().unwrap().as_deref(), Some("a"));
-        assert_eq!(cache.previous().unwrap().as_deref(), Some("b"));
-    }
-
-    #[test]
-    fn clear_active_and_previous_removes_both_files() {
+    fn clear_active_removes_the_file() {
         let (_dir, cache) = tmp_cache();
         cache.set_active("x").unwrap();
-        cache.set_previous("y").unwrap();
-        cache.clear_active_previous().unwrap();
+        cache.clear_active().unwrap();
         assert!(cache.active().unwrap().is_none());
-        assert!(cache.previous().unwrap().is_none());
+        // Idempotent: clearing a missing file is fine.
+        cache.clear_active().unwrap();
     }
 }
