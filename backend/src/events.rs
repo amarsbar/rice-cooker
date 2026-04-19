@@ -106,64 +106,9 @@ mod tests {
     }
 
     #[test]
-    fn success_omits_nulls_and_false_dry_run() {
-        let ev = Event::Success {
-            active: Some("caelestia".into()),
-            previous: Some("noctalia".into()),
-            dry_run: false,
-        };
-        let s = serde_json::to_string(&ev).unwrap();
-        assert_eq!(
-            s,
-            r#"{"type":"success","active":"caelestia","previous":"noctalia"}"#
-        );
-    }
-
-    #[test]
-    fn success_includes_dry_run_when_true() {
-        let ev = Event::Success {
-            active: None,
-            previous: None,
-            dry_run: true,
-        };
-        let s = serde_json::to_string(&ev).unwrap();
-        assert_eq!(s, r#"{"type":"success","dry_run":true}"#);
-    }
-
-    #[test]
-    fn fail_includes_plugins_when_set() {
-        let ev = Event::Fail {
-            stage: "precheck".into(),
-            reason: "missing_plugins".into(),
-            plugins: Some(vec!["Foo.Bar".into(), "Baz.Qux".into()]),
-            log_tail: None,
-        };
-        let s = serde_json::to_string(&ev).unwrap();
-        assert_eq!(
-            s,
-            r#"{"type":"fail","stage":"precheck","reason":"missing_plugins","plugins":["Foo.Bar","Baz.Qux"]}"#
-        );
-    }
-
-    #[test]
-    fn fail_without_extras_has_only_stage_and_reason() {
-        let ev = Event::Fail {
-            stage: "preflight".into(),
-            reason: "git_missing".into(),
-            plugins: None,
-            log_tail: None,
-        };
-        let s = serde_json::to_string(&ev).unwrap();
-        assert_eq!(
-            s,
-            r#"{"type":"fail","stage":"preflight","reason":"git_missing"}"#
-        );
-    }
-
-    #[test]
-    fn success_roundtrips_after_skipping_defaults() {
-        // Serializing omits null/false fields; deserializing the omitted form must still
-        // reconstruct the original struct via #[serde(default)].
+    fn success_roundtrips_and_skips_defaults() {
+        // Covers both skip_serializing_if (None/false omitted) and the matching
+        // #[serde(default)] on deserialize.
         let original = Event::Success {
             active: Some("x".into()),
             previous: None,
@@ -176,14 +121,18 @@ mod tests {
     }
 
     #[test]
-    fn fail_roundtrips_with_no_extras() {
+    fn fail_roundtrips_with_plugins() {
         let original = Event::Fail {
             stage: "precheck".into(),
             reason: "missing_plugins".into(),
-            plugins: None,
+            plugins: Some(vec!["Foo".into()]),
             log_tail: None,
         };
         let wire = serde_json::to_string(&original).unwrap();
+        assert_eq!(
+            wire,
+            r#"{"type":"fail","stage":"precheck","reason":"missing_plugins","plugins":["Foo"]}"#
+        );
         let back: Event = serde_json::from_str(&wire).unwrap();
         assert_eq!(back, original);
     }

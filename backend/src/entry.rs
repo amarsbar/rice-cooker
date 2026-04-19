@@ -36,41 +36,22 @@ mod tests {
     }
 
     #[test]
-    fn root_shell_qml_found() {
-        let tmp = tempfile::tempdir().unwrap();
-        make_file(tmp.path(), "shell.qml");
-        let result = find_shell_qml(tmp.path()).unwrap();
-        assert_eq!(result, Some(std::path::PathBuf::from("shell.qml")));
-    }
-
-    #[test]
-    fn ii_shell_qml_found_when_root_missing() {
-        let tmp = tempfile::tempdir().unwrap();
-        make_file(tmp.path(), "ii/shell.qml");
-        let result = find_shell_qml(tmp.path()).unwrap();
-        assert_eq!(result, Some(std::path::PathBuf::from("ii/shell.qml")));
-    }
-
-    #[test]
-    fn quickshell_shell_qml_found_when_above_missing() {
-        let tmp = tempfile::tempdir().unwrap();
-        make_file(tmp.path(), "quickshell/shell.qml");
-        let result = find_shell_qml(tmp.path()).unwrap();
-        assert_eq!(
-            result,
-            Some(std::path::PathBuf::from("quickshell/shell.qml"))
-        );
-    }
-
-    #[test]
-    fn config_quickshell_shell_qml_found_when_others_missing() {
-        let tmp = tempfile::tempdir().unwrap();
-        make_file(tmp.path(), ".config/quickshell/shell.qml");
-        let result = find_shell_qml(tmp.path()).unwrap();
-        assert_eq!(
-            result,
-            Some(std::path::PathBuf::from(".config/quickshell/shell.qml"))
-        );
+    fn each_candidate_is_found_in_isolation() {
+        for candidate in [
+            "shell.qml",
+            "ii/shell.qml",
+            "quickshell/shell.qml",
+            ".config/quickshell/shell.qml",
+        ] {
+            let tmp = tempfile::tempdir().unwrap();
+            make_file(tmp.path(), candidate);
+            let result = find_shell_qml(tmp.path()).unwrap();
+            assert_eq!(
+                result.as_deref(),
+                Some(std::path::Path::new(candidate)),
+                "failed for candidate {candidate:?}"
+            );
+        }
     }
 
     #[test]
