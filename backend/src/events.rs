@@ -35,8 +35,6 @@ pub enum Event {
     Success {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         active: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        previous: Option<String>,
         #[serde(default, skip_serializing_if = "is_false")]
         dry_run: bool,
     },
@@ -100,7 +98,6 @@ mod tests {
             (
                 Event::Success {
                     active: Some("x".into()),
-                    previous: None,
                     dry_run: false,
                 },
                 r#"{"type":"success","active":"x"}"#,

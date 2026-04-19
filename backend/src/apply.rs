@@ -73,7 +73,6 @@ pub struct ApplyParams<'a> {
 #[derive(Debug, Serialize)]
 pub struct Status {
     pub active: Option<String>,
-    pub previous: Option<String>,
     pub original: Option<String>,
     pub quickshell_running: bool,
     pub cache_dir: String,
@@ -121,7 +120,6 @@ pub fn run_apply<W: Write>(
     if params.dry_run {
         events.emit(&Event::Success {
             active: None,
-            previous: None,
             dry_run: true,
         })?;
         return Ok(true);
@@ -134,32 +132,14 @@ pub fn run_apply<W: Write>(
     // Post-verify: shell is running the new rice. A cache write failure here must
     // still emit a fail event — the UI has already been told the pipeline succeeded
     // through step/verify/done; exit-code-2 without an event breaks the contract.
-    let prior = try_stage!(events, "commit", "read_active", cache.active());
     try_stage!(
         events,
         "commit",
         "set_active",
         cache.set_active(params.name)
     );
-    if let Some(p) = &prior {
-        if p != params.name {
-            if let Err(e) = cache.set_previous(p) {
-                // Roll back active to the prior value so state stays coherent. If the
-                // rollback itself fails, surface both errors in the event so an operator
-                // can see that state is now genuinely wedged (active points to the
-                // new rice, previous missing) rather than merely "set_previous failed".
-                let reason = match cache.set_active(p) {
-                    Ok(()) => format!("set_previous: {e}"),
-                    Err(rb) => format!("set_previous: {e}; rollback_failed: {rb}"),
-                };
-                emit_fail(events, "commit", &reason, None, None)?;
-                return Ok(false);
-            }
-        }
-    }
     events.emit(&Event::Success {
         active: Some(params.name.to_string()),
-        previous: prior,
         dry_run: false,
     })?;
     Ok(true)
@@ -176,55 +156,6 @@ fn validate_rice_name(name: &str) -> std::result::Result<(), &'static str> {
     } else {
         Err("invalid_name")
     }
-}
-
-pub fn run_revert<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<bool> {
-    hello(events, "revert")?;
-    try_stage!(events, "init", cache.ensure_dirs());
-    let _lock = match acquire_lock(cache, events)? {
-        Some(l) => l,
-        None => return Ok(false),
-    };
-
-    if !preflight(cache, events)? {
-        return Ok(false);
-    }
-
-    let previous_name = match try_stage!(events, "revert", "read_previous", cache.previous()) {
-        Some(n) => n,
-        None => {
-            emit_fail(events, "revert", "no_previous", None, None)?;
-            return Ok(false);
-        }
-    };
-    let rice_dir = cache.rice_dir(&previous_name);
-    if !rice_dir.is_dir() {
-        emit_fail(events, "revert", "previous_missing_from_cache", None, None)?;
-        return Ok(false);
-    }
-
-    let Some(entry_rel) = locate_entry(&rice_dir, events)? else {
-        return Ok(false);
-    };
-
-    if !precheck(&rice_dir, events)? {
-        return Ok(false);
-    }
-
-    let log_file = cache.last_run_log();
-    if !wet_pipeline(&rice_dir, &entry_rel, &log_file, events)? {
-        return Ok(false);
-    }
-
-    try_stage!(events, "commit", "swap", cache.swap_active_previous());
-    let active = try_stage!(events, "commit", "read_active", cache.active());
-    let previous = try_stage!(events, "commit", "read_previous", cache.previous());
-    events.emit(&Event::Success {
-        active,
-        previous,
-        dry_run: false,
-    })?;
-    Ok(true)
 }
 
 pub fn run_exit<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<bool> {
@@ -253,10 +184,9 @@ pub fn run_exit<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<
         step(events, Step::Launch, StepState::Done)?;
     }
 
-    try_stage!(events, "commit", "clear", cache.clear_active_previous());
+    try_stage!(events, "commit", "clear", cache.clear_active());
     events.emit(&Event::Success {
         active: None,
-        previous: None,
         dry_run: false,
     })?;
     Ok(true)
@@ -265,7 +195,6 @@ pub fn run_exit<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<
 pub fn get_status(cache: &Cache) -> Result<Status> {
     Ok(Status {
         active: cache.active()?,
-        previous: cache.previous()?,
         original: cache.original()?,
         quickshell_running: find_running_quickshell()?.is_some(),
         cache_dir: cache.root().display().to_string(),

@@ -26,8 +26,6 @@ enum Cmd {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Switch back to the previously-applied rice.
-    Revert,
     /// Kill the active rice; restore the user's pre-RiceCooker shell if recorded.
     Exit,
     /// Print a single JSON object describing current state.
@@ -64,10 +62,6 @@ fn run() -> Result<bool> {
                 dry_run,
             };
             apply::run_apply(&cache, &params, &mut events)
-        }
-        Cmd::Revert => {
-            let mut events = EventWriter::new(&mut lock);
-            apply::run_revert(&cache, &mut events)
         }
         Cmd::Exit => {
             let mut events = EventWriter::new(&mut lock);

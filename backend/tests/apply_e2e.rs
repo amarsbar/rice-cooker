@@ -16,7 +16,6 @@ fn status_on_empty_cache_reports_defaults() {
     );
     let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(v["active"], serde_json::Value::Null);
-    assert_eq!(v["previous"], serde_json::Value::Null);
     assert_eq!(v["original"], serde_json::Value::Null);
     assert_eq!(v["cache_dir"], h.cache_dir.display().to_string());
     assert!(v["quickshell_running"].is_boolean());
@@ -203,57 +202,6 @@ fn apply_verify_log_error_reports_qs_error() {
 }
 
 #[test]
-fn revert_with_no_previous_reports_no_previous() {
-    let h = Harness::new();
-    let out = h.bin().arg("revert").output().unwrap();
-    assert_eq!(out.status.code(), Some(1));
-    let events = parse_ndjson(&out.stdout);
-    let last = last_event(&events);
-    assert_eq!(last["type"], "fail");
-    assert_eq!(last["stage"], "revert");
-    assert_eq!(last["reason"], "no_previous");
-}
-
-#[test]
-fn apply_then_revert_swaps_active_and_previous() {
-    let h = Harness::new();
-    h.with_rice_file("shell.qml", HAPPY_SHELL_QML);
-
-    // first apply: A
-    let a = h
-        .bin()
-        .args(["apply", "--name", "A", "--repo", "https://example/a.git"])
-        .output()
-        .unwrap();
-    assert!(
-        a.status.success(),
-        "{:?}",
-        String::from_utf8_lossy(&a.stdout)
-    );
-
-    // second apply: B
-    let b = h
-        .bin()
-        .args(["apply", "--name", "B", "--repo", "https://example/b.git"])
-        .output()
-        .unwrap();
-    assert!(b.status.success());
-    assert_eq!(h.read_cache_file("active").as_deref(), Some("B"));
-    assert_eq!(h.read_cache_file("previous").as_deref(), Some("A"));
-
-    // revert
-    let r = h.bin().arg("revert").output().unwrap();
-    assert!(
-        r.status.success(),
-        "stderr: {}\nstdout: {}",
-        String::from_utf8_lossy(&r.stderr),
-        String::from_utf8_lossy(&r.stdout)
-    );
-    assert_eq!(h.read_cache_file("active").as_deref(), Some("A"));
-    assert_eq!(h.read_cache_file("previous").as_deref(), Some("B"));
-}
-
-#[test]
 fn exit_with_no_original_clears_state_and_reports_success() {
     let h = Harness::new();
     h.with_rice_file("shell.qml", HAPPY_SHELL_QML);
@@ -410,46 +358,6 @@ fn apply_pgrep_syntax_error_fails_cleanly_with_kill_quickshell_stage() {
     let last = last_event(&events);
     assert_eq!(last["type"], "fail");
     assert_eq!(last["stage"], "kill_quickshell");
-}
-
-#[test]
-fn apply_set_previous_failure_rolls_back_active() {
-    // After verify passes, if set_previous fails (here: pre-created `previous` as
-    // a directory, so rename(tmp, previous) fails), active must be rolled back to
-    // the prior value so subsequent revert doesn't swap to a missing previous.
-    let h = Harness::new();
-    h.with_rice_file("shell.qml", HAPPY_SHELL_QML);
-
-    // First apply: establishes active = "A".
-    let a = h
-        .bin()
-        .args(["apply", "--name", "A", "--repo", "https://example/a.git"])
-        .output()
-        .unwrap();
-    assert!(a.status.success());
-    assert_eq!(h.read_cache_file("active").as_deref(), Some("A"));
-
-    // Corrupt: make `previous` a directory so rename into it fails.
-    std::fs::create_dir(h.cache_dir.join("previous")).unwrap();
-
-    // Second apply: set_active("B") succeeds, set_previous("A") fails, rollback fires.
-    let b = h
-        .bin()
-        .args(["apply", "--name", "B", "--repo", "https://example/b.git"])
-        .output()
-        .unwrap();
-    assert_eq!(b.status.code(), Some(1));
-    let events = parse_ndjson(&b.stdout);
-    let last = last_event(&events);
-    assert_eq!(last["type"], "fail");
-    assert_eq!(last["stage"], "commit");
-    let reason = last["reason"].as_str().unwrap_or("");
-    assert!(
-        reason.starts_with("set_previous:"),
-        "expected set_previous failure reason, got: {reason}"
-    );
-    // Rollback should have restored active to "A".
-    assert_eq!(h.read_cache_file("active").as_deref(), Some("A"));
 }
 
 #[test]
