@@ -59,7 +59,7 @@ pub fn find_running_quickshell() -> anyhow::Result<Option<QuickshellProc>> {
         if !owned_by_uid(pid, our_uid) {
             continue;
         }
-        let cmdline_path = format!("/proc/{}/cmdline", pid);
+        let cmdline_path = format!("/proc/{pid}/cmdline");
         let bytes = match std::fs::read(&cmdline_path) {
             Ok(b) => b,
             Err(_) => continue,
