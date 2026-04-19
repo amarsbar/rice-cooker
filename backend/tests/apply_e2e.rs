@@ -415,6 +415,67 @@ fn apply_sigkill_fallback_fails_cleanly_if_qs_stays_alive() {
 }
 
 #[test]
+fn apply_pgrep_syntax_error_fails_cleanly_with_kill_quickshell_stage() {
+    // If pgrep returns exit 2 or 3 (not 0/1), pgrep_matches must surface it as an
+    // error instead of treating it as "no match". Regression guard: a naive
+    // `.status().success()` would let the post-SIGKILL re-verify pass silently
+    // and allow launch_detached to race a still-alive quickshell.
+    let h = Harness::new();
+    h.with_rice_file("shell.qml", HAPPY_SHELL_QML);
+    let out = h
+        .bin()
+        .args(["apply", "--name", "x", "--repo", "https://example/x.git"])
+        .env("FAKE_PGREP_EXIT", "2")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let events = parse_ndjson(&out.stdout);
+    let last = last_event(&events);
+    assert_eq!(last["type"], "fail");
+    assert_eq!(last["stage"], "kill_quickshell");
+}
+
+#[test]
+fn apply_set_previous_failure_rolls_back_active() {
+    // After verify passes, if set_previous fails (here: pre-created `previous` as
+    // a directory, so rename(tmp, previous) fails), active must be rolled back to
+    // the prior value so subsequent revert doesn't swap to a missing previous.
+    let h = Harness::new();
+    h.with_rice_file("shell.qml", HAPPY_SHELL_QML);
+
+    // First apply: establishes active = "A".
+    let a = h
+        .bin()
+        .args(["apply", "--name", "A", "--repo", "https://example/a.git"])
+        .output()
+        .unwrap();
+    assert!(a.status.success());
+    assert_eq!(h.read_cache_file("active").as_deref(), Some("A"));
+
+    // Corrupt: make `previous` a directory so rename into it fails.
+    std::fs::create_dir(h.cache_dir.join("previous")).unwrap();
+
+    // Second apply: set_active("B") succeeds, set_previous("A") fails, rollback fires.
+    let b = h
+        .bin()
+        .args(["apply", "--name", "B", "--repo", "https://example/b.git"])
+        .output()
+        .unwrap();
+    assert_eq!(b.status.code(), Some(1));
+    let events = parse_ndjson(&b.stdout);
+    let last = last_event(&events);
+    assert_eq!(last["type"], "fail");
+    assert_eq!(last["stage"], "commit");
+    let reason = last["reason"].as_str().unwrap_or("");
+    assert!(
+        reason.starts_with("set_previous:"),
+        "expected set_previous failure reason, got: {reason}"
+    );
+    // Rollback should have restored active to "A".
+    assert_eq!(h.read_cache_file("active").as_deref(), Some("A"));
+}
+
+#[test]
 fn second_concurrent_apply_errors_lock_held() {
     let h = Harness::new();
     h.with_rice_file("shell.qml", HAPPY_SHELL_QML);

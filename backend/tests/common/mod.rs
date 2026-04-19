@@ -62,6 +62,10 @@ exit 0
 
 pub const FAKE_PGREP: &str = r#"#!/bin/sh
 printf 'pgrep %s\n' "$*" >> "$FAKE_LOG"
+# Hard-override exit code (simulates pgrep 2=syntax / 3=fatal).
+if [ -n "$FAKE_PGREP_EXIT" ]; then
+    exit "$FAKE_PGREP_EXIT"
+fi
 # -xf <pattern> = verify check; -f <pattern> = broad kill check
 has_xf=0
 for a in "$@"; do
