@@ -399,7 +399,6 @@ dependencies = [
  "assert_cmd",
  "clap",
  "fs4",
- "libc",
  "regex",
  "serde",
  "serde_json",
