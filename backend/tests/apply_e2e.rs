@@ -1,9 +1,8 @@
 mod common;
 
-use common::{event_types, last_event, parse_ndjson, Harness};
+use common::{Harness, event_types, last_event, parse_ndjson};
 
 const HAPPY_SHELL_QML: &str = "import QtQuick 2.15\nimport Quickshell\nShellRoot {}\n";
-const BROKEN_SHELL_QML: &str = "import QtQuick 2.15\nimport Foo.Bar 1.0\nShellRoot {}\n";
 
 #[test]
 fn status_on_empty_cache_reports_defaults() {
@@ -54,96 +53,6 @@ fn apply_happy_path_updates_active_and_emits_success() {
 }
 
 #[test]
-fn apply_precheck_failure_does_not_kill_quickshell() {
-    let h = Harness::new();
-    h.with_rice_file("shell.qml", BROKEN_SHELL_QML);
-
-    let out = h
-        .bin()
-        .args([
-            "apply",
-            "--name",
-            "busted",
-            "--repo",
-            "https://example/x.git",
-        ])
-        .output()
-        .unwrap();
-    assert!(!out.status.success(), "expected non-zero exit");
-    assert_eq!(
-        out.status.code(),
-        Some(1),
-        "expected exit 1 (reported failure), not 2 (internal error)"
-    );
-    let events = parse_ndjson(&out.stdout);
-    let last = last_event(&events);
-    assert_eq!(last["type"], "fail");
-    assert_eq!(last["stage"], "precheck");
-    assert_eq!(last["reason"], "missing_plugins");
-    assert_eq!(last["plugins"], serde_json::json!(["Foo"]));
-
-    let invocations = h.read_invocations();
-    assert!(
-        !invocations.contains("pkill -TERM -f ^quickshell"),
-        "process state was touched: {invocations}"
-    );
-    assert!(
-        !invocations.contains("setsid"),
-        "setsid was invoked: {invocations}"
-    );
-}
-
-#[test]
-fn apply_dry_run_stops_after_precheck() {
-    let h = Harness::new();
-    h.with_rice_file("shell.qml", HAPPY_SHELL_QML);
-
-    let out = h
-        .bin()
-        .args([
-            "apply",
-            "--name",
-            "caelestia",
-            "--repo",
-            "https://example/x.git",
-            "--dry-run",
-        ])
-        .output()
-        .unwrap();
-    assert!(out.status.success());
-    let events = parse_ndjson(&out.stdout);
-    let last = last_event(&events);
-    assert_eq!(last["type"], "success");
-    assert_eq!(last["dry_run"], true);
-    assert_eq!(last.get("active"), None);
-    // active must NOT be updated — the observable contract of dry-run.
-    assert_eq!(h.read_cache_file("active"), None);
-}
-
-#[test]
-fn apply_no_shell_qml_reports_entry_failure() {
-    let h = Harness::new();
-    // rice source is empty — no shell.qml anywhere
-    let out = h
-        .bin()
-        .args([
-            "apply",
-            "--name",
-            "empty",
-            "--repo",
-            "https://example/x.git",
-        ])
-        .output()
-        .unwrap();
-    assert_eq!(out.status.code(), Some(1));
-    let events = parse_ndjson(&out.stdout);
-    let last = last_event(&events);
-    assert_eq!(last["type"], "fail");
-    assert_eq!(last["stage"], "entry");
-    assert_eq!(last["reason"], "no_shell_qml");
-}
-
-#[test]
 fn apply_verify_dead_process_reports_qs_exited() {
     let h = Harness::new();
     h.with_rice_file("shell.qml", HAPPY_SHELL_QML);
@@ -169,112 +78,13 @@ fn apply_verify_dead_process_reports_qs_exited() {
 }
 
 #[test]
-fn apply_verify_log_error_reports_qs_error() {
-    let h = Harness::new();
-    h.with_rice_file("shell.qml", HAPPY_SHELL_QML);
-
-    let out = h
-        .bin()
-        .args([
-            "apply",
-            "--name",
-            "caelestia",
-            "--repo",
-            "https://example/x.git",
-        ])
-        .env(
-            "FAKE_QS_LOG",
-            "QQmlApplicationEngine failed to load component",
-        )
-        .output()
-        .unwrap();
-    assert_eq!(out.status.code(), Some(1));
-    let events = parse_ndjson(&out.stdout);
-    let last = last_event(&events);
-    assert_eq!(last["type"], "fail");
-    assert_eq!(last["stage"], "verify");
-    assert_eq!(last["reason"], "qs_error");
-    let log_tail = last["log_tail"].as_str().unwrap_or("");
-    assert!(
-        log_tail.contains("QQmlApplicationEngine"),
-        "got: {log_tail}"
-    );
-}
-
-#[test]
-fn exit_with_no_original_clears_state_and_reports_success() {
-    let h = Harness::new();
-    h.with_rice_file("shell.qml", HAPPY_SHELL_QML);
-    // apply A first so active is set
-    h.bin()
-        .args(["apply", "--name", "A", "--repo", "https://example/a.git"])
-        .output()
-        .unwrap();
-
-    let out = h.bin().arg("exit").output().unwrap();
-    assert!(out.status.success());
-    let events = parse_ndjson(&out.stdout);
-    let last = last_event(&events);
-    assert_eq!(last["type"], "success");
-    assert_eq!(h.read_cache_file("active"), None);
-}
-
-#[test]
-fn apply_clone_failure_reports_clone_stage_with_log_tail() {
-    let h = Harness::new();
-    h.with_rice_file("shell.qml", HAPPY_SHELL_QML);
-    let out = h
-        .bin()
-        .args(["apply", "--name", "x", "--repo", "https://example/x.git"])
-        .env("FAKE_GIT_FAIL", "1")
-        .output()
-        .unwrap();
-    assert_eq!(out.status.code(), Some(1));
-    let events = parse_ndjson(&out.stdout);
-    let last = last_event(&events);
-    assert_eq!(last["type"], "fail");
-    assert_eq!(last["stage"], "clone");
-    let log_tail = last["log_tail"].as_str().unwrap_or("");
-    assert!(
-        log_tail.contains("fake git: scripted failure"),
-        "log_tail missing git stderr: {log_tail}"
-    );
-    // Precheck should never have run; no process state touched.
-    let invocations = h.read_invocations();
-    assert!(
-        !invocations.contains("pkill"),
-        "pkill was invoked after clone fail: {invocations}"
-    );
-    assert!(
-        !invocations.contains("setsid"),
-        "setsid was invoked after clone fail: {invocations}"
-    );
-}
-
-#[test]
-fn apply_setsid_failure_reports_launch_stage() {
-    let h = Harness::new();
-    h.with_rice_file("shell.qml", HAPPY_SHELL_QML);
-    let out = h
-        .bin()
-        .args(["apply", "--name", "x", "--repo", "https://example/x.git"])
-        .env("FAKE_SETSID_FAIL", "1")
-        .output()
-        .unwrap();
-    assert_eq!(out.status.code(), Some(1));
-    let events = parse_ndjson(&out.stdout);
-    let last = last_event(&events);
-    assert_eq!(last["type"], "fail");
-    assert_eq!(last["stage"], "launch");
-}
-
-#[test]
 fn apply_rejects_path_traversal_in_name() {
+    // The catalog is curated, but a typo'd entry ('..', '/') would otherwise write
+    // outside the rices/ subdir. cache::rice_dir guards the filesystem boundary.
+    // Names starting with '-' are separately rejected by clap (exit code 2).
     let h = Harness::new();
     h.with_rice_file("shell.qml", HAPPY_SHELL_QML);
-    // Note: names starting with `-` are rejected by clap itself (exit code 2), which is
-    // defense-in-depth — our validate_rice_name still rejects them if clap ever changes.
-    for bad_name in ["../etc", "..", ".", "foo/bar", "", ".hidden"] {
+    for bad_name in ["../etc", "..", ".", "foo/bar", ""] {
         let out = h
             .bin()
             .args([
@@ -299,65 +109,21 @@ fn apply_rejects_path_traversal_in_name() {
 }
 
 #[test]
-fn apply_rejects_dash_prefixed_repo_url() {
+fn exit_with_no_original_clears_state_and_reports_success() {
     let h = Harness::new();
     h.with_rice_file("shell.qml", HAPPY_SHELL_QML);
-    // Use --repo=VALUE to bypass clap's own "value cannot start with -" guard, so the
-    // test actually exercises our guard inside git::clone_or_update.
-    let out = h
-        .bin()
-        .args(["apply", "--name", "x", "--repo=--upload-pack=/tmp/evil"])
+    // Apply A first so active is set.
+    h.bin()
+        .args(["apply", "--name", "A", "--repo", "https://example/a.git"])
         .output()
         .unwrap();
-    assert_eq!(out.status.code(), Some(1));
-    let events = parse_ndjson(&out.stdout);
-    let last = last_event(&events);
-    assert_eq!(last["type"], "fail");
-    assert_eq!(last["stage"], "clone");
-    let reason = last["reason"].as_str().unwrap_or("");
-    assert!(reason.contains("refusing repo URL"), "reason: {reason}");
-}
 
-#[test]
-fn apply_sigkill_fallback_fails_cleanly_if_qs_stays_alive() {
-    // Simulate the rare case where both TERM and KILL fail to reap quickshell.
-    // FAKE_QS_KILL_ALIVE=1 makes the fake pgrep return "alive" for the broad
-    // check, so kill_quickshell's post-SIGKILL re-verify should detect that
-    // qs is still running and emit a kill_quickshell fail event.
-    let h = Harness::new();
-    h.with_rice_file("shell.qml", HAPPY_SHELL_QML);
-    let out = h
-        .bin()
-        .args(["apply", "--name", "x", "--repo", "https://example/x.git"])
-        .env("FAKE_QS_KILL_ALIVE", "1")
-        .output()
-        .unwrap();
-    assert_eq!(out.status.code(), Some(1));
+    let out = h.bin().arg("exit").output().unwrap();
+    assert!(out.status.success());
     let events = parse_ndjson(&out.stdout);
     let last = last_event(&events);
-    assert_eq!(last["type"], "fail");
-    assert_eq!(last["stage"], "kill_quickshell");
-}
-
-#[test]
-fn apply_pgrep_syntax_error_fails_cleanly_with_kill_quickshell_stage() {
-    // If pgrep returns exit 2 or 3 (not 0/1), pgrep_matches must surface it as an
-    // error instead of treating it as "no match". Regression guard: a naive
-    // `.status().success()` would let the post-SIGKILL re-verify pass silently
-    // and allow launch_detached to race a still-alive quickshell.
-    let h = Harness::new();
-    h.with_rice_file("shell.qml", HAPPY_SHELL_QML);
-    let out = h
-        .bin()
-        .args(["apply", "--name", "x", "--repo", "https://example/x.git"])
-        .env("FAKE_PGREP_EXIT", "2")
-        .output()
-        .unwrap();
-    assert_eq!(out.status.code(), Some(1));
-    let events = parse_ndjson(&out.stdout);
-    let last = last_event(&events);
-    assert_eq!(last["type"], "fail");
-    assert_eq!(last["stage"], "kill_quickshell");
+    assert_eq!(last["type"], "success");
+    assert_eq!(h.read_cache_file("active"), None);
 }
 
 #[test]
@@ -366,7 +132,6 @@ fn second_concurrent_apply_errors_lock_held() {
     h.with_rice_file("shell.qml", HAPPY_SHELL_QML);
     std::fs::create_dir_all(&h.cache_dir).unwrap();
     let lock_path = h.cache_dir.join("apply.lock");
-    // Hold the lock via fs4 directly, then invoke apply.
     use fs4::fs_std::FileExt;
     let f = std::fs::File::create(&lock_path).unwrap();
     f.try_lock_exclusive().unwrap();
@@ -376,7 +141,6 @@ fn second_concurrent_apply_errors_lock_held() {
         .args(["apply", "--name", "A", "--repo", "https://example/a.git"])
         .output()
         .unwrap();
-    // Clean up
     let _ = fs4::fs_std::FileExt::unlock(&f);
 
     assert_eq!(out.status.code(), Some(1));

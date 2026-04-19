@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 
 pub struct Cache {
     root: PathBuf,
@@ -20,8 +20,20 @@ impl Cache {
         &self.root
     }
 
-    pub fn rice_dir(&self, name: &str) -> PathBuf {
-        self.root.join("rices").join(name)
+    /// Resolve the on-disk directory for a rice by name. Rejects names that could
+    /// escape the `rices/` subdir — even under a curated catalog, a typo'd entry
+    /// (`..`, `/`, `\`, NUL) would otherwise write outside the cache root. The name
+    /// is part of a filesystem path, not a URL, so this check matters even when
+    /// the URL-side is trusted.
+    pub fn rice_dir(&self, name: &str) -> Result<PathBuf> {
+        if name.is_empty()
+            || name == "."
+            || name == ".."
+            || name.chars().any(|c| matches!(c, '/' | '\\' | '\0'))
+        {
+            return Err(anyhow!("invalid rice name: {name:?}"));
+        }
+        Ok(self.root.join("rices").join(name))
     }
 
     pub fn last_run_log(&self) -> PathBuf {
@@ -213,6 +225,18 @@ mod tests {
         cache.set_original(None).unwrap();
         assert!(cache.original_is_recorded());
         assert!(cache.original().unwrap().is_none());
+    }
+
+    #[test]
+    fn rice_dir_accepts_clean_names_rejects_traversal() {
+        let (_dir, cache) = tmp_cache();
+        for good in ["caelestia", "noctalia-2", "rice_v1", "Foo.Bar"] {
+            let p = cache.rice_dir(good).unwrap();
+            assert_eq!(p, cache.root().join("rices").join(good));
+        }
+        for bad in ["", ".", "..", "a/b", "a\\b", "a\0b"] {
+            assert!(cache.rice_dir(bad).is_err(), "accepted: {bad:?}");
+        }
     }
 
     #[test]

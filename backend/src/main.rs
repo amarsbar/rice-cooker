@@ -23,6 +23,9 @@ enum Cmd {
         name: String,
         #[arg(long)]
         repo: String,
+        /// Path to the rice's shell.qml relative to the repo root. Default: shell.qml.
+        #[arg(long, default_value = "shell.qml")]
+        entry: String,
         #[arg(long)]
         dry_run: bool,
     },
@@ -53,12 +56,14 @@ fn run() -> Result<bool> {
         Cmd::Apply {
             name,
             repo,
+            entry,
             dry_run,
         } => {
             let mut events = EventWriter::new(&mut lock);
             let params = ApplyParams {
                 name: &name,
                 repo: &repo,
+                entry: &entry,
                 dry_run,
             };
             apply::run_apply(&cache, &params, &mut events)

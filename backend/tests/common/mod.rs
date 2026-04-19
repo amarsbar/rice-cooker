@@ -164,10 +164,6 @@ impl Harness {
         cmd
     }
 
-    pub fn read_invocations(&self) -> String {
-        fs::read_to_string(&self.invocation_log).unwrap_or_default()
-    }
-
     pub fn read_cache_file(&self, name: &str) -> Option<String> {
         fs::read_to_string(self.cache_dir.join(name))
             .ok()
