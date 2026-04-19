@@ -4,16 +4,13 @@ use std::path::{Component, Path, PathBuf};
 use anyhow::Result;
 use serde::Serialize;
 
+use std::fs;
+
 use crate::cache::{Cache, OriginalShell};
 use crate::events::{Event, EventWriter, SCHEMA_VERSION, Step, StepState};
 use crate::git;
 use crate::lock::{ApplyLock, LockError};
 use crate::process::{self, VerifyResult, find_running_quickshell};
-
-/// Entry candidates to auto-discover when the requested `--entry` path isn't present
-/// in the rice. Covers the common layouts we've seen: root-level shell.qml
-/// (noctalia-shell) and a `quickshell/` subdir (DankMaterialShell).
-const ENTRY_FALLBACKS: &[&str] = &["shell.qml", "quickshell/shell.qml"];
 
 /// Turn a `Result<T, E>` into its Ok value, or emit a stage fail event and early-return
 /// `Ok(false)` from the enclosing function. Enforces the post-hello contract: never
@@ -282,20 +279,49 @@ fn validate_entry_path(entry: &str) -> Option<PathBuf> {
     Some(pb)
 }
 
-/// Resolve the rice's entry file. Try the requested path first; if missing, fall
-/// through `ENTRY_FALLBACKS`. Assumes `preferred` has already been validated by
-/// `validate_entry_path`.
+/// Resolve the rice's entry file. Try the requested path first; if missing, walk
+/// the rice directory looking for any `shell.qml` and pick the shallowest match
+/// (ties broken lexicographically). Hidden directories (`.git`, `.github`, ...)
+/// are skipped so the walk doesn't pick up cloned-repo metadata or pull in a
+/// test fixture buried under a dot-prefixed path.
 fn resolve_entry(rice_dir: &Path, preferred: &Path) -> Option<PathBuf> {
     if rice_dir.join(preferred).is_file() {
         return Some(preferred.to_path_buf());
     }
-    for fallback in ENTRY_FALLBACKS {
-        let pb = PathBuf::from(fallback);
-        if pb != preferred && rice_dir.join(&pb).is_file() {
-            return Some(pb);
+    let mut matches: Vec<PathBuf> = Vec::new();
+    collect_shell_qml(rice_dir, rice_dir, &mut matches);
+    matches.sort_by(|a, b| {
+        a.components()
+            .count()
+            .cmp(&b.components().count())
+            .then_with(|| a.cmp(b))
+    });
+    matches.into_iter().next()
+}
+
+fn collect_shell_qml(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+        if name_str.starts_with('.') {
+            continue;
+        }
+        let path = entry.path();
+        match entry.file_type() {
+            // Symlinks fall through both arms (is_dir/is_file false on Linux),
+            // so we never descend into or collect a symlinked shell.qml.
+            Ok(ft) if ft.is_dir() => collect_shell_qml(root, &path, out),
+            Ok(ft) if ft.is_file() && name_str == "shell.qml" => {
+                if let Ok(rel) = path.strip_prefix(root) {
+                    out.push(rel.to_path_buf());
+                }
+            }
+            _ => {}
         }
     }
-    None
 }
 
 fn wet_pipeline<W: Write>(
@@ -360,27 +386,57 @@ mod tests {
     }
 
     #[test]
-    fn resolve_entry_prefers_requested_then_falls_back() {
+    fn resolve_entry_prefers_requested_then_walks_for_shell_qml() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path();
 
-        // Preferred hit: the requested path exists, take it.
+        // 1. Requested path exists — take it verbatim.
         std::fs::write(root.join("custom.qml"), b"").unwrap();
         assert_eq!(
             resolve_entry(root, Path::new("custom.qml")),
             Some(PathBuf::from("custom.qml"))
         );
 
-        // Fallback hit: requested doesn't exist, fall through to quickshell/shell.qml.
+        // 2. Requested missing, a deep shell.qml exists — walk finds it.
+        std::fs::create_dir_all(root.join("nested/deep")).unwrap();
+        std::fs::write(root.join("nested/deep/shell.qml"), b"").unwrap();
+        assert_eq!(
+            resolve_entry(root, Path::new("missing.qml")),
+            Some(PathBuf::from("nested/deep/shell.qml"))
+        );
+
+        // 3. Shallower match added — shallowest wins.
         std::fs::create_dir_all(root.join("quickshell")).unwrap();
         std::fs::write(root.join("quickshell/shell.qml"), b"").unwrap();
         assert_eq!(
-            resolve_entry(root, Path::new("does-not-exist.qml")),
+            resolve_entry(root, Path::new("missing.qml")),
             Some(PathBuf::from("quickshell/shell.qml"))
         );
 
-        // Nothing exists: None (no bogus path invented).
-        let empty = tempfile::tempdir().unwrap();
-        assert_eq!(resolve_entry(empty.path(), Path::new("shell.qml")), None);
+        // 4. Root shell.qml beats every nested match.
+        std::fs::write(root.join("shell.qml"), b"").unwrap();
+        assert_eq!(
+            resolve_entry(root, Path::new("missing.qml")),
+            Some(PathBuf::from("shell.qml"))
+        );
+
+        // 5. Lexicographic tie-break between two equally-shallow matches.
+        let tied = tempfile::tempdir().unwrap();
+        let troot = tied.path();
+        std::fs::create_dir_all(troot.join("zeta")).unwrap();
+        std::fs::create_dir_all(troot.join("alpha")).unwrap();
+        std::fs::write(troot.join("zeta/shell.qml"), b"").unwrap();
+        std::fs::write(troot.join("alpha/shell.qml"), b"").unwrap();
+        assert_eq!(
+            resolve_entry(troot, Path::new("missing.qml")),
+            Some(PathBuf::from("alpha/shell.qml"))
+        );
+
+        // 6. Hidden dirs are skipped — a shell.qml under .git shouldn't be found.
+        let hidden = tempfile::tempdir().unwrap();
+        let hroot = hidden.path();
+        std::fs::create_dir_all(hroot.join(".git")).unwrap();
+        std::fs::write(hroot.join(".git/shell.qml"), b"").unwrap();
+        assert_eq!(resolve_entry(hroot, Path::new("missing.qml")), None);
     }
 }
