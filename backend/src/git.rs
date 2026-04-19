@@ -3,6 +3,8 @@ use std::io;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
+use anyhow::Context;
+
 pub fn preflight() -> anyhow::Result<()> {
     let status = Command::new("git")
         .arg("--version")
@@ -29,13 +31,20 @@ pub fn clone_or_update(repo_url: &str, dest: &Path, log_file: &Path) -> anyhow::
         anyhow::bail!("refusing repo URL starting with '-': {}", repo_url);
     }
 
+    // Fresh log per clone/update so a retry doesn't include stderr from the
+    // previous failed attempt. launch_detached truncates again at step 6 for
+    // qs stderr; this truncation covers the failed-retry-before-launch case.
+    fs::write(log_file, b"")
+        .with_context(|| format!("truncating git log {}", log_file.display()))?;
+
     if dest.join(".git").exists() {
         let fetch_status = git_cmd()
             .args(["-C"])
             .arg(dest)
             .args(["fetch", "--depth", "1", "origin", "HEAD"])
             .stderr(open_log(log_file)?)
-            .status()?;
+            .status()
+            .context("spawning git fetch")?;
 
         if !fetch_status.success() {
             anyhow::bail!("git fetch failed with exit code {:?}", fetch_status.code());
@@ -46,14 +55,16 @@ pub fn clone_or_update(repo_url: &str, dest: &Path, log_file: &Path) -> anyhow::
             .arg(dest)
             .args(["reset", "--hard", "FETCH_HEAD"])
             .stderr(open_log(log_file)?)
-            .status()?;
+            .status()
+            .context("spawning git reset")?;
 
         if !reset_status.success() {
             anyhow::bail!("git reset failed with exit code {:?}", reset_status.code());
         }
     } else {
         if let Some(parent) = dest.parent() {
-            fs::create_dir_all(parent)?;
+            fs::create_dir_all(parent)
+                .with_context(|| format!("creating rice cache parent {}", parent.display()))?;
         }
 
         // `--` separates options from positional arguments; without it, a repo URL starting
@@ -63,7 +74,8 @@ pub fn clone_or_update(repo_url: &str, dest: &Path, log_file: &Path) -> anyhow::
             .args(["clone", "--depth", "1", "--", repo_url])
             .arg(dest)
             .stderr(open_log(log_file)?)
-            .status()?;
+            .status()
+            .context("spawning git clone")?;
 
         if !clone_status.success() {
             anyhow::bail!("git clone failed with exit code {:?}", clone_status.code());
