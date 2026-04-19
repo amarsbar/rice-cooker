@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use anyhow::{Context, Result, anyhow};
 
@@ -133,21 +133,59 @@ pub enum VerifyResult {
     Dead { log_tail: String },
 }
 
-pub fn verify(entry_rel: &Path, log_file: &Path) -> Result<VerifyResult> {
+pub fn verify(rice_dir: &Path, entry_rel: &Path, log_file: &Path) -> Result<VerifyResult> {
     thread::sleep(Duration::from_millis(VERIFY_WAIT_MS));
     let pat = quickshell_cmdline_pattern(entry_rel);
     let alive = pgrep_matches(&["-xf", &pat])?;
     if alive {
         return Ok(VerifyResult::Ok);
     }
-    // Surface log-read failures in the tail instead of silently falling back to "".
-    let log_contents = match fs::read_to_string(log_file) {
-        Ok(s) => s,
-        Err(e) => format!("<log unreadable at {}: {}>", log_file.display(), e),
-    };
+    // Quickshell writes its authoritative startup log to
+    // `$XDG_RUNTIME_DIR/quickshell/by-id/<id>/log.log`, NOT to stderr — the
+    // stderr file we redirect into via `setsid` is empty for the important
+    // cases (missing QML module, parse error, etc). Prefer the runtime log
+    // when we can find one matching our entry path, and fall back to our
+    // stderr capture if not.
+    let entry_abs = rice_dir.join(entry_rel);
+    let log_contents = find_quickshell_runtime_log(&entry_abs)
+        .and_then(|p| fs::read_to_string(&p).ok())
+        .or_else(|| fs::read_to_string(log_file).ok())
+        .unwrap_or_else(|| format!("<no log content for {}>", entry_abs.display()));
     Ok(VerifyResult::Dead {
         log_tail: tail_lines(&log_contents, LOG_TAIL_LINES),
     })
+}
+
+/// Locate the `log.log` quickshell wrote for a specific entry path by scanning
+/// `$XDG_RUNTIME_DIR/quickshell/by-id/*`. Picks the newest log whose content
+/// references the target path — that filter is what keeps us from returning
+/// some other running shell's log if the user has concurrent Quickshells.
+fn find_quickshell_runtime_log(entry_abs: &Path) -> Option<PathBuf> {
+    let runtime = std::env::var_os("XDG_RUNTIME_DIR")?;
+    let by_id = PathBuf::from(runtime).join("quickshell/by-id");
+    find_qs_log_in(&by_id, entry_abs)
+}
+
+fn find_qs_log_in(by_id: &Path, entry_abs: &Path) -> Option<PathBuf> {
+    let target = entry_abs.to_string_lossy().into_owned();
+    let mut best: Option<(SystemTime, PathBuf)> = None;
+    for entry in fs::read_dir(by_id).ok()?.flatten() {
+        let log = entry.path().join("log.log");
+        let Ok(meta) = fs::metadata(&log) else {
+            continue;
+        };
+        let Ok(mtime) = meta.modified() else { continue };
+        let Ok(content) = fs::read_to_string(&log) else {
+            continue;
+        };
+        if !content.contains(&target) {
+            continue;
+        }
+        if best.as_ref().is_none_or(|(t, _)| mtime > *t) {
+            best = Some((mtime, log));
+        }
+    }
+    best.map(|(_, p)| p)
 }
 
 // Hardcoded to `quickshell` (not `qs`): this pattern only verifies a shell *we*
@@ -254,6 +292,45 @@ mod tests {
         let lossy = parse_cmdline(b"\xff\0ok\0");
         assert!(lossy[0].contains('\u{FFFD}'));
         assert_eq!(lossy[1], "ok");
+    }
+
+    #[test]
+    fn find_qs_log_picks_newest_matching_entry_ignores_unrelated() {
+        use std::time::Duration;
+        let tmp = tempfile::tempdir().unwrap();
+        let by_id = tmp.path();
+        let target = Path::new("/some/path/shell.qml");
+
+        // Mkdir helper: write a log.log with given content and bump mtime offset.
+        let write_log = |id: &str, body: &str| {
+            let dir = by_id.join(id);
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join("log.log"), body).unwrap();
+            dir.join("log.log")
+        };
+
+        // Unrelated entry — a different shell, mentions a different path.
+        let _older = write_log("aaa111", "INFO: Launching /other/shell.qml\nERROR: oops");
+        // Older match for our target.
+        let older_match = write_log(
+            "bbb222",
+            "INFO: Launching config: /some/path/shell.qml\nERROR: old run",
+        );
+        // Newer match for our target — should win.
+        std::thread::sleep(Duration::from_millis(20));
+        let newer_match = write_log(
+            "ccc333",
+            "INFO: Launching config: /some/path/shell.qml\nERROR: new run",
+        );
+
+        let found = find_qs_log_in(by_id, target).expect("should find a match");
+        assert_eq!(found, newer_match);
+        // Older match exists but isn't picked.
+        assert!(older_match.is_file());
+
+        // No match when no log mentions the target.
+        let unrelated_target = Path::new("/nowhere/shell.qml");
+        assert!(find_qs_log_in(by_id, unrelated_target).is_none());
     }
 
     #[test]

@@ -321,7 +321,7 @@ fn wet_pipeline<W: Write>(
     step(events, Step::Launch, StepState::Done)?;
 
     step(events, Step::Verify, StepState::Start)?;
-    match process::verify(entry_rel, log_file)? {
+    match process::verify(rice_dir, entry_rel, log_file)? {
         VerifyResult::Ok => {
             step(events, Step::Verify, StepState::Done)?;
             Ok(true)
