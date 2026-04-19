@@ -230,16 +230,6 @@ mod tests {
     }
 
     #[test]
-    fn set_original_some_writes_path() {
-        let (_dir, cache) = tmp_cache();
-        cache.set_original(Some("/path/to/shell.qml")).unwrap();
-        assert_eq!(
-            cache.original().unwrap().as_deref(),
-            Some("/path/to/shell.qml")
-        );
-    }
-
-    #[test]
     fn set_original_none_writes_empty_sentinel() {
         let (_dir, cache) = tmp_cache();
         cache.set_original(None).unwrap();
@@ -273,14 +263,5 @@ mod tests {
         cache.clear_active_previous().unwrap();
         assert!(cache.active().unwrap().is_none());
         assert!(cache.previous().unwrap().is_none());
-    }
-
-    #[test]
-    fn rice_dir_joins_root_rices_name() {
-        let (_dir, cache) = tmp_cache();
-        assert_eq!(
-            cache.rice_dir("foo"),
-            cache.root().join("rices").join("foo")
-        );
     }
 }

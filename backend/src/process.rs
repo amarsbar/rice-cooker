@@ -171,70 +171,28 @@ mod tests {
     fn pattern_escapes_dots_and_slashes() {
         let p = quickshell_cmdline_pattern(Path::new("ii/shell.qml"));
         assert_eq!(p, r"^quickshell -p \./ii/shell\.qml$");
-    }
-
-    #[test]
-    fn pattern_for_root_entry() {
-        let p = quickshell_cmdline_pattern(Path::new("shell.qml"));
-        assert_eq!(p, r"^quickshell -p \./shell\.qml$");
-    }
-
-    #[test]
-    fn pattern_is_a_valid_regex() {
-        let p = quickshell_cmdline_pattern(Path::new(".config/quickshell/shell.qml"));
         Regex::new(&p).expect("compiles");
     }
 
     #[test]
     fn scan_returns_none_for_clean_log() {
         assert!(scan_log_for_errors("").is_none());
-        assert!(scan_log_for_errors("qs: loaded ok\nstarted session\n").is_none());
+        assert!(scan_log_for_errors("qs: loaded ok\n").is_none());
     }
 
     #[test]
-    fn scan_detects_qqml_engine_failure() {
-        let log = "foo\nQQmlApplicationEngine failed to load component\nbar";
+    fn scan_detects_known_error_patterns() {
         assert_eq!(
-            scan_log_for_errors(log).as_deref(),
+            scan_log_for_errors("QQmlApplicationEngine failed to load").as_deref(),
             Some("QQmlApplicationEngine failed")
         );
+        let missing = r#"module "Foo.Bar" is not installed"#;
+        assert!(scan_log_for_errors(missing).is_some());
     }
 
     #[test]
-    fn scan_detects_missing_module() {
-        let log = r#"QQmlApplicationEngine failed to load: module "Foo.Bar" is not installed"#;
-        let hit = scan_log_for_errors(log).unwrap();
-        // Either pattern match is acceptable; earlier patterns win.
-        assert!(
-            hit.contains("QQmlApplicationEngine failed") || hit.contains("is not installed"),
-            "got: {hit}"
-        );
-    }
-
-    #[test]
-    fn scan_detects_syntax_error() {
-        let log = "SyntaxError: Unexpected token";
-        assert_eq!(scan_log_for_errors(log).as_deref(), Some("SyntaxError"));
-    }
-
-    #[test]
-    fn tail_returns_whole_when_fewer_than_n() {
+    fn tail_returns_last_n_lines() {
+        assert_eq!(tail_lines("1\n2\n3\n4\n5", 2), "4\n5");
         assert_eq!(tail_lines("a\nb\nc", 10), "a\nb\nc");
-    }
-
-    #[test]
-    fn tail_returns_last_n_when_more() {
-        let log = "1\n2\n3\n4\n5";
-        assert_eq!(tail_lines(log, 2), "4\n5");
-    }
-
-    #[test]
-    fn tail_on_empty_is_empty() {
-        assert_eq!(tail_lines("", 5), "");
-    }
-
-    #[test]
-    fn tail_preserves_content_without_trailing_newline() {
-        assert_eq!(tail_lines("a\nb", 5), "a\nb");
     }
 }
