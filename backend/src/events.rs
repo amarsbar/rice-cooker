@@ -57,8 +57,6 @@ fn is_false(b: &bool) -> bool {
 pub enum Step {
     Preflight,
     Clone,
-    Entry,
-    Precheck,
     Notifiers,
     KillQuickshell,
     Launch,

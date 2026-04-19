@@ -86,19 +86,14 @@ pub fn clone_or_update(repo_url: &str, dest: &Path, log_file: &Path) -> anyhow::
     Ok(())
 }
 
-// Preconfigured `git` invocation with hardening env + config:
-// - GIT_TERMINAL_PROMPT=0 / GIT_ASKPASS=/bin/false keep git from blocking on a
-//   credential prompt when spawned from a GUI with no attached terminal.
-// - DISPLAY="" suppresses ssh's ASKPASS mechanism (ssh only invokes SSH_ASKPASS
-//   when DISPLAY is set), so an unset DISPLAY alone is sufficient.
-// - `-c protocol.ext.allow=never` forbids the `ext::` protocol (arbitrary-
-//   command RCE) even if a submodule or remote helper tries to reach for it.
+// Preconfigured `git` invocation. `-c protocol.ext.allow=never` forbids the `ext::`
+// protocol (arbitrary-command RCE) — cheap defense-in-depth in case a curated entry
+// or upstream rename ever sneaks one in. The terminal/askpass env guards were
+// dropped when the backend moved to a curated-URL world: public rice repos won't
+// prompt for credentials.
 fn git_cmd() -> Command {
     let mut cmd = Command::new("git");
-    cmd.args(["-c", "protocol.ext.allow=never"])
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .env("GIT_ASKPASS", "/bin/false")
-        .env("DISPLAY", "");
+    cmd.args(["-c", "protocol.ext.allow=never"]);
     cmd
 }
 
