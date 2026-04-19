@@ -14,12 +14,15 @@ const KILL_WAIT_MS: u64 = 500;
 const VERIFY_WAIT_MS: u64 = 300;
 const LOG_TAIL_LINES: usize = 20;
 
+// Ordered most-specific-first: scan_log_for_errors returns the first match, so the more
+// diagnostic patterns (e.g. the exact missing module name) should win over generic ones
+// like "QQmlApplicationEngine failed" that often accompany them on the same log.
 const ERROR_PATTERNS: &[&str] = &[
-    r"QQmlApplicationEngine failed",
-    r#"module ".*" is not installed"#,
+    r#"module "[^"]*" is not installed"#,
     r"Cannot assign to non-existent property",
     r"Component is not ready",
-    r"SyntaxError",
+    r"\bSyntaxError\b",
+    r"QQmlApplicationEngine failed",
 ];
 
 pub fn kill_notif_daemons() -> Result<()> {
@@ -70,13 +73,26 @@ fn run_pkill(args: &[&str]) -> Result<()> {
 }
 
 fn quickshell_running() -> Result<bool> {
-    let out = Command::new("pgrep")
-        .args(["-f", "^quickshell"])
+    pgrep_matches(&["-f", "^quickshell"])
+}
+
+// pgrep exit codes: 0 = matches found, 1 = no matches, 2 = syntax, 3 = fatal.
+// Match the same discipline as run_pkill: conflating 2/3 with 1 (no-match) would
+// silently let a broken pgrep invocation report "not running" and bypass the
+// post-SIGKILL re-verify.
+fn pgrep_matches(args: &[&str]) -> Result<bool> {
+    let status = Command::new("pgrep")
+        .args(args)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
         .context("spawning pgrep")?;
-    Ok(out.success())
+    match status.code() {
+        Some(0) => Ok(true),
+        Some(1) => Ok(false),
+        Some(c) => Err(anyhow!("pgrep {:?} failed with exit code {}", args, c)),
+        None => Err(anyhow!("pgrep {:?} terminated by signal", args)),
+    }
 }
 
 pub fn launch_detached(rice_dir: &Path, entry_rel: &Path, log_file: &Path) -> Result<()> {
@@ -110,13 +126,7 @@ pub enum VerifyResult {
 pub fn verify(entry_rel: &Path, log_file: &Path) -> Result<VerifyResult> {
     thread::sleep(Duration::from_millis(VERIFY_WAIT_MS));
     let pat = quickshell_cmdline_pattern(entry_rel);
-    let alive = Command::new("pgrep")
-        .args(["-xf", &pat])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .context("spawning pgrep for verify")?
-        .success();
+    let alive = pgrep_matches(&["-xf", &pat])?;
     // Surfacing log-read failures matters here: verify's whole job is diagnosis.
     // If we silently fell back to "", a missing-log bug would masquerade as a healthy shell.
     let log_contents = match fs::read_to_string(log_file) {

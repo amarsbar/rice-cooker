@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Parse the null-separated argv bytes of /proc/<pid>/cmdline into owned Strings.
 /// Trailing NUL is tolerated (Linux appends one). Empty input returns an empty Vec.
@@ -16,10 +16,10 @@ pub fn parse_cmdline(bytes: &[u8]) -> Vec<String> {
 }
 
 /// Given argv (including argv[0]), find the value after `-p` or `-c` (whichever appears first).
+/// Skips argv[0] so a binary pathologically named `-p` can't be mistaken for a flag.
 /// Returns None if neither flag is present or no value follows.
-/// Supports `-p foo`, `-c bar`. Does NOT need to support `-p=foo`.
 pub fn extract_entry_arg(argv: &[String]) -> Option<String> {
-    let mut iter = argv.iter();
+    let mut iter = argv.iter().skip(1);
     while let Some(arg) = iter.next() {
         if arg == "-p" || arg == "-c" {
             return iter.next().cloned();
@@ -31,19 +31,24 @@ pub fn extract_entry_arg(argv: &[String]) -> Option<String> {
 pub struct QuickshellProc {
     pub pid: i32,
     pub cmdline: Vec<String>,
+    /// The process's cwd at scan time (resolved from /proc/<pid>/cwd). Used to
+    /// resolve relative `-p` paths back to an absolute path when stamping `original`.
+    pub cwd: Option<PathBuf>,
 }
 
-/// Scan /proc for the first running process whose argv[0] basename is exactly "quickshell".
-/// Returns Ok(None) if no such process exists. Returns Err only on unexpected IO errors
-/// (missing /proc, permission denied at top level); transient errors on individual pid
-/// subdirectories (process exited mid-scan, etc.) must be silently skipped.
+/// Scan /proc for the first running process owned by the current UID whose argv[0]
+/// basename is exactly "quickshell". Owner-filtering matters on shared hosts:
+/// picking up another user's qs and stamping their `-p` path into our `original`
+/// file would cause `exit` to later try to launch their session.
 pub fn find_running_quickshell() -> anyhow::Result<Option<QuickshellProc>> {
+    let our_uid = unsafe { libc::getuid() };
     let proc_dir = std::fs::read_dir("/proc")?;
     for entry in proc_dir {
-        let entry = entry?;
+        // Iterator errors on /proc itself are transient (entry vanishing mid-scan);
+        // skip rather than aborting the whole scan.
+        let Ok(entry) = entry else { continue };
         let name = entry.file_name();
         let name_str = name.to_string_lossy();
-        // Only consider entries whose name is all digits (i.e. PID directories).
         if !name_str.chars().all(|c| c.is_ascii_digit()) {
             continue;
         }
@@ -51,10 +56,13 @@ pub fn find_running_quickshell() -> anyhow::Result<Option<QuickshellProc>> {
             Ok(p) => p,
             Err(_) => continue,
         };
+        if !owned_by_uid(pid, our_uid) {
+            continue;
+        }
         let cmdline_path = format!("/proc/{}/cmdline", pid);
         let bytes = match std::fs::read(&cmdline_path) {
             Ok(b) => b,
-            Err(_) => continue, // process exited mid-scan or we lack permission
+            Err(_) => continue,
         };
         let argv = parse_cmdline(&bytes);
         if argv.is_empty() {
@@ -65,10 +73,34 @@ pub fn find_running_quickshell() -> anyhow::Result<Option<QuickshellProc>> {
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_default();
         if argv0_basename == "quickshell" {
-            return Ok(Some(QuickshellProc { pid, cmdline: argv }));
+            let cwd = std::fs::read_link(format!("/proc/{pid}/cwd")).ok();
+            return Ok(Some(QuickshellProc {
+                pid,
+                cmdline: argv,
+                cwd,
+            }));
         }
     }
     Ok(None)
+}
+
+fn owned_by_uid(pid: i32, uid: libc::uid_t) -> bool {
+    let status = match std::fs::read_to_string(format!("/proc/{pid}/status")) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    for line in status.lines() {
+        if let Some(rest) = line.strip_prefix("Uid:") {
+            // Uid: <real> <eff> <saved> <fs>  — first field is what we want.
+            if let Some(real) = rest.split_whitespace().next() {
+                return real
+                    .parse::<libc::uid_t>()
+                    .map(|u| u == uid)
+                    .unwrap_or(false);
+            }
+        }
+    }
+    false
 }
 
 #[cfg(test)]

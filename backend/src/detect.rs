@@ -32,6 +32,13 @@ fn import_regex() -> &'static Regex {
     RE.get_or_init(|| Regex::new(r"^\s*import\s+([A-Z][A-Za-z0-9_.]*)").unwrap())
 }
 
+fn block_comment_regex() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    // (?s) makes . match newlines so `/* ... */` spanning lines is stripped.
+    // Non-greedy `.*?` so consecutive block comments don't fuse into one match.
+    RE.get_or_init(|| Regex::new(r"(?s)/\*.*?\*/").unwrap())
+}
+
 pub fn detect_missing_plugins(rice_root: &Path) -> Result<Vec<String>> {
     let local = local_first_segments(rice_root)?;
     let re = import_regex();
@@ -46,9 +53,10 @@ pub fn detect_missing_plugins(rice_root: &Path) -> Result<Vec<String>> {
         if entry.path().extension().and_then(|e| e.to_str()) != Some("qml") {
             continue;
         }
-        let contents = fs::read_to_string(entry.path())
+        let raw = fs::read_to_string(entry.path())
             .with_context(|| format!("reading {}", entry.path().display()))?;
-        for line in contents.lines() {
+        let stripped = strip_qml_comments(&raw);
+        for line in stripped.lines() {
             if let Some(caps) = re.captures(line) {
                 let dotted = &caps[1];
                 let first = dotted.split('.').next().unwrap_or(dotted);
@@ -61,6 +69,21 @@ pub fn detect_missing_plugins(rice_root: &Path) -> Result<Vec<String>> {
     }
 
     Ok(missing.into_iter().collect())
+}
+
+/// Strip QML/JS-style block and line comments so an `import` inside a comment
+/// isn't mistaken for a real plugin dependency. This is best-effort (doesn't
+/// understand strings), but it fixes the common multi-line comment case.
+fn strip_qml_comments(source: &str) -> String {
+    let without_blocks = block_comment_regex().replace_all(source, "");
+    without_blocks
+        .lines()
+        .map(|line| match line.find("//") {
+            Some(i) => &line[..i],
+            None => line,
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn local_first_segments(rice_root: &Path) -> Result<BTreeSet<String>> {

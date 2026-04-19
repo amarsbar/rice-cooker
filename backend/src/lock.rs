@@ -1,7 +1,7 @@
 use std::fs::{File, OpenOptions};
 use std::path::Path;
 
-use fs2::FileExt;
+use fs4::fs_std::FileExt;
 
 /// A process-held exclusive lock tied to a lockfile path.
 /// Dropping the `ApplyLock` releases the lock. The lockfile itself persists on disk;
@@ -65,21 +65,11 @@ impl ApplyLock {
             .truncate(false)
             .open(path)?;
 
+        // fs4 returns Ok(true) on acquired, Ok(false) on contention, Err on real IO failure.
         match file.try_lock_exclusive() {
-            Ok(()) => Ok(ApplyLock { file }),
-            Err(e) => {
-                if e.kind() == std::io::ErrorKind::WouldBlock {
-                    return Err(LockError::AlreadyHeld);
-                }
-                // On Linux EWOULDBLOCK == EAGAIN == 11; cover both regardless of
-                // what ErrorKind fs2 surfaces on a given platform/version.
-                if let Some(raw) = e.raw_os_error() {
-                    if raw == libc::EWOULDBLOCK || raw == libc::EAGAIN {
-                        return Err(LockError::AlreadyHeld);
-                    }
-                }
-                Err(LockError::Io(e))
-            }
+            Ok(true) => Ok(ApplyLock { file }),
+            Ok(false) => Err(LockError::AlreadyHeld),
+            Err(e) => Err(LockError::Io(e)),
         }
     }
 }

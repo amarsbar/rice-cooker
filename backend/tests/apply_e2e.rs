@@ -147,6 +147,7 @@ fn apply_no_shell_qml_reports_entry_failure() {
     let last = last_event(&events);
     assert_eq!(last["type"], "fail");
     assert_eq!(last["stage"], "entry");
+    assert_eq!(last["reason"], "no_shell_qml");
 }
 
 #[test]
@@ -393,13 +394,34 @@ fn apply_rejects_dash_prefixed_repo_url() {
 }
 
 #[test]
+fn apply_sigkill_fallback_fails_cleanly_if_qs_stays_alive() {
+    // Simulate the rare case where both TERM and KILL fail to reap quickshell.
+    // FAKE_QS_KILL_ALIVE=1 makes the fake pgrep return "alive" for the broad
+    // check, so kill_quickshell's post-SIGKILL re-verify should detect that
+    // qs is still running and emit a kill_quickshell fail event.
+    let h = Harness::new();
+    h.with_rice_file("shell.qml", HAPPY_SHELL_QML);
+    let out = h
+        .bin()
+        .args(["apply", "--name", "x", "--repo", "https://example/x.git"])
+        .env("FAKE_QS_KILL_ALIVE", "1")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let events = parse_ndjson(&out.stdout);
+    let last = last_event(&events);
+    assert_eq!(last["type"], "fail");
+    assert_eq!(last["stage"], "kill_quickshell");
+}
+
+#[test]
 fn second_concurrent_apply_errors_lock_held() {
     let h = Harness::new();
     h.with_rice_file("shell.qml", HAPPY_SHELL_QML);
     std::fs::create_dir_all(&h.cache_dir).unwrap();
     let lock_path = h.cache_dir.join("apply.lock");
-    // Hold the lock via fs2 directly, then invoke apply.
-    use fs2::FileExt;
+    // Hold the lock via fs4 directly, then invoke apply.
+    use fs4::fs_std::FileExt;
     let f = std::fs::File::create(&lock_path).unwrap();
     f.try_lock_exclusive().unwrap();
 
@@ -409,7 +431,7 @@ fn second_concurrent_apply_errors_lock_held() {
         .output()
         .unwrap();
     // Clean up
-    let _ = fs2::FileExt::unlock(&f);
+    let _ = fs4::fs_std::FileExt::unlock(&f);
 
     assert_eq!(out.status.code(), Some(1));
     let events = parse_ndjson(&out.stdout);

@@ -97,6 +97,13 @@ pub fn run_apply<W: Write>(
     if let Some(p) = &prior {
         if p != params.name {
             if let Err(e) = cache.set_previous(p) {
+                // Roll back active so state stays coherent: if set_previous fails,
+                // revert to the prior active value so a subsequent revert doesn't
+                // swap to a stale or absent "previous".
+                let _ = match &prior {
+                    Some(v) => cache.set_active(v),
+                    None => cache.clear_active_previous(),
+                };
                 emit_fail(events, "commit", &format!("set_previous: {e}"), None, None)?;
                 return Ok(false);
             }
@@ -110,7 +117,9 @@ pub fn run_apply<W: Write>(
     Ok(true)
 }
 
-/// Rejects names that would break out of the rice cache or trip git argv parsing.
+/// Rejects names that would break out of the rice cache, trip git argv parsing,
+/// or corrupt the single-line cache state files (which only strip trailing newlines
+/// on read — a name containing `\n` would round-trip differently).
 fn validate_rice_name(name: &str) -> std::result::Result<(), &'static str> {
     if name.is_empty() {
         return Err("empty_name");
@@ -129,6 +138,9 @@ fn validate_rice_name(name: &str) -> std::result::Result<(), &'static str> {
     }
     if name.chars().any(|c| matches!(c, '/' | '\\' | '\0')) {
         return Err("invalid_char");
+    }
+    if name.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return Err("invalid_whitespace_or_control");
     }
     Ok(())
 }
@@ -172,8 +184,20 @@ pub fn run_revert<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Resul
         emit_fail(events, "commit", &format!("swap: {e}"), None, None)?;
         return Ok(false);
     }
-    let active = cache.active()?;
-    let previous = cache.previous()?;
+    let active = match cache.active() {
+        Ok(a) => a,
+        Err(e) => {
+            emit_fail(events, "commit", &format!("read_active: {e}"), None, None)?;
+            return Ok(false);
+        }
+    };
+    let previous = match cache.previous() {
+        Ok(p) => p,
+        Err(e) => {
+            emit_fail(events, "commit", &format!("read_previous: {e}"), None, None)?;
+            return Ok(false);
+        }
+    };
     events.emit(&Event::Success {
         active,
         previous,
@@ -191,10 +215,19 @@ pub fn run_exit<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<
     };
 
     step(events, Step::KillQuickshell, StepState::Start)?;
-    process::kill_quickshell()?;
+    if let Err(e) = process::kill_quickshell() {
+        emit_fail(events, "kill_quickshell", &format!("{e}"), None, None)?;
+        return Ok(false);
+    }
     step(events, Step::KillQuickshell, StepState::Done)?;
 
-    let original = cache.original()?;
+    let original = match cache.original() {
+        Ok(o) => o,
+        Err(e) => {
+            emit_fail(events, "commit", &format!("read_original: {e}"), None, None)?;
+            return Ok(false);
+        }
+    };
     if let Some(entry_path) = original {
         let entry_pb = PathBuf::from(&entry_path);
         let (rice_dir, entry_rel) = split_launch_path(&entry_pb);
@@ -208,7 +241,10 @@ pub fn run_exit<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<
         step(events, Step::Launch, StepState::Done)?;
     }
 
-    cache.clear_active_previous()?;
+    if let Err(e) = cache.clear_active_previous() {
+        emit_fail(events, "commit", &format!("clear: {e}"), None, None)?;
+        return Ok(false);
+    }
     events.emit(&Event::Success {
         active: None,
         previous: None,
@@ -274,7 +310,16 @@ fn preflight<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<boo
         return Ok(false);
     }
     if !cache.original_is_recorded() {
-        record_original(cache)?;
+        if let Err(e) = record_original(cache) {
+            emit_fail(
+                events,
+                "preflight",
+                &format!("record_original: {e}"),
+                None,
+                None,
+            )?;
+            return Ok(false);
+        }
     }
     step(events, Step::Preflight, StepState::Done)?;
     Ok(true)
@@ -284,7 +329,20 @@ fn record_original(cache: &Cache) -> Result<()> {
     match find_running_quickshell()? {
         Some(proc) => {
             let entry = extract_entry_arg(&proc.cmdline);
-            cache.set_original(entry.as_deref())?;
+            // If the recorded entry is a relative path, resolve it against the process's
+            // cwd at scan time so later `exit` can relaunch from the right directory.
+            // Bare names (e.g. from `-c mybar`) stay as-is — they aren't paths.
+            let resolved = entry.map(|e| {
+                let p = PathBuf::from(&e);
+                if p.is_absolute() || !e.contains('/') {
+                    e
+                } else if let Some(cwd) = &proc.cwd {
+                    cwd.join(&p).to_string_lossy().into_owned()
+                } else {
+                    e
+                }
+            });
+            cache.set_original(resolved.as_deref())?;
         }
         None => cache.set_original(None)?,
     }
@@ -323,11 +381,17 @@ fn wet_pipeline<W: Write>(
     events: &mut EventWriter<W>,
 ) -> Result<bool> {
     step(events, Step::Notifiers, StepState::Start)?;
-    process::kill_notif_daemons()?;
+    if let Err(e) = process::kill_notif_daemons() {
+        emit_fail(events, "notifiers", &format!("{e}"), None, None)?;
+        return Ok(false);
+    }
     step(events, Step::Notifiers, StepState::Done)?;
 
     step(events, Step::KillQuickshell, StepState::Start)?;
-    process::kill_quickshell()?;
+    if let Err(e) = process::kill_quickshell() {
+        emit_fail(events, "kill_quickshell", &format!("{e}"), None, None)?;
+        return Ok(false);
+    }
     step(events, Step::KillQuickshell, StepState::Done)?;
 
     step(events, Step::Launch, StepState::Start)?;
@@ -391,5 +455,50 @@ mod tests {
         let (dir, name) = split_launch_path(Path::new("shell.qml"));
         assert_eq!(dir, PathBuf::from("."));
         assert_eq!(name, PathBuf::from("shell.qml"));
+    }
+
+    #[test]
+    fn validate_rice_name_rejects_every_bad_class() {
+        // Table-drive the full reject list. Guards the contract against silent
+        // collapse during refactors.
+        let cases: &[(&str, &str)] = &[
+            ("", "empty_name"),
+            (".", "reserved_name"),
+            ("..", "reserved_name"),
+            ("-foo", "leading_dash"),
+            (".hidden", "leading_dot"),
+            ("a/b", "invalid_char"),
+            ("a\\b", "invalid_char"),
+            ("a\0b", "invalid_char"),
+            ("with space", "invalid_whitespace_or_control"),
+            ("with\ttab", "invalid_whitespace_or_control"),
+            ("with\nnewline", "invalid_whitespace_or_control"),
+            ("with\rcr", "invalid_whitespace_or_control"),
+            ("with\x07bell", "invalid_whitespace_or_control"),
+        ];
+        for (name, expected) in cases {
+            assert_eq!(
+                validate_rice_name(name),
+                Err(*expected),
+                "wrong reject for {name:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn validate_rice_name_accepts_typical_names() {
+        for name in ["caelestia", "noctalia-2", "rice_v1", "Foo.Bar", "a1b2c3"] {
+            assert_eq!(
+                validate_rice_name(name),
+                Ok(()),
+                "unexpectedly rejected {name:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn validate_rice_name_rejects_too_long() {
+        let long = "a".repeat(65);
+        assert_eq!(validate_rice_name(&long), Err("name_too_long"));
     }
 }
