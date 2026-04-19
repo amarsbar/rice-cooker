@@ -88,8 +88,10 @@ impl Cache {
     pub fn clear_active_previous(&self) -> Result<()> {
         for name in ["active", "previous"] {
             let p = self.root.join(name);
-            if p.exists() {
-                fs::remove_file(&p).with_context(|| format!("removing {}", p.display()))?;
+            match fs::remove_file(&p) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(e).with_context(|| format!("removing {}", p.display())),
             }
         }
         Ok(())
@@ -112,7 +114,18 @@ fn read_line_file(path: &Path) -> Result<Option<String>> {
 }
 
 fn write_line_file(path: &Path, contents: &str) -> Result<()> {
-    let tmp = path.with_extension("tmp");
+    // Append `.tmp` to the full filename instead of replacing the extension —
+    // `with_extension("tmp")` would turn `foo.bar` into `foo.tmp`, a potential collision.
+    let tmp = {
+        let parent = path.parent().unwrap_or(Path::new("."));
+        let name = path
+            .file_name()
+            .map(|n| n.to_os_string())
+            .unwrap_or_default();
+        let mut tmp_name = name;
+        tmp_name.push(".tmp");
+        parent.join(tmp_name)
+    };
     if let Err(e) = fs::write(&tmp, format!("{contents}\n")) {
         let _ = fs::remove_file(&tmp);
         return Err(e).with_context(|| format!("writing {}", tmp.display()));

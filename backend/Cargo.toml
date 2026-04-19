@@ -15,7 +15,7 @@ path = "src/lib.rs"
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
-fs2 = "0.4"
+fs4 = "0.13"
 libc = "0.2"
 regex = "1"
 serde = { version = "1", features = ["derive"] }

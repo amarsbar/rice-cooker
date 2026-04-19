@@ -21,14 +21,18 @@ pub fn preflight() -> anyhow::Result<()> {
 }
 
 pub fn clone_or_update(repo_url: &str, dest: &Path, log_file: &Path) -> anyhow::Result<()> {
-    // Reject URLs starting with `-` up front: even with `--` guarding below, surfacing the
-    // error as our own message is clearer than whatever git would emit.
+    // Reject URLs starting with `-` up front: even with `--` guarding below, our own message
+    // is clearer than whatever git would emit. Also reject `ext::` explicitly — that protocol
+    // lets the URL specify an arbitrary command to run, which is a well-known RCE vector.
     if repo_url.starts_with('-') {
         anyhow::bail!("refusing repo URL starting with '-': {}", repo_url);
     }
+    if repo_url.starts_with("ext::") {
+        anyhow::bail!("refusing ext:: repo URL: {}", repo_url);
+    }
 
     if dest.join(".git").exists() {
-        let fetch_status = Command::new("git")
+        let fetch_status = git_cmd()
             .args(["-C"])
             .arg(dest)
             .args(["fetch", "--depth", "1", "origin", "HEAD"])
@@ -39,7 +43,7 @@ pub fn clone_or_update(repo_url: &str, dest: &Path, log_file: &Path) -> anyhow::
             anyhow::bail!("git fetch failed with exit code {:?}", fetch_status.code());
         }
 
-        let reset_status = Command::new("git")
+        let reset_status = git_cmd()
             .args(["-C"])
             .arg(dest)
             .args(["reset", "--hard", "FETCH_HEAD"])
@@ -57,7 +61,7 @@ pub fn clone_or_update(repo_url: &str, dest: &Path, log_file: &Path) -> anyhow::
         // `--` separates options from positional arguments; without it, a repo URL starting
         // with `-` (e.g. `--upload-pack=...`) would be interpreted as a git option — a
         // known RCE vector for git wrappers.
-        let clone_status = Command::new("git")
+        let clone_status = git_cmd()
             .args(["clone", "--depth", "1", "--", repo_url])
             .arg(dest)
             .stderr(open_log(log_file)?)
@@ -69,6 +73,22 @@ pub fn clone_or_update(repo_url: &str, dest: &Path, log_file: &Path) -> anyhow::
     }
 
     Ok(())
+}
+
+// Preconfigured `git` invocation with hardening env + config:
+// - GIT_TERMINAL_PROMPT=0 / GIT_ASKPASS=/bin/false keep git from blocking on a credential
+//   prompt when the caller is spawned from a GUI with no attached terminal.
+// - SSH_ASKPASS=/bin/false + DISPLAY="" do the same for the ssh transport.
+// - `-c protocol.ext.allow=never` forbids the `ext::` protocol even if some submodule or
+//   remote helper tries to sneak it past the URL-prefix check above.
+fn git_cmd() -> Command {
+    let mut cmd = Command::new("git");
+    cmd.args(["-c", "protocol.ext.allow=never"])
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_ASKPASS", "/bin/false")
+        .env("SSH_ASKPASS", "/bin/false")
+        .env("DISPLAY", "");
+    cmd
 }
 
 fn open_log(log_file: &Path) -> anyhow::Result<fs::File> {

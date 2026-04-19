@@ -8,24 +8,27 @@ use tempfile::TempDir;
 
 pub const FAKE_GIT: &str = r#"#!/bin/sh
 printf 'git %s\n' "$*" >> "$FAKE_LOG"
-# git --version (used by preflight)
-case "$1" in
-    --version) echo "git version fake 1.0.0"; exit 0 ;;
-esac
-# git -C <dir> <subcmd>
-case "$1" in
-    -C)
-        shift 2
-        ;;
-esac
+# Strip leading top-level options that real git accepts before the subcommand:
+# -c KEY=VAL, -C DIR, --version, --exec-path=...
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --version) echo "git version fake 1.0.0"; exit 0 ;;
+        -c) shift 2 ;;
+        -C) shift 2 ;;
+        --exec-path=*|--git-dir=*) shift ;;
+        *) break ;;
+    esac
+done
 case "$1" in
     clone)
-        # clone --depth 1 URL DEST
+        # clone [flags...] [--] URL DEST
+        shift
         DEST=""
+        URL_SEEN=""
         while [ $# -gt 0 ]; do
             case "$1" in
                 --depth) shift 2 ;;
-                clone) shift ;;
+                --) shift ;;
                 -*) shift ;;
                 *)
                     if [ -z "$URL_SEEN" ]; then URL_SEEN=1; shift
