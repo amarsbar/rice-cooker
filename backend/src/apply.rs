@@ -27,6 +27,37 @@ fn find_shell_qml(rice_root: &Path) -> Result<Option<PathBuf>> {
     Ok(None)
 }
 
+/// Turn a `Result<T, E>` into its Ok value, or emit a stage fail event and early-return
+/// `Ok(false)` from the enclosing function. Collapses the "step X failed, report it
+/// and bail cleanly" boilerplate that otherwise repeats at every pipeline gate.
+macro_rules! try_stage {
+    ($events:expr, $stage:literal, $expr:expr $(,)?) => {
+        match $expr {
+            Ok(v) => v,
+            Err(e) => {
+                emit_fail($events, $stage, &format!("{e}"), None, None)?;
+                return Ok(false);
+            }
+        }
+    };
+    // With a prefix: useful when multiple sites share a stage but want distinct reasons.
+    ($events:expr, $stage:literal, $reason_prefix:literal, $expr:expr $(,)?) => {
+        match $expr {
+            Ok(v) => v,
+            Err(e) => {
+                emit_fail(
+                    $events,
+                    $stage,
+                    &format!("{}: {}", $reason_prefix, e),
+                    None,
+                    None,
+                )?;
+                return Ok(false);
+            }
+        }
+    };
+}
+
 pub struct ApplyParams<'a> {
     pub name: &'a str,
     pub repo: &'a str,
@@ -53,10 +84,7 @@ pub fn run_apply<W: Write>(
         return Ok(false);
     }
 
-    if let Err(e) = cache.ensure_dirs() {
-        emit_fail(events, "init", &format!("{e}"), None, None)?;
-        return Ok(false);
-    }
+    try_stage!(events, "init", cache.ensure_dirs());
     let _lock = match acquire_lock(cache, events)? {
         Some(l) => l,
         None => return Ok(false),
@@ -97,20 +125,16 @@ pub fn run_apply<W: Write>(
         return Ok(false);
     }
 
-    // Post-verify: shell is running the new rice. If a cache write fails here the user
-    // shouldn't see exit-code-2 without a fail event — the UI has already been told the
-    // pipeline succeeded through step/verify/done. Translate to a commit-stage fail.
-    let prior = match cache.active() {
-        Ok(p) => p,
-        Err(e) => {
-            emit_fail(events, "commit", &format!("read_active: {e}"), None, None)?;
-            return Ok(false);
-        }
-    };
-    if let Err(e) = cache.set_active(params.name) {
-        emit_fail(events, "commit", &format!("set_active: {e}"), None, None)?;
-        return Ok(false);
-    }
+    // Post-verify: shell is running the new rice. A cache write failure here must
+    // still emit a fail event — the UI has already been told the pipeline succeeded
+    // through step/verify/done; exit-code-2 without an event breaks the contract.
+    let prior = try_stage!(events, "commit", "read_active", cache.active());
+    try_stage!(
+        events,
+        "commit",
+        "set_active",
+        cache.set_active(params.name)
+    );
     if let Some(p) = &prior {
         if p != params.name {
             if let Err(e) = cache.set_previous(p) {
@@ -150,10 +174,7 @@ fn validate_rice_name(name: &str) -> std::result::Result<(), &'static str> {
 
 pub fn run_revert<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<bool> {
     hello(events, "revert")?;
-    if let Err(e) = cache.ensure_dirs() {
-        emit_fail(events, "init", &format!("{e}"), None, None)?;
-        return Ok(false);
-    }
+    try_stage!(events, "init", cache.ensure_dirs());
     let _lock = match acquire_lock(cache, events)? {
         Some(l) => l,
         None => return Ok(false),
@@ -163,14 +184,10 @@ pub fn run_revert<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Resul
         return Ok(false);
     }
 
-    let previous_name = match cache.previous() {
-        Ok(Some(n)) => n,
-        Ok(None) => {
+    let previous_name = match try_stage!(events, "revert", "read_previous", cache.previous()) {
+        Some(n) => n,
+        None => {
             emit_fail(events, "revert", "no_previous", None, None)?;
-            return Ok(false);
-        }
-        Err(e) => {
-            emit_fail(events, "revert", &format!("read_previous: {e}"), None, None)?;
             return Ok(false);
         }
     };
@@ -193,24 +210,9 @@ pub fn run_revert<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Resul
         return Ok(false);
     }
 
-    if let Err(e) = cache.swap_active_previous() {
-        emit_fail(events, "commit", &format!("swap: {e}"), None, None)?;
-        return Ok(false);
-    }
-    let active = match cache.active() {
-        Ok(a) => a,
-        Err(e) => {
-            emit_fail(events, "commit", &format!("read_active: {e}"), None, None)?;
-            return Ok(false);
-        }
-    };
-    let previous = match cache.previous() {
-        Ok(p) => p,
-        Err(e) => {
-            emit_fail(events, "commit", &format!("read_previous: {e}"), None, None)?;
-            return Ok(false);
-        }
-    };
+    try_stage!(events, "commit", "swap", cache.swap_active_previous());
+    let active = try_stage!(events, "commit", "read_active", cache.active());
+    let previous = try_stage!(events, "commit", "read_previous", cache.previous());
     events.emit(&Event::Success {
         active,
         previous,
@@ -221,29 +223,17 @@ pub fn run_revert<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Resul
 
 pub fn run_exit<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<bool> {
     hello(events, "exit")?;
-    if let Err(e) = cache.ensure_dirs() {
-        emit_fail(events, "init", &format!("{e}"), None, None)?;
-        return Ok(false);
-    }
+    try_stage!(events, "init", cache.ensure_dirs());
     let _lock = match acquire_lock(cache, events)? {
         Some(l) => l,
         None => return Ok(false),
     };
 
     step(events, Step::KillQuickshell, StepState::Start)?;
-    if let Err(e) = process::kill_quickshell() {
-        emit_fail(events, "kill_quickshell", &format!("{e}"), None, None)?;
-        return Ok(false);
-    }
+    try_stage!(events, "kill_quickshell", process::kill_quickshell());
     step(events, Step::KillQuickshell, StepState::Done)?;
 
-    let original = match cache.original() {
-        Ok(o) => o,
-        Err(e) => {
-            emit_fail(events, "commit", &format!("read_original: {e}"), None, None)?;
-            return Ok(false);
-        }
-    };
+    let original = try_stage!(events, "commit", "read_original", cache.original());
     if let Some(entry_path) = original {
         let entry_pb = PathBuf::from(&entry_path);
         let (rice_dir, entry_rel) = split_launch_path(&entry_pb);
@@ -257,10 +247,7 @@ pub fn run_exit<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<
         step(events, Step::Launch, StepState::Done)?;
     }
 
-    if let Err(e) = cache.clear_active_previous() {
-        emit_fail(events, "commit", &format!("clear: {e}"), None, None)?;
-        return Ok(false);
-    }
+    try_stage!(events, "commit", "clear", cache.clear_active_previous());
     events.emit(&Event::Success {
         active: None,
         previous: None,
@@ -326,16 +313,12 @@ fn preflight<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<boo
         return Ok(false);
     }
     if !cache.original_is_recorded() {
-        if let Err(e) = record_original(cache) {
-            emit_fail(
-                events,
-                "preflight",
-                &format!("record_original: {e}"),
-                None,
-                None,
-            )?;
-            return Ok(false);
-        }
+        try_stage!(
+            events,
+            "preflight",
+            "record_original",
+            record_original(cache)
+        );
     }
     step(events, Step::Preflight, StepState::Done)?;
     Ok(true)
@@ -397,17 +380,11 @@ fn wet_pipeline<W: Write>(
     events: &mut EventWriter<W>,
 ) -> Result<bool> {
     step(events, Step::Notifiers, StepState::Start)?;
-    if let Err(e) = process::kill_notif_daemons() {
-        emit_fail(events, "notifiers", &format!("{e}"), None, None)?;
-        return Ok(false);
-    }
+    try_stage!(events, "notifiers", process::kill_notif_daemons());
     step(events, Step::Notifiers, StepState::Done)?;
 
     step(events, Step::KillQuickshell, StepState::Start)?;
-    if let Err(e) = process::kill_quickshell() {
-        emit_fail(events, "kill_quickshell", &format!("{e}"), None, None)?;
-        return Ok(false);
-    }
+    try_stage!(events, "kill_quickshell", process::kill_quickshell());
     step(events, Step::KillQuickshell, StepState::Done)?;
 
     step(events, Step::Launch, StepState::Start)?;

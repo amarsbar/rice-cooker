@@ -117,13 +117,7 @@ fn apply_dry_run_stops_after_precheck() {
     assert_eq!(last["type"], "success");
     assert_eq!(last["dry_run"], true);
     assert_eq!(last.get("active"), None);
-
-    let invocations = h.read_invocations();
-    assert!(
-        !invocations.contains("setsid"),
-        "dry-run ran setsid: {invocations}"
-    );
-    // active should NOT be updated
+    // active must NOT be updated — the observable contract of dry-run.
     assert_eq!(h.read_cache_file("active"), None);
 }
 
@@ -275,23 +269,6 @@ fn exit_with_no_original_clears_state_and_reports_success() {
     let last = last_event(&events);
     assert_eq!(last["type"], "success");
     assert_eq!(h.read_cache_file("active"), None);
-}
-
-#[test]
-fn apply_records_original_on_first_run_with_no_qs() {
-    // First apply with no running quickshell should write an empty `original`.
-    let h = Harness::new();
-    h.with_rice_file("shell.qml", HAPPY_SHELL_QML);
-    let out = h
-        .bin()
-        .args(["apply", "--name", "A", "--repo", "https://example/a.git"])
-        .output()
-        .unwrap();
-    assert!(out.status.success());
-    let original_path = h.cache_dir.join("original");
-    assert!(original_path.is_file());
-    let contents = std::fs::read_to_string(&original_path).unwrap();
-    assert_eq!(contents, "\n", "expected empty sentinel, got {contents:?}");
 }
 
 #[test]

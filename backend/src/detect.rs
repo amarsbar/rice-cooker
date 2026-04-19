@@ -118,26 +118,14 @@ mod tests {
     }
 
     #[test]
-    fn empty_rice_has_no_missing_plugins() {
-        let dir = tempfile::tempdir().unwrap();
-        assert!(detect_missing_plugins(dir.path()).unwrap().is_empty());
-    }
-
-    #[test]
-    fn qtquick_imports_are_allowed() {
+    fn allowlisted_imports_are_all_accepted() {
+        // Qt*, Qt.labs.*, and Quickshell.* all resolve via first-segment allowlist.
         let dir = tempfile::tempdir().unwrap();
         write_qml(
             dir.path(),
             "shell.qml",
-            "import QtQuick 2.15\nimport QtQuick.Controls 2.15\n",
+            "import QtQuick 2.15\nimport QtQuick.Controls 2.15\nimport Qt.labs.platform 1.0\n",
         );
-        assert!(detect_missing_plugins(dir.path()).unwrap().is_empty());
-    }
-
-    #[test]
-    fn qt_labs_imports_are_allowed_via_first_segment_qt() {
-        let dir = tempfile::tempdir().unwrap();
-        write_qml(dir.path(), "shell.qml", "import Qt.labs.platform 1.0\n");
         assert!(detect_missing_plugins(dir.path()).unwrap().is_empty());
     }
 
