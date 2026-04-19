@@ -281,9 +281,9 @@ fn validate_entry_path(entry: &str) -> Option<PathBuf> {
 
 /// Resolve the rice's entry file. Try the requested path first; if missing, walk
 /// the rice directory looking for any `shell.qml` and pick the shallowest match
-/// (ties broken lexicographically). Hidden directories (`.git`, `.github`, ...)
-/// are skipped so the walk doesn't pick up cloned-repo metadata or pull in a
-/// test fixture buried under a dot-prefixed path.
+/// (ties broken lexicographically). Only `.git` is skipped during the walk —
+/// dotfile-style repos commonly stash their shell under `.config/quickshell/`,
+/// so we can't blanket-skip dot-prefixed directories.
 fn resolve_entry(rice_dir: &Path, preferred: &Path) -> Option<PathBuf> {
     if rice_dir.join(preferred).is_file() {
         return Some(preferred.to_path_buf());
@@ -306,7 +306,7 @@ fn collect_shell_qml(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in entries.flatten() {
         let name = entry.file_name();
         let name_str = name.to_string_lossy();
-        if name_str.starts_with('.') {
+        if name_str == ".git" {
             continue;
         }
         let path = entry.path();
@@ -432,11 +432,17 @@ mod tests {
             Some(PathBuf::from("alpha/shell.qml"))
         );
 
-        // 6. Hidden dirs are skipped — a shell.qml under .git shouldn't be found.
-        let hidden = tempfile::tempdir().unwrap();
-        let hroot = hidden.path();
-        std::fs::create_dir_all(hroot.join(".git")).unwrap();
-        std::fs::write(hroot.join(".git/shell.qml"), b"").unwrap();
-        assert_eq!(resolve_entry(hroot, Path::new("missing.qml")), None);
+        // 6. `.git` is skipped (clone metadata shouldn't win) but other dot-dirs
+        //    like `.config/` are walked — that's the common dotfiles-repo layout.
+        let mixed = tempfile::tempdir().unwrap();
+        let mroot = mixed.path();
+        std::fs::create_dir_all(mroot.join(".git")).unwrap();
+        std::fs::write(mroot.join(".git/shell.qml"), b"").unwrap();
+        std::fs::create_dir_all(mroot.join(".config/quickshell")).unwrap();
+        std::fs::write(mroot.join(".config/quickshell/shell.qml"), b"").unwrap();
+        assert_eq!(
+            resolve_entry(mroot, Path::new("missing.qml")),
+            Some(PathBuf::from(".config/quickshell/shell.qml"))
+        );
     }
 }
