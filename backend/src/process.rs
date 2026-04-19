@@ -213,11 +213,12 @@ pub struct QuickshellProc {
     pub cwd: Option<PathBuf>,
 }
 
-/// Scan /proc for the first running process owned by the current UID whose argv[0]
-/// basename is exactly "quickshell". Owner-filtering matters on shared hosts:
-/// picking up another user's qs would poison our `original` file.
+/// Scan /proc for the first process whose argv[0] basename is exactly "quickshell".
+/// No owner filtering: on single-user Linux laptops (our target) there's only one
+/// quickshell, and `hidepid` already masks other users' /proc entries on most
+/// modern distros. A shared-host user running RiceCooker alongside someone else's
+/// Quickshell is a threat model we don't need to defend against up front.
 pub fn find_running_quickshell() -> Result<Option<QuickshellProc>> {
-    let our_uid = unsafe { libc::getuid() };
     let proc_dir = fs::read_dir("/proc")?;
     for entry in proc_dir {
         let Ok(entry) = entry else { continue };
@@ -225,9 +226,6 @@ pub fn find_running_quickshell() -> Result<Option<QuickshellProc>> {
         let Ok(pid) = name.to_string_lossy().parse::<i32>() else {
             continue;
         };
-        if !owned_by_uid(pid, our_uid) {
-            continue;
-        }
         let bytes = match fs::read(format!("/proc/{pid}/cmdline")) {
             Ok(b) => b,
             Err(_) => continue,
@@ -246,25 +244,6 @@ pub fn find_running_quickshell() -> Result<Option<QuickshellProc>> {
         }
     }
     Ok(None)
-}
-
-fn owned_by_uid(pid: i32, uid: libc::uid_t) -> bool {
-    let status = match fs::read_to_string(format!("/proc/{pid}/status")) {
-        Ok(s) => s,
-        Err(_) => return false,
-    };
-    for line in status.lines() {
-        if let Some(rest) = line.strip_prefix("Uid:") {
-            // Uid: <real> <eff> <saved> <fs>  — the first field is what we want.
-            if let Some(real) = rest.split_whitespace().next() {
-                return real
-                    .parse::<libc::uid_t>()
-                    .map(|u| u == uid)
-                    .unwrap_or(false);
-            }
-        }
-    }
-    false
 }
 
 #[cfg(test)]
