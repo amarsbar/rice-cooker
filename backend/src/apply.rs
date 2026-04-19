@@ -30,12 +30,18 @@ fn find_shell_qml(rice_root: &Path) -> Result<Option<PathBuf>> {
 /// Turn a `Result<T, E>` into its Ok value, or emit a stage fail event and early-return
 /// `Ok(false)` from the enclosing function. Collapses the "step X failed, report it
 /// and bail cleanly" boilerplate that otherwise repeats at every pipeline gate.
+///
+/// Enforces the post-hello contract: any early return on the apply/revert/exit path
+/// must emit a fail event before surfacing Ok(false) — never exit-code-2 without one.
+///
+/// Errors are formatted with `{e:#}` so anyhow context chains (e.g. "spawning git fetch:
+/// No such file or directory") surface whole; bare `{e}` would drop inner sources.
 macro_rules! try_stage {
     ($events:expr, $stage:literal, $expr:expr $(,)?) => {
         match $expr {
             Ok(v) => v,
             Err(e) => {
-                emit_fail($events, $stage, &format!("{e}"), None, None)?;
+                emit_fail($events, $stage, &format!("{e:#}"), None, None)?;
                 return Ok(false);
             }
         }
@@ -48,7 +54,7 @@ macro_rules! try_stage {
                 emit_fail(
                     $events,
                     $stage,
-                    &format!("{}: {}", $reason_prefix, e),
+                    &format!("{}: {:#}", $reason_prefix, e),
                     None,
                     None,
                 )?;

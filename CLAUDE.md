@@ -10,7 +10,7 @@ Guidance for Claude Code (and other AI assistants) working in this repo.
 
 ## Testing philosophy
 
-This backend is ~1200 LOC of glue over external processes. That shape doesn't warrant heavy test weight.
+This backend is ~1300 LOC of glue over external processes. That shape doesn't warrant heavy test weight.
 
 - **Prefer fewer, higher-value tests.** A 1:1 tests-to-code ratio for this kind of backend is a smell, not a target. Reference CLI tools in Rust (cargo-binstall, mise, rustup) sit around 25–40% test share.
 - **Don't write tests for thin wrappers.** If the function is `let out = Command::new("pkill").args(...).status()?; map_exit_code(out)`, testing it with a fake binary is testing the fake, not the code.
@@ -47,7 +47,7 @@ If a new concern fits one of those, extend it. Don't add a new file.
 
 - `cargo fmt` + `cargo clippy --all-targets --all-features -- -D warnings` must be clean before committing.
 - `Cargo.lock` is checked in (binary crate). `backend/target/` is gitignored.
-- Keep dependencies minimal. Prefer 25 lines of manual `Display`/`Error` over adding `thiserror`.
+- Keep the dep set small. Don't add a crate for functionality that's <30 lines of standard-library code — we'd rather write an inline trait impl or helper.
 
 ## Linux-only
 
