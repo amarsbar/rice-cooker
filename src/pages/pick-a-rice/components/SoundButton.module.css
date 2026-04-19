@@ -1,0 +1,34 @@
+/* Outer ellipse ring (168:6744) — 40 × 40 */
+.ring {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+}
+
+.ring > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+}
+
+/* Inner teal circle (168:6745) — 37.377 × 37.377, teal bg, fully rounded */
+.inner {
+  position: absolute;
+  width: 37.377px;
+  height: 37.377px;
+  background: var(--color-teal);
+  border-radius: 158.333px;
+  overflow: hidden;
+}
+
+/* Sound icon (168:6746) — 20 × 20 centered inside .inner */
+.icon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 20px;
+  height: 20px;
+  transform: translate(-50%, -50%);
+}

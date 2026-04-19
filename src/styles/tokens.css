@@ -1,0 +1,30 @@
+:root {
+  /* Colors from Figma */
+  --color-card-bg: #000001;
+  --color-mint: #dfecdb;
+  --color-yellow: #ffc501;
+  --color-teal: #4b837d;
+  --color-cream: #fdfdf1;
+  --color-pink: #ff99a9;
+  --color-mauve: #917c89;
+  --color-pill-text: #feffff;
+  --color-counter-text: #000001;
+
+  /* Card dimensions — sizes vary per view and live in view.tsx POSITIONS. */
+  --card-radius: 32px;
+  --card-border-width: 9px;
+
+  /* Preview dimensions */
+  --preview-radius-top: 9.683px;
+  --preview-radius-bottom: 6.899px;
+  --preview-dashed-radius: 12px;
+
+  /* Header */
+  --header-height: 48px;
+
+  /* Fonts */
+  --font-display: 'Madimi One', sans-serif;
+  --fs-title: 24px;
+  --fs-counter: 15px;
+  --fs-pill: 13px;
+}

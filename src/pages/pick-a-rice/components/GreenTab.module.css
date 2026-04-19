@@ -1,0 +1,7 @@
+.tab {
+  position: absolute;
+  width: 59px;
+  height: 81px;
+  background: var(--color-mint);
+  border-top-right-radius: 16px;
+}

@@ -1,0 +1,31 @@
+@import '@fontsource/madimi-one/400.css';
+@import './tokens.css';
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+body {
+  font-family: var(--font-display);
+  color: var(--color-pill-text);
+  /* no cursor, no scrollbars, no system highlight — transparent desktop overlay */
+  cursor: default;
+}
+
+img {
+  display: block;
+  -webkit-user-drag: none;
+}
