@@ -39,7 +39,10 @@ pub fn run_apply<W: Write>(
         return Ok(false);
     }
 
-    cache.ensure_dirs()?;
+    if let Err(e) = cache.ensure_dirs() {
+        emit_fail(events, "init", &format!("{e}"), None, None)?;
+        return Ok(false);
+    }
     let _lock = match acquire_lock(cache, events)? {
         Some(l) => l,
         None => return Ok(false),
@@ -99,11 +102,9 @@ pub fn run_apply<W: Write>(
             if let Err(e) = cache.set_previous(p) {
                 // Roll back active so state stays coherent: if set_previous fails,
                 // revert to the prior active value so a subsequent revert doesn't
-                // swap to a stale or absent "previous".
-                let _ = match &prior {
-                    Some(v) => cache.set_active(v),
-                    None => cache.clear_active_previous(),
-                };
+                // swap to a stale or absent "previous". Best-effort: a failed
+                // rollback can't usefully surface beyond the primary commit fail.
+                let _ = cache.set_active(p);
                 emit_fail(events, "commit", &format!("set_previous: {e}"), None, None)?;
                 return Ok(false);
             }
@@ -147,7 +148,10 @@ fn validate_rice_name(name: &str) -> std::result::Result<(), &'static str> {
 
 pub fn run_revert<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<bool> {
     hello(events, "revert")?;
-    cache.ensure_dirs()?;
+    if let Err(e) = cache.ensure_dirs() {
+        emit_fail(events, "init", &format!("{e}"), None, None)?;
+        return Ok(false);
+    }
     let _lock = match acquire_lock(cache, events)? {
         Some(l) => l,
         None => return Ok(false),
@@ -157,9 +161,16 @@ pub fn run_revert<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Resul
         return Ok(false);
     }
 
-    let Some(previous_name) = cache.previous()? else {
-        emit_fail(events, "revert", "no_previous", None, None)?;
-        return Ok(false);
+    let previous_name = match cache.previous() {
+        Ok(Some(n)) => n,
+        Ok(None) => {
+            emit_fail(events, "revert", "no_previous", None, None)?;
+            return Ok(false);
+        }
+        Err(e) => {
+            emit_fail(events, "revert", &format!("read_previous: {e}"), None, None)?;
+            return Ok(false);
+        }
     };
     let rice_dir = cache.rice_dir(&previous_name);
     if !rice_dir.is_dir() {
@@ -208,7 +219,10 @@ pub fn run_revert<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Resul
 
 pub fn run_exit<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<bool> {
     hello(events, "exit")?;
-    cache.ensure_dirs()?;
+    if let Err(e) = cache.ensure_dirs() {
+        emit_fail(events, "init", &format!("{e}"), None, None)?;
+        return Ok(false);
+    }
     let _lock = match acquire_lock(cache, events)? {
         Some(l) => l,
         None => return Ok(false),
