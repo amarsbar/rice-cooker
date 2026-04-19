@@ -1,0 +1,82 @@
+/* Logo (Figma 168:7238) — 37.818 × 24 at (18, 10). The SVG bleeds slightly
+   past the container via the inset-negative bleed div. */
+.logo {
+  position: absolute;
+  left: 18px;
+  top: 10px;
+  width: 37.818px;
+  height: 24px;
+}
+
+.logoBleed {
+  position: absolute;
+  inset: -6.43% -2% -6.43% -2.54%;
+}
+
+.logoBleed > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+}
+
+/* "Pick a rice" title (168:7241) — centered horizontally, top 6px, 24px Madimi One, yellow */
+.title {
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-size: var(--fs-title);
+  font-weight: 400;
+  color: var(--color-yellow);
+  line-height: normal;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Counter pills (168:7242, 7244, 7246) — 18.565 wide, yellow bg, fully rounded, black text */
+.pill {
+  position: absolute;
+  top: 10px;
+  width: 18.565px;
+  padding: 2.561px;
+  background: var(--color-yellow);
+  border-radius: 237.773px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.pill > p {
+  font-family: var(--font-display);
+  font-size: var(--fs-counter);
+  font-weight: 400;
+  color: var(--color-counter-text);
+  line-height: normal;
+  text-align: center;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.pillStep {
+  left: 424px;
+}
+
+.pillSlash {
+  left: 436.8px;
+}
+
+.pillTotal {
+  left: 451.43px;
+}
+
+/* Dotted divider (168:7248) — 452 × 4 at (18, 42) */
+.divider {
+  position: absolute;
+  left: 18px;
+  top: 42px;
+  width: 452px;
+  height: 4px;
+}

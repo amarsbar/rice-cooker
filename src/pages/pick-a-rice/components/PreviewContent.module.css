@@ -1,0 +1,45 @@
+.preview {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Exit preview button (168:7329) — yellow, 10px padding, 8px rounded, at (17, 12) */
+.exitButton {
+  position: absolute;
+  left: 17px;
+  top: 12px;
+  padding: 10px;
+  background: var(--color-yellow);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.exitButton > p {
+  font-family: var(--font-display);
+  font-size: var(--fs-title);
+  font-weight: 400;
+  color: var(--color-counter-text);
+  line-height: normal;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Preview state label (168:7330) — centered horizontally, 16.5px above card
+   center, 24px Madimi One, mint at 40% opacity */
+.previewLabel {
+  position: absolute;
+  left: 50%;
+  top: calc(50% - 16.5px);
+  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-size: var(--fs-title);
+  font-weight: 400;
+  color: var(--color-mint);
+  opacity: 0.4;
+  line-height: normal;
+  text-align: center;
+  white-space: nowrap;
+}

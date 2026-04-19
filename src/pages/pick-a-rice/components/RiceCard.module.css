@@ -1,0 +1,9 @@
+/* Figma node 168:7234 — main card.
+   Position + size are motion-driven (see view.tsx / POSITIONS). */
+.card {
+  position: absolute;
+  background: var(--color-card-bg);
+  border: var(--card-border-width) solid var(--color-mint);
+  border-radius: var(--card-radius);
+  overflow: hidden;
+}

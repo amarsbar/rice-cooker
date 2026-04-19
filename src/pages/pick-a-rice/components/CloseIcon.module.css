@@ -1,0 +1,31 @@
+.wrap {
+  position: absolute;
+  width: 41.803px;
+  height: 56.667px;
+}
+
+.wrap > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  pointer-events: none;
+}
+
+/* Circular hitbox at the top of the pin (41.803 × 41.803). clip-path prevents
+   clicks in the corners of the bounding box from registering so the hitbox
+   matches the visible circle. */
+.hitbox {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 41.803px;
+  height: 41.803px;
+  clip-path: circle(50%);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  appearance: none;
+}
