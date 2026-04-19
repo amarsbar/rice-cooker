@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::OnceLock;
 use std::thread;
@@ -99,6 +99,9 @@ pub fn launch_detached(rice_dir: &Path, entry_rel: &Path, log_file: &Path) -> Re
     let log = fs::File::create(log_file)
         .with_context(|| format!("opening log {}", log_file.display()))?;
     let entry_arg = format!("./{}", entry_rel.display());
+    // `setsid -f` forks a new session leader and returns immediately — its exit code
+    // reflects only whether setsid *spawned* successfully, NOT whether the child
+    // quickshell stayed alive. Quickshell health is checked separately by `verify()`.
     let status = Command::new("setsid")
         .arg("-f")
         .arg("quickshell")
@@ -111,7 +114,9 @@ pub fn launch_detached(rice_dir: &Path, entry_rel: &Path, log_file: &Path) -> Re
         .status()
         .context("spawning setsid quickshell")?;
     if !status.success() {
-        return Err(anyhow!("setsid exited non-zero: {status}"));
+        return Err(anyhow!(
+            "setsid failed to spawn (exit {status}); quickshell health is checked by verify()"
+        ));
     }
     Ok(())
 }
@@ -173,6 +178,95 @@ pub fn tail_lines(text: &str, n: usize) -> String {
     lines[start..].join("\n")
 }
 
+// ── /proc introspection: used to record the user's pre-RiceCooker shell ───────
+
+/// Parse the null-separated argv bytes of /proc/<pid>/cmdline into owned Strings.
+/// Trailing NUL is tolerated (Linux appends one). Invalid UTF-8 becomes U+FFFD.
+pub fn parse_cmdline(bytes: &[u8]) -> Vec<String> {
+    if bytes.is_empty() {
+        return Vec::new();
+    }
+    let trimmed = bytes.strip_suffix(b"\0").unwrap_or(bytes);
+    trimmed
+        .split(|&b| b == 0)
+        .map(|arg| String::from_utf8_lossy(arg).into_owned())
+        .collect()
+}
+
+/// Given argv (including argv[0]), find the value after `-p`. Only `-p` is matched —
+/// `-c <name>` takes a config name, not a path, so recording it and later launching
+/// as `quickshell -p ./<name>` on `exit` would silently load the wrong thing.
+pub fn extract_entry_arg(argv: &[String]) -> Option<String> {
+    let mut iter = argv.iter().skip(1);
+    while let Some(arg) = iter.next() {
+        if arg == "-p" {
+            return iter.next().cloned();
+        }
+    }
+    None
+}
+
+pub struct QuickshellProc {
+    pub cmdline: Vec<String>,
+    /// /proc/<pid>/cwd at scan time, used to resolve relative `-p` paths when
+    /// stamping `original`.
+    pub cwd: Option<PathBuf>,
+}
+
+/// Scan /proc for the first running process owned by the current UID whose argv[0]
+/// basename is exactly "quickshell". Owner-filtering matters on shared hosts:
+/// picking up another user's qs would poison our `original` file.
+pub fn find_running_quickshell() -> Result<Option<QuickshellProc>> {
+    let our_uid = unsafe { libc::getuid() };
+    let proc_dir = fs::read_dir("/proc")?;
+    for entry in proc_dir {
+        let Ok(entry) = entry else { continue };
+        let name = entry.file_name();
+        let Ok(pid) = name.to_string_lossy().parse::<i32>() else {
+            continue;
+        };
+        if !owned_by_uid(pid, our_uid) {
+            continue;
+        }
+        let bytes = match fs::read(format!("/proc/{pid}/cmdline")) {
+            Ok(b) => b,
+            Err(_) => continue,
+        };
+        let argv = parse_cmdline(&bytes);
+        if argv.is_empty() {
+            continue;
+        }
+        let argv0_basename = Path::new(&argv[0])
+            .file_name()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if argv0_basename == "quickshell" {
+            let cwd = fs::read_link(format!("/proc/{pid}/cwd")).ok();
+            return Ok(Some(QuickshellProc { cmdline: argv, cwd }));
+        }
+    }
+    Ok(None)
+}
+
+fn owned_by_uid(pid: i32, uid: libc::uid_t) -> bool {
+    let status = match fs::read_to_string(format!("/proc/{pid}/status")) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    for line in status.lines() {
+        if let Some(rest) = line.strip_prefix("Uid:") {
+            // Uid: <real> <eff> <saved> <fs>  — the first field is what we want.
+            if let Some(real) = rest.split_whitespace().next() {
+                return real
+                    .parse::<libc::uid_t>()
+                    .map(|u| u == uid)
+                    .unwrap_or(false);
+            }
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -196,13 +290,51 @@ mod tests {
             scan_log_for_errors("QQmlApplicationEngine failed to load").as_deref(),
             Some("QQmlApplicationEngine failed")
         );
-        let missing = r#"module "Foo.Bar" is not installed"#;
-        assert!(scan_log_for_errors(missing).is_some());
+        assert!(scan_log_for_errors(r#"module "Foo.Bar" is not installed"#).is_some());
     }
 
     #[test]
     fn tail_returns_last_n_lines() {
         assert_eq!(tail_lines("1\n2\n3\n4\n5", 2), "4\n5");
         assert_eq!(tail_lines("a\nb\nc", 10), "a\nb\nc");
+    }
+
+    #[test]
+    fn parse_cmdline_handles_edge_cases() {
+        assert!(parse_cmdline(b"").is_empty());
+        // Trailing NUL tolerated; missing NUL OK; empty middle arg preserved.
+        assert_eq!(parse_cmdline(b"foo\0bar\0"), vec!["foo", "bar"]);
+        assert_eq!(parse_cmdline(b"foo\0bar"), vec!["foo", "bar"]);
+        assert_eq!(parse_cmdline(b"foo\0\0bar\0"), vec!["foo", "", "bar"]);
+        // Invalid UTF-8 becomes U+FFFD via from_utf8_lossy.
+        let lossy = parse_cmdline(b"\xff\0ok\0");
+        assert!(lossy[0].contains('\u{FFFD}'));
+        assert_eq!(lossy[1], "ok");
+    }
+
+    #[test]
+    fn extract_entry_arg_covers_every_shape() {
+        fn sv(xs: &[&str]) -> Vec<String> {
+            xs.iter().map(|s| s.to_string()).collect()
+        }
+        // argv[0] is always skipped; only `-p` matches.
+        let cases: &[(&[&str], Option<&str>)] = &[
+            (&["quickshell", "-p", "./shell.qml"], Some("./shell.qml")),
+            (&["quickshell", "-c", "mybar"], None),
+            (&["quickshell", "-p"], None),
+            (&["quickshell"], None),
+            (&["quickshell", "--help"], None),
+            (
+                &["quickshell", "-c", "first", "-p", "second"],
+                Some("second"),
+            ),
+        ];
+        for (argv, expected) in cases {
+            assert_eq!(
+                extract_entry_arg(&sv(argv)).as_deref(),
+                *expected,
+                "argv = {argv:?}"
+            );
+        }
     }
 }

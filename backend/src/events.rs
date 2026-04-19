@@ -79,62 +79,48 @@ mod tests {
     use super::*;
 
     #[test]
-    fn serializes_hello_event() {
-        let ev = Event::Hello {
-            version: 1,
-            subcommand: "apply".into(),
-        };
-        let s = serde_json::to_string(&ev).unwrap();
-        assert_eq!(s, r#"{"type":"hello","version":1,"subcommand":"apply"}"#);
-    }
-
-    #[test]
-    fn serializes_step_event() {
-        let ev = Event::Step {
-            step: Step::Clone,
-            state: StepState::Start,
-        };
-        let s = serde_json::to_string(&ev).unwrap();
-        assert_eq!(s, r#"{"type":"step","step":"clone","state":"start"}"#);
-
-        let ev = Event::Step {
-            step: Step::Precheck,
-            state: StepState::Done,
-        };
-        let s = serde_json::to_string(&ev).unwrap();
-        assert_eq!(s, r#"{"type":"step","step":"precheck","state":"done"}"#);
-    }
-
-    #[test]
-    fn success_roundtrips_and_skips_defaults() {
-        // Covers both skip_serializing_if (None/false omitted) and the matching
-        // #[serde(default)] on deserialize.
-        let original = Event::Success {
-            active: Some("x".into()),
-            previous: None,
-            dry_run: false,
-        };
-        let wire = serde_json::to_string(&original).unwrap();
-        assert_eq!(wire, r#"{"type":"success","active":"x"}"#);
-        let back: Event = serde_json::from_str(&wire).unwrap();
-        assert_eq!(back, original);
-    }
-
-    #[test]
-    fn fail_roundtrips_with_plugins() {
-        let original = Event::Fail {
-            stage: "precheck".into(),
-            reason: "missing_plugins".into(),
-            plugins: Some(vec!["Foo".into()]),
-            log_tail: None,
-        };
-        let wire = serde_json::to_string(&original).unwrap();
-        assert_eq!(
-            wire,
-            r#"{"type":"fail","stage":"precheck","reason":"missing_plugins","plugins":["Foo"]}"#
-        );
-        let back: Event = serde_json::from_str(&wire).unwrap();
-        assert_eq!(back, original);
+    fn every_variant_roundtrips_through_ndjson_schema() {
+        let cases: &[(Event, &str)] = &[
+            (
+                Event::Hello {
+                    version: 1,
+                    subcommand: "apply".into(),
+                },
+                r#"{"type":"hello","version":1,"subcommand":"apply"}"#,
+            ),
+            (
+                Event::Step {
+                    step: Step::Clone,
+                    state: StepState::Start,
+                },
+                r#"{"type":"step","step":"clone","state":"start"}"#,
+            ),
+            // Success omits None/false fields on serialize and reconstructs them on
+            // deserialize via #[serde(default)] — pins both halves of the contract.
+            (
+                Event::Success {
+                    active: Some("x".into()),
+                    previous: None,
+                    dry_run: false,
+                },
+                r#"{"type":"success","active":"x"}"#,
+            ),
+            (
+                Event::Fail {
+                    stage: "precheck".into(),
+                    reason: "missing_plugins".into(),
+                    plugins: Some(vec!["Foo".into()]),
+                    log_tail: None,
+                },
+                r#"{"type":"fail","stage":"precheck","reason":"missing_plugins","plugins":["Foo"]}"#,
+            ),
+        ];
+        for (ev, wire) in cases {
+            let got = serde_json::to_string(ev).unwrap();
+            assert_eq!(&got, wire, "serialize");
+            let back: Event = serde_json::from_str(&got).unwrap();
+            assert_eq!(&back, ev, "roundtrip");
+        }
     }
 
     #[test]

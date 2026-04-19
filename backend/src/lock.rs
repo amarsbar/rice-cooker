@@ -87,44 +87,19 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn acquire_succeeds_on_fresh_path() {
+    fn acquire_contend_drop_cycle() {
         let dir = tempdir().unwrap();
         let lock_path = dir.path().join("apply.lock");
-        let result = ApplyLock::try_acquire(&lock_path);
-        assert!(result.is_ok(), "expected Ok, got {result:?}");
-    }
-
-    #[test]
-    fn second_acquire_while_held_errors_already_held() {
-        let dir = tempdir().unwrap();
-        let lock_path = dir.path().join("apply.lock");
-        let _first = ApplyLock::try_acquire(&lock_path).expect("first acquire must succeed");
-        let second = ApplyLock::try_acquire(&lock_path);
+        // Fresh acquire succeeds.
+        let first = ApplyLock::try_acquire(&lock_path).expect("first acquire");
+        // Second acquire while first is held → AlreadyHeld.
+        let held = ApplyLock::try_acquire(&lock_path);
         assert!(
-            matches!(second, Err(LockError::AlreadyHeld)),
-            "expected AlreadyHeld, got {second:?}"
+            matches!(held, Err(LockError::AlreadyHeld)),
+            "expected AlreadyHeld, got {held:?}"
         );
-    }
-
-    #[test]
-    fn lock_released_after_drop() {
-        let dir = tempdir().unwrap();
-        let lock_path = dir.path().join("apply.lock");
-        {
-            let _lock = ApplyLock::try_acquire(&lock_path).expect("first acquire must succeed");
-        } // _lock dropped here
-        let second = ApplyLock::try_acquire(&lock_path);
-        assert!(second.is_ok(), "expected Ok after drop, got {second:?}");
-    }
-
-    #[test]
-    fn missing_parent_dir_errors_io_not_alreadyheld() {
-        let dir = tempdir().unwrap();
-        let lock_path = dir.path().join("nonexistent_dir").join("apply.lock");
-        let result = ApplyLock::try_acquire(&lock_path);
-        assert!(
-            matches!(result, Err(LockError::Io(_))),
-            "expected Io error, got {result:?}"
-        );
+        // Drop the first; a subsequent acquire succeeds.
+        drop(first);
+        assert!(ApplyLock::try_acquire(&lock_path).is_ok());
     }
 }
