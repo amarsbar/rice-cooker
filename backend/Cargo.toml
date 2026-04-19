@@ -1,0 +1,34 @@
+[package]
+name = "rice-cooker-backend"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "rice-cooker-backend"
+path = "src/main.rs"
+
+[lib]
+name = "rice_cooker_backend"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+fs2 = "0.4"
+libc = "0.2"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+walkdir = "2"
+
+[dev-dependencies]
+assert_cmd = "2"
+tempfile = "3"
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+opt-level = 3
+lto = "thin"
