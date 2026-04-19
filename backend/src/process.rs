@@ -213,11 +213,14 @@ pub struct QuickshellProc {
     pub cwd: Option<PathBuf>,
 }
 
-/// Scan /proc for the first process whose argv[0] basename is exactly "quickshell".
+/// Scan /proc for a process whose argv[0] basename is exactly "quickshell".
+/// Returns the first match in /proc iteration order, which is kernel-dependent —
+/// relying on a *specific* match when two Quickshells run simultaneously is wrong.
+/// The design doc assumes one Quickshell at a time, so first-match is fine here.
+///
 /// No owner filtering: on single-user Linux laptops (our target) there's only one
 /// quickshell, and `hidepid` already masks other users' /proc entries on most
-/// modern distros. A shared-host user running RiceCooker alongside someone else's
-/// Quickshell is a threat model we don't need to defend against up front.
+/// modern distros.
 pub fn find_running_quickshell() -> Result<Option<QuickshellProc>> {
     let proc_dir = fs::read_dir("/proc")?;
     for entry in proc_dir {
