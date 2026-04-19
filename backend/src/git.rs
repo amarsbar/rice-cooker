@@ -21,14 +21,12 @@ pub fn preflight() -> anyhow::Result<()> {
 }
 
 pub fn clone_or_update(repo_url: &str, dest: &Path, log_file: &Path) -> anyhow::Result<()> {
-    // Reject URLs starting with `-` up front: even with `--` guarding below, our own message
-    // is clearer than whatever git would emit. Also reject `ext::` explicitly — that protocol
-    // lets the URL specify an arbitrary command to run, which is a well-known RCE vector.
+    // Reject URLs starting with `-` up front: our message is clearer than whatever
+    // git would emit and the `--` separator below only guards the top-level URL,
+    // not e.g. submodule URLs. The `ext::` vector is separately blocked by the
+    // `-c protocol.ext.allow=never` config in git_cmd() — no need to double-check here.
     if repo_url.starts_with('-') {
         anyhow::bail!("refusing repo URL starting with '-': {}", repo_url);
-    }
-    if repo_url.starts_with("ext::") {
-        anyhow::bail!("refusing ext:: repo URL: {}", repo_url);
     }
 
     if dest.join(".git").exists() {
@@ -76,17 +74,17 @@ pub fn clone_or_update(repo_url: &str, dest: &Path, log_file: &Path) -> anyhow::
 }
 
 // Preconfigured `git` invocation with hardening env + config:
-// - GIT_TERMINAL_PROMPT=0 / GIT_ASKPASS=/bin/false keep git from blocking on a credential
-//   prompt when the caller is spawned from a GUI with no attached terminal.
-// - SSH_ASKPASS=/bin/false + DISPLAY="" do the same for the ssh transport.
-// - `-c protocol.ext.allow=never` forbids the `ext::` protocol even if some submodule or
-//   remote helper tries to sneak it past the URL-prefix check above.
+// - GIT_TERMINAL_PROMPT=0 / GIT_ASKPASS=/bin/false keep git from blocking on a
+//   credential prompt when spawned from a GUI with no attached terminal.
+// - DISPLAY="" suppresses ssh's ASKPASS mechanism (ssh only invokes SSH_ASKPASS
+//   when DISPLAY is set), so an unset DISPLAY alone is sufficient.
+// - `-c protocol.ext.allow=never` forbids the `ext::` protocol (arbitrary-
+//   command RCE) even if a submodule or remote helper tries to reach for it.
 fn git_cmd() -> Command {
     let mut cmd = Command::new("git");
     cmd.args(["-c", "protocol.ext.allow=never"])
         .env("GIT_TERMINAL_PROMPT", "0")
         .env("GIT_ASKPASS", "/bin/false")
-        .env("SSH_ASKPASS", "/bin/false")
         .env("DISPLAY", "");
     cmd
 }

@@ -28,10 +28,6 @@ impl Cache {
         self.root.join("last-run.log")
     }
 
-    pub fn self_log(&self) -> PathBuf {
-        self.root.join("rice-cooker.log")
-    }
-
     pub fn apply_lock(&self) -> PathBuf {
         self.root.join("apply.lock")
     }
@@ -116,16 +112,9 @@ fn read_line_file(path: &Path) -> Result<Option<String>> {
 fn write_line_file(path: &Path, contents: &str) -> Result<()> {
     // Append `.tmp` to the full filename instead of replacing the extension —
     // `with_extension("tmp")` would turn `foo.bar` into `foo.tmp`, a potential collision.
-    let tmp = {
-        let parent = path.parent().unwrap_or(Path::new("."));
-        let name = path
-            .file_name()
-            .map(|n| n.to_os_string())
-            .unwrap_or_default();
-        let mut tmp_name = name;
-        tmp_name.push(".tmp");
-        parent.join(tmp_name)
-    };
+    let mut tmp = path.as_os_str().to_os_string();
+    tmp.push(".tmp");
+    let tmp = PathBuf::from(tmp);
     if let Err(e) = fs::write(&tmp, format!("{contents}\n")) {
         let _ = fs::remove_file(&tmp);
         return Err(e).with_context(|| format!("writing {}", tmp.display()));
