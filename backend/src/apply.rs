@@ -6,12 +6,26 @@ use serde::Serialize;
 
 use crate::cache::Cache;
 use crate::detect::detect_missing_plugins;
-use crate::entry::find_shell_qml;
 use crate::events::{Event, EventWriter, Step, StepState, SCHEMA_VERSION};
 use crate::git;
 use crate::lock::{ApplyLock, LockError};
-use crate::proc_info::{extract_entry_arg, find_running_quickshell};
-use crate::process::{self, VerifyResult};
+use crate::process::{self, extract_entry_arg, find_running_quickshell, VerifyResult};
+
+const SHELL_QML_CANDIDATES: &[&str] = &[
+    "shell.qml",
+    "ii/shell.qml",
+    "quickshell/shell.qml",
+    ".config/quickshell/shell.qml",
+];
+
+fn find_shell_qml(rice_root: &Path) -> Result<Option<PathBuf>> {
+    for &candidate in SHELL_QML_CANDIDATES {
+        if rice_root.join(candidate).is_file() {
+            return Ok(Some(PathBuf::from(candidate)));
+        }
+    }
+    Ok(None)
+}
 
 pub struct ApplyParams<'a> {
     pub name: &'a str,
@@ -100,12 +114,15 @@ pub fn run_apply<W: Write>(
     if let Some(p) = &prior {
         if p != params.name {
             if let Err(e) = cache.set_previous(p) {
-                // Roll back active so state stays coherent: if set_previous fails,
-                // revert to the prior active value so a subsequent revert doesn't
-                // swap to a stale or absent "previous". Best-effort: a failed
-                // rollback can't usefully surface beyond the primary commit fail.
-                let _ = cache.set_active(p);
-                emit_fail(events, "commit", &format!("set_previous: {e}"), None, None)?;
+                // Roll back active to the prior value so state stays coherent. If the
+                // rollback itself fails, surface both errors in the event so an operator
+                // can see that state is now genuinely wedged (active points to the
+                // new rice, previous missing) rather than merely "set_previous failed".
+                let reason = match cache.set_active(p) {
+                    Ok(()) => format!("set_previous: {e}"),
+                    Err(rb) => format!("set_previous: {e}; rollback_failed: {rb}"),
+                };
+                emit_fail(events, "commit", &reason, None, None)?;
                 return Ok(false);
             }
         }
@@ -118,32 +135,17 @@ pub fn run_apply<W: Write>(
     Ok(true)
 }
 
-/// Rejects names that would break out of the rice cache, trip git argv parsing,
-/// or corrupt the single-line cache state files (which only strip trailing newlines
-/// on read — a name containing `\n` would round-trip differently).
+/// Names must match `^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$`. This one regex covers every
+/// class of reject the old per-case validator enumerated: empty, too-long, `.`/`..`,
+/// leading dash, leading dot, path separators, NUL, whitespace, control chars.
 fn validate_rice_name(name: &str) -> std::result::Result<(), &'static str> {
-    if name.is_empty() {
-        return Err("empty_name");
+    static RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let re = RE.get_or_init(|| regex::Regex::new(r"^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$").unwrap());
+    if re.is_match(name) {
+        Ok(())
+    } else {
+        Err("invalid_name")
     }
-    if name.len() > 64 {
-        return Err("name_too_long");
-    }
-    if name == "." || name == ".." {
-        return Err("reserved_name");
-    }
-    if name.starts_with('-') {
-        return Err("leading_dash");
-    }
-    if name.starts_with('.') {
-        return Err("leading_dot");
-    }
-    if name.chars().any(|c| matches!(c, '/' | '\\' | '\0')) {
-        return Err("invalid_char");
-    }
-    if name.chars().any(|c| c.is_whitespace() || c.is_control()) {
-        return Err("invalid_whitespace_or_control");
-    }
-    Ok(())
 }
 
 pub fn run_revert<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<bool> {
@@ -458,6 +460,41 @@ mod tests {
     use super::*;
 
     #[test]
+    fn find_shell_qml_walks_candidates_in_order() {
+        use std::fs;
+        let make = |rel: &str| {
+            let tmp = tempfile::tempdir().unwrap();
+            let p = tmp.path().join(rel);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(&p, b"").unwrap();
+            tmp
+        };
+        // Empty dir → None.
+        let empty = tempfile::tempdir().unwrap();
+        assert_eq!(find_shell_qml(empty.path()).unwrap(), None);
+        // Each candidate found in isolation, relative to rice root.
+        for candidate in SHELL_QML_CANDIDATES {
+            let tmp = make(candidate);
+            assert_eq!(
+                find_shell_qml(tmp.path()).unwrap().as_deref(),
+                Some(Path::new(candidate)),
+                "candidate: {candidate}"
+            );
+        }
+        // Earlier candidate wins when two are present.
+        let tmp = tempfile::tempdir().unwrap();
+        for rel in ["shell.qml", "ii/shell.qml"] {
+            let p = tmp.path().join(rel);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(&p, b"").unwrap();
+        }
+        assert_eq!(
+            find_shell_qml(tmp.path()).unwrap(),
+            Some(PathBuf::from("shell.qml"))
+        );
+    }
+
+    #[test]
     fn split_launch_path_with_parent() {
         let (dir, name) = split_launch_path(Path::new("/foo/bar/shell.qml"));
         assert_eq!(dir, PathBuf::from("/foo/bar"));
@@ -472,47 +509,36 @@ mod tests {
     }
 
     #[test]
-    fn validate_rice_name_rejects_every_bad_class() {
-        // Table-drive the full reject list. Guards the contract against silent
-        // collapse during refactors.
-        let cases: &[(&str, &str)] = &[
-            ("", "empty_name"),
-            (".", "reserved_name"),
-            ("..", "reserved_name"),
-            ("-foo", "leading_dash"),
-            (".hidden", "leading_dot"),
-            ("a/b", "invalid_char"),
-            ("a\\b", "invalid_char"),
-            ("a\0b", "invalid_char"),
-            ("with space", "invalid_whitespace_or_control"),
-            ("with\ttab", "invalid_whitespace_or_control"),
-            ("with\nnewline", "invalid_whitespace_or_control"),
-            ("with\rcr", "invalid_whitespace_or_control"),
-            ("with\x07bell", "invalid_whitespace_or_control"),
+    fn validate_rice_name_accepts_typical_and_rejects_bad() {
+        for good in ["caelestia", "noctalia-2", "rice_v1", "Foo.Bar", "a1b2c3"] {
+            assert_eq!(validate_rice_name(good), Ok(()), "rejected: {good:?}");
+        }
+        let bad: &[&str] = &[
+            "",
+            ".",
+            "..",
+            "-foo",
+            ".hidden",
+            "a/b",
+            "a\\b",
+            "a\0b",
+            "with space",
+            "with\ttab",
+            "with\nnewline",
+            "with\rcr",
+            "with\x07bell",
         ];
-        for (name, expected) in cases {
+        for name in bad {
             assert_eq!(
                 validate_rice_name(name),
-                Err(*expected),
-                "wrong reject for {name:?}"
+                Err("invalid_name"),
+                "accepted: {name:?}"
             );
         }
-    }
-
-    #[test]
-    fn validate_rice_name_accepts_typical_names() {
-        for name in ["caelestia", "noctalia-2", "rice_v1", "Foo.Bar", "a1b2c3"] {
-            assert_eq!(
-                validate_rice_name(name),
-                Ok(()),
-                "unexpectedly rejected {name:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn validate_rice_name_rejects_too_long() {
-        let long = "a".repeat(65);
-        assert_eq!(validate_rice_name(&long), Err("name_too_long"));
+        assert_eq!(
+            validate_rice_name(&"a".repeat(65)),
+            Err("invalid_name"),
+            "65-char name should exceed the 64-char cap"
+        );
     }
 }

@@ -161,32 +161,44 @@ mod tests {
     use super::*;
 
     #[test]
-    fn resolve_root_prefers_rice_cooker_cache_dir() {
-        let root = resolve_root_with(Some("/a"), Some("/b/cache"), Some("/home/x")).unwrap();
-        assert_eq!(root, std::path::PathBuf::from("/a"));
-    }
-
-    #[test]
-    fn resolve_root_falls_back_to_xdg_cache_home() {
-        let root = resolve_root_with(None, Some("/b/cache"), Some("/home/x")).unwrap();
-        assert_eq!(root, std::path::PathBuf::from("/b/cache/rice-cooker"));
-    }
-
-    #[test]
-    fn resolve_root_falls_back_to_home_dot_cache() {
-        let root = resolve_root_with(None, None, Some("/home/x")).unwrap();
-        assert_eq!(root, std::path::PathBuf::from("/home/x/.cache/rice-cooker"));
-    }
-
-    #[test]
-    fn resolve_root_treats_empty_env_as_unset() {
-        let root = resolve_root_with(Some(""), Some(""), Some("/home/x")).unwrap();
-        assert_eq!(root, std::path::PathBuf::from("/home/x/.cache/rice-cooker"));
-    }
-
-    #[test]
-    fn resolve_root_errors_when_nothing_set() {
-        assert!(resolve_root_with(None, None, None).is_err());
+    fn resolve_root_respects_env_precedence() {
+        // Each row is (rc, xdg, home) inputs and the expected root. `None` root = Err.
+        type Row<'a> = (
+            Option<&'a str>,
+            Option<&'a str>,
+            Option<&'a str>,
+            Option<&'a str>,
+        );
+        let cases: &[Row] = &[
+            (Some("/a"), Some("/b/c"), Some("/home/x"), Some("/a")),
+            (
+                None,
+                Some("/b/c"),
+                Some("/home/x"),
+                Some("/b/c/rice-cooker"),
+            ),
+            (
+                None,
+                None,
+                Some("/home/x"),
+                Some("/home/x/.cache/rice-cooker"),
+            ),
+            // Empty env vars are treated like unset.
+            (
+                Some(""),
+                Some(""),
+                Some("/home/x"),
+                Some("/home/x/.cache/rice-cooker"),
+            ),
+            (None, None, None, None),
+        ];
+        for (rc, xdg, home, expected) in cases {
+            let got = resolve_root_with(*rc, *xdg, *home);
+            match expected {
+                Some(want) => assert_eq!(got.unwrap(), PathBuf::from(want)),
+                None => assert!(got.is_err()),
+            }
+        }
     }
 
     fn tmp_cache() -> (tempfile::TempDir, Cache) {
@@ -204,47 +216,29 @@ mod tests {
     }
 
     #[test]
-    fn active_returns_none_when_missing() {
+    fn active_reads_none_when_missing_or_empty_and_writes_roundtrip() {
         let (_dir, cache) = tmp_cache();
+        // Missing and empty both read as None (two distinct IO paths in read_line_file).
         assert!(cache.active().unwrap().is_none());
-    }
-
-    #[test]
-    fn active_returns_none_when_empty() {
-        let (_dir, cache) = tmp_cache();
         std::fs::write(cache.root().join("active"), "").unwrap();
         assert!(cache.active().unwrap().is_none());
-    }
-
-    #[test]
-    fn set_active_and_read_roundtrip() {
-        let (_dir, cache) = tmp_cache();
-        cache.set_active("caelestia").unwrap();
-        assert_eq!(cache.active().unwrap().as_deref(), Some("caelestia"));
-    }
-
-    #[test]
-    fn set_active_overwrites_with_trailing_newline_trimmed() {
-        let (_dir, cache) = tmp_cache();
+        // Write + overwrite both round-trip; trailing newline is stripped on read.
         cache.set_active("first").unwrap();
         cache.set_active("second").unwrap();
         assert_eq!(cache.active().unwrap().as_deref(), Some("second"));
     }
 
     #[test]
-    fn set_original_none_writes_empty_sentinel() {
+    fn original_none_and_original_is_recorded_flag() {
         let (_dir, cache) = tmp_cache();
-        cache.set_original(None).unwrap();
-        assert!(cache.root().join("original").is_file());
-        assert!(cache.original().unwrap().is_none());
-    }
-
-    #[test]
-    fn original_is_recorded_distinguishes_presence_from_emptiness() {
-        let (_dir, cache) = tmp_cache();
+        // Not yet recorded.
         assert!(!cache.original_is_recorded());
+        assert!(cache.original().unwrap().is_none());
+        // set_original(None) writes the empty-sentinel form, which is "recorded as empty"
+        // (distinct from "never recorded at all").
         cache.set_original(None).unwrap();
         assert!(cache.original_is_recorded());
+        assert!(cache.original().unwrap().is_none());
     }
 
     #[test]
