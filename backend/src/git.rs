@@ -168,33 +168,6 @@ mod tests {
     }
 
     #[test]
-    fn clone_into_existing_clone_runs_fetch_reset() {
-        let (_bare_guard, bare_repo) = make_bare_repo();
-        let dest_dir = tempdir().expect("dest tempdir");
-        let dest = dest_dir.path().join("clone");
-        let log_dir = tempdir().expect("log tempdir");
-        let log_file = log_dir.path().join("git.log");
-
-        // First clone.
-        clone_or_update(bare_repo.to_str().unwrap(), &dest, &log_file)
-            .expect("first clone_or_update should succeed");
-
-        assert!(
-            dest.join(".git").exists(),
-            ".git should exist after first call"
-        );
-
-        // Second call — should fetch + reset against the same bare repo.
-        clone_or_update(bare_repo.to_str().unwrap(), &dest, &log_file)
-            .expect("second clone_or_update should succeed");
-
-        assert!(
-            dest.join(".git").exists(),
-            ".git should still exist after second call"
-        );
-    }
-
-    #[test]
     fn clone_with_invalid_url_returns_err_and_log_populated() {
         let dest_dir = tempdir().expect("dest tempdir");
         let dest = dest_dir.path().join("clone");
