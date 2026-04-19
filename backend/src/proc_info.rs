@@ -15,13 +15,15 @@ pub fn parse_cmdline(bytes: &[u8]) -> Vec<String> {
         .collect()
 }
 
-/// Given argv (including argv[0]), find the value after `-p` or `-c` (whichever appears first).
-/// Skips argv[0] so a binary pathologically named `-p` can't be mistaken for a flag.
-/// Returns None if neither flag is present or no value follows.
+/// Given argv (including argv[0]), find the value after `-p`. Only `-p` is matched —
+/// `-c <name>` takes a config name, not a path, so storing it and later handing it
+/// to `setsid quickshell -p ./<name>` on `exit` would silently load the wrong thing.
+/// If the user ran qs with `-c`, we prefer to record nothing (caller stamps empty)
+/// over recording a path-shaped value we know is actually a config name.
 pub fn extract_entry_arg(argv: &[String]) -> Option<String> {
     let mut iter = argv.iter().skip(1);
     while let Some(arg) = iter.next() {
-        if arg == "-p" || arg == "-c" {
+        if arg == "-p" {
             return iter.next().cloned();
         }
     }
@@ -29,7 +31,6 @@ pub fn extract_entry_arg(argv: &[String]) -> Option<String> {
 }
 
 pub struct QuickshellProc {
-    pub pid: i32,
     pub cmdline: Vec<String>,
     /// The process's cwd at scan time (resolved from /proc/<pid>/cwd). Used to
     /// resolve relative `-p` paths back to an absolute path when stamping `original`.
@@ -49,12 +50,10 @@ pub fn find_running_quickshell() -> anyhow::Result<Option<QuickshellProc>> {
         let Ok(entry) = entry else { continue };
         let name = entry.file_name();
         let name_str = name.to_string_lossy();
-        if !name_str.chars().all(|c| c.is_ascii_digit()) {
+        // `parse::<i32>` already rejects non-numeric names (like `self`, `thread-self`),
+        // so a separate digit pre-check is redundant.
+        let Ok(pid) = name_str.parse::<i32>() else {
             continue;
-        }
-        let pid: i32 = match name_str.parse() {
-            Ok(p) => p,
-            Err(_) => continue,
         };
         if !owned_by_uid(pid, our_uid) {
             continue;
@@ -74,11 +73,7 @@ pub fn find_running_quickshell() -> anyhow::Result<Option<QuickshellProc>> {
             .unwrap_or_default();
         if argv0_basename == "quickshell" {
             let cwd = std::fs::read_link(format!("/proc/{pid}/cwd")).ok();
-            return Ok(Some(QuickshellProc {
-                pid,
-                cmdline: argv,
-                cwd,
-            }));
+            return Ok(Some(QuickshellProc { cmdline: argv, cwd }));
         }
     }
     Ok(None)
@@ -164,11 +159,9 @@ mod tests {
     }
 
     #[test]
-    fn extract_entry_arg_dash_c() {
-        assert_eq!(
-            extract_entry_arg(&sv(&["quickshell", "-c", "mybar"])),
-            Some("mybar".to_string())
-        );
+    fn extract_entry_arg_dash_c_is_ignored() {
+        // -c takes a config name, not a path — recording it would misfire on exit.
+        assert_eq!(extract_entry_arg(&sv(&["quickshell", "-c", "mybar"])), None);
     }
 
     #[test]
@@ -187,11 +180,11 @@ mod tests {
     }
 
     #[test]
-    fn extract_entry_arg_earliest_wins() {
-        // -p comes before -c → -p's value is returned.
+    fn extract_entry_arg_skips_over_dash_c_to_find_dash_p() {
+        // -c appears first but we only match -p; the -p value is picked up later.
         assert_eq!(
-            extract_entry_arg(&sv(&["quickshell", "-p", "first", "-c", "second"])),
-            Some("first".to_string())
+            extract_entry_arg(&sv(&["quickshell", "-c", "first", "-p", "second"])),
+            Some("second".to_string())
         );
     }
 }
