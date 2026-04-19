@@ -2,6 +2,19 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, anyhow};
+use serde::{Deserialize, Serialize};
+
+/// The full invocation needed to re-launch the user's pre-RiceCooker shell on
+/// `exit`. Storing argv rather than a `-p <path>` lets us restore any
+/// form the user ran — `qs -c <name>`, `quickshell -p ./<path>`, bare `qs`,
+/// etc. — by replaying argv verbatim via `setsid`. `cwd` matters when argv
+/// contains a relative `-p` path.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OriginalShell {
+    pub argv: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<String>,
+}
 
 pub struct Cache {
     root: PathBuf,
@@ -50,20 +63,41 @@ impl Cache {
         read_line_file(&self.root.join("active"))
     }
 
-    pub fn original(&self) -> Result<Option<String>> {
-        read_line_file(&self.root.join("original"))
+    pub fn original(&self) -> Result<Option<OriginalShell>> {
+        let path = self.root.join("original");
+        match fs::read_to_string(&path) {
+            Ok(s) if s.trim().is_empty() => Ok(None),
+            // A malformed file (e.g. a plain-path record from an older backend) is
+            // treated as unrecorded so `exit` can still complete cleanly; `apply`'s
+            // preflight agrees via `original_is_recorded()` below and overwrites on
+            // the next run.
+            Ok(s) => Ok(serde_json::from_str::<OriginalShell>(s.trim()).ok()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(e).with_context(|| format!("reading {}", path.display())),
+        }
     }
 
+    /// True when the file exists AND its content is either empty (the "recorded as
+    /// nothing" sentinel) or a valid `OriginalShell`. Stale/malformed content
+    /// reads as unrecorded so the next `apply` preflight re-captures.
     pub fn original_is_recorded(&self) -> bool {
-        self.root.join("original").is_file()
+        match fs::read_to_string(self.root.join("original")) {
+            Ok(s) if s.trim().is_empty() => true,
+            Ok(s) => serde_json::from_str::<OriginalShell>(s.trim()).is_ok(),
+            Err(_) => false,
+        }
     }
 
     pub fn set_active(&self, name: &str) -> Result<()> {
         write_line_file(&self.root.join("active"), name)
     }
 
-    pub fn set_original(&self, entry: Option<&str>) -> Result<()> {
-        write_line_file(&self.root.join("original"), entry.unwrap_or(""))
+    pub fn set_original(&self, shell: Option<&OriginalShell>) -> Result<()> {
+        let body = match shell {
+            Some(s) => serde_json::to_string(s).context("serializing original shell")?,
+            None => String::new(),
+        };
+        write_line_file(&self.root.join("original"), &body)
     }
 
     pub fn clear_active(&self) -> Result<()> {
@@ -211,7 +245,7 @@ mod tests {
     }
 
     #[test]
-    fn original_none_and_original_is_recorded_flag() {
+    fn original_none_recorded_flag_and_argv_roundtrip() {
         let (_dir, cache) = tmp_cache();
         // Not yet recorded.
         assert!(!cache.original_is_recorded());
@@ -221,6 +255,24 @@ mod tests {
         cache.set_original(None).unwrap();
         assert!(cache.original_is_recorded());
         assert!(cache.original().unwrap().is_none());
+        // Full argv + cwd round-trips through JSON — covers the `qs -c <name>` case
+        // the old path-only format couldn't restore.
+        let shell = OriginalShell {
+            argv: vec!["qs".into(), "-c".into(), "clock".into()],
+            cwd: Some("/home/x".into()),
+        };
+        cache.set_original(Some(&shell)).unwrap();
+        assert_eq!(cache.original().unwrap(), Some(shell));
+    }
+
+    #[test]
+    fn original_stale_plain_text_reads_as_unrecorded() {
+        // Old backend versions wrote a bare path; the migration contract is that
+        // such a file reads as None and triggers a re-record on the next apply.
+        let (_dir, cache) = tmp_cache();
+        std::fs::write(cache.root().join("original"), "shell.qml\n").unwrap();
+        assert!(cache.original().unwrap().is_none());
+        assert!(!cache.original_is_recorded());
     }
 
     #[test]

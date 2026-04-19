@@ -1,14 +1,19 @@
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use anyhow::Result;
 use serde::Serialize;
 
-use crate::cache::Cache;
+use crate::cache::{Cache, OriginalShell};
 use crate::events::{Event, EventWriter, SCHEMA_VERSION, Step, StepState};
 use crate::git;
 use crate::lock::{ApplyLock, LockError};
-use crate::process::{self, VerifyResult, extract_entry_arg, find_running_quickshell};
+use crate::process::{self, VerifyResult, find_running_quickshell};
+
+/// Entry candidates to auto-discover when the requested `--entry` path isn't present
+/// in the rice. Covers the common layouts we've seen: root-level shell.qml
+/// (noctalia-shell) and a `quickshell/` subdir (DankMaterialShell).
+const ENTRY_FALLBACKS: &[&str] = &["shell.qml", "quickshell/shell.qml"];
 
 /// Turn a `Result<T, E>` into its Ok value, or emit a stage fail event and early-return
 /// `Ok(false)` from the enclosing function. Enforces the post-hello contract: never
@@ -87,11 +92,34 @@ pub fn run_apply<W: Write>(
     }
     step(events, Step::Clone, StepState::Done)?;
 
-    let entry_rel = PathBuf::from(params.entry);
-    if !rice_dir.join(&entry_rel).is_file() {
-        emit_fail(events, "entry", "entry_missing", None, None)?;
-        return Ok(false);
-    }
+    // Validate the requested entry up front so `--entry /etc/passwd` or
+    // `--entry ../escape.qml` gets a dedicated `entry_invalid` reason rather than
+    // silently falling through to a fallback (which would mislead catalog debugging).
+    let preferred_entry = match validate_entry_path(params.entry) {
+        Some(p) => p,
+        None => {
+            emit_fail(events, "input", "entry_invalid", None, None)?;
+            return Ok(false);
+        }
+    };
+    let entry_rel = match resolve_entry(&rice_dir, &preferred_entry) {
+        Some(r) => {
+            if r != preferred_entry {
+                // Visible to the operator but out-of-band from the NDJSON stream, so
+                // UIs that only read stdout aren't affected; CLI users see the note.
+                eprintln!(
+                    "rice-cooker-backend: entry '{}' not found; using '{}' instead",
+                    preferred_entry.display(),
+                    r.display()
+                );
+            }
+            r
+        }
+        None => {
+            emit_fail(events, "entry", "entry_missing", None, None)?;
+            return Ok(false);
+        }
+    };
 
     if params.dry_run {
         events.emit(&Event::Success {
@@ -134,12 +162,15 @@ pub fn run_exit<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<
     step(events, Step::KillQuickshell, StepState::Done)?;
 
     let original = try_stage!(events, "commit", "read_original", cache.original());
-    if let Some(entry_path) = original {
-        let entry_pb = PathBuf::from(&entry_path);
-        let (rice_dir, entry_rel) = split_launch_path(&entry_pb);
+    if let Some(shell) = original {
+        let cwd = shell
+            .cwd
+            .as_deref()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("."));
         let log_file = cache.last_run_log();
         step(events, Step::Launch, StepState::Start)?;
-        if let Err(e) = process::launch_detached(&rice_dir, &entry_rel, &log_file) {
+        if let Err(e) = process::launch_argv(&shell.argv, &cwd, &log_file) {
             let tail = read_tail(&log_file);
             emit_fail(events, "launch", &format!("{e:#}"), None, Some(tail))?;
             return Ok(false);
@@ -158,7 +189,9 @@ pub fn run_exit<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<
 pub fn get_status(cache: &Cache) -> Result<Status> {
     Ok(Status {
         active: cache.active()?,
-        original: cache.original()?,
+        // Render the saved argv as a human-readable command line for display only;
+        // the full argv lives in the cache file for exit-time restoration.
+        original: cache.original()?.map(|s| s.argv.join(" ")),
         quickshell_running: find_running_quickshell()?.is_some(),
         cache_dir: cache.root().display().to_string(),
     })
@@ -225,25 +258,44 @@ fn preflight<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<boo
 fn record_original(cache: &Cache) -> Result<()> {
     match find_running_quickshell()? {
         Some(proc) => {
-            let entry = extract_entry_arg(&proc.cmdline);
-            // A relative `-p` path is resolved against the process's cwd at scan time
-            // so later `exit` can relaunch from the right directory. Bare names (no `/`)
-            // stay as-is — they aren't paths.
-            let resolved = entry.map(|e| {
-                let p = PathBuf::from(&e);
-                if p.is_absolute() || !e.contains('/') {
-                    e
-                } else if let Some(cwd) = &proc.cwd {
-                    cwd.join(&p).to_string_lossy().into_owned()
-                } else {
-                    e
-                }
-            });
-            cache.set_original(resolved.as_deref())?;
+            let shell = OriginalShell {
+                argv: proc.cmdline,
+                cwd: proc.cwd.map(|p| p.to_string_lossy().into_owned()),
+            };
+            cache.set_original(Some(&shell))?;
         }
         None => cache.set_original(None)?,
     }
     Ok(())
+}
+
+/// Reject absolute paths and any component containing `..` so the entry path can't
+/// escape the cloned rice directory. The curated-catalog threat model doesn't
+/// defend against symlinks *inside* the clone (a malicious maintainer with commit
+/// access could point `shell.qml -> /etc/passwd`); quickshell would refuse to load
+/// that content, so the blast radius is a failed verify, not data exfiltration.
+fn validate_entry_path(entry: &str) -> Option<PathBuf> {
+    let pb = PathBuf::from(entry);
+    if pb.is_absolute() || pb.components().any(|c| matches!(c, Component::ParentDir)) {
+        return None;
+    }
+    Some(pb)
+}
+
+/// Resolve the rice's entry file. Try the requested path first; if missing, fall
+/// through `ENTRY_FALLBACKS`. Assumes `preferred` has already been validated by
+/// `validate_entry_path`.
+fn resolve_entry(rice_dir: &Path, preferred: &Path) -> Option<PathBuf> {
+    if rice_dir.join(preferred).is_file() {
+        return Some(preferred.to_path_buf());
+    }
+    for fallback in ENTRY_FALLBACKS {
+        let pb = PathBuf::from(fallback);
+        if pb != preferred && rice_dir.join(&pb).is_file() {
+            return Some(pb);
+        }
+    }
+    None
 }
 
 fn wet_pipeline<W: Write>(
@@ -281,19 +333,6 @@ fn wet_pipeline<W: Write>(
     }
 }
 
-fn split_launch_path(entry: &Path) -> (PathBuf, PathBuf) {
-    match entry.parent() {
-        Some(parent) if !parent.as_os_str().is_empty() => (
-            parent.to_path_buf(),
-            entry
-                .file_name()
-                .map(PathBuf::from)
-                .unwrap_or_else(|| entry.to_path_buf()),
-        ),
-        _ => (PathBuf::from("."), entry.to_path_buf()),
-    }
-}
-
 fn read_tail(path: &Path) -> String {
     match std::fs::read_to_string(path) {
         Ok(c) => process::tail_lines(&c, 20),
@@ -306,16 +345,42 @@ mod tests {
     use super::*;
 
     #[test]
-    fn split_launch_path_with_parent() {
-        let (dir, name) = split_launch_path(Path::new("/foo/bar/shell.qml"));
-        assert_eq!(dir, PathBuf::from("/foo/bar"));
-        assert_eq!(name, PathBuf::from("shell.qml"));
+    fn validate_entry_path_accepts_relative_rejects_absolute_and_traversal() {
+        assert_eq!(
+            validate_entry_path("shell.qml"),
+            Some(PathBuf::from("shell.qml"))
+        );
+        assert_eq!(
+            validate_entry_path("quickshell/shell.qml"),
+            Some(PathBuf::from("quickshell/shell.qml"))
+        );
+        assert_eq!(validate_entry_path("/etc/passwd"), None);
+        assert_eq!(validate_entry_path("../escape.qml"), None);
+        assert_eq!(validate_entry_path("nested/../escape.qml"), None);
     }
 
     #[test]
-    fn split_launch_path_without_parent() {
-        let (dir, name) = split_launch_path(Path::new("shell.qml"));
-        assert_eq!(dir, PathBuf::from("."));
-        assert_eq!(name, PathBuf::from("shell.qml"));
+    fn resolve_entry_prefers_requested_then_falls_back() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+
+        // Preferred hit: the requested path exists, take it.
+        std::fs::write(root.join("custom.qml"), b"").unwrap();
+        assert_eq!(
+            resolve_entry(root, Path::new("custom.qml")),
+            Some(PathBuf::from("custom.qml"))
+        );
+
+        // Fallback hit: requested doesn't exist, fall through to quickshell/shell.qml.
+        std::fs::create_dir_all(root.join("quickshell")).unwrap();
+        std::fs::write(root.join("quickshell/shell.qml"), b"").unwrap();
+        assert_eq!(
+            resolve_entry(root, Path::new("does-not-exist.qml")),
+            Some(PathBuf::from("quickshell/shell.qml"))
+        );
+
+        // Nothing exists: None (no bogus path invented).
+        let empty = tempfile::tempdir().unwrap();
+        assert_eq!(resolve_entry(empty.path(), Path::new("shell.qml")), None);
     }
 }

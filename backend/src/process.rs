@@ -12,6 +12,13 @@ const KILL_WAIT_MS: u64 = 500;
 const VERIFY_WAIT_MS: u64 = 300;
 const LOG_TAIL_LINES: usize = 20;
 
+// Match both `quickshell` and its `qs` symlink (shipped by the same package), with
+// or without a leading absolute/relative path. Users invoke any of: `qs -c <name>`,
+// `quickshell -p …`, or `/usr/bin/quickshell …`. `( |$)` after the name guards
+// against `qsfoo`/`quickshellx` false positives; `(^|/)` before handles the path
+// prefix case while still anchoring at a component boundary.
+pub const QS_MATCH_PATTERN: &str = r"(^|/)(quickshell|qs)( |$)";
+
 pub fn kill_notif_daemons() -> Result<()> {
     for name in NOTIFIERS {
         run_pkill(&["-TERM", "-x", name])?;
@@ -20,7 +27,7 @@ pub fn kill_notif_daemons() -> Result<()> {
 }
 
 pub fn kill_quickshell() -> Result<()> {
-    run_pkill(&["-TERM", "-f", "^quickshell"])?;
+    run_pkill(&["-TERM", "-f", QS_MATCH_PATTERN])?;
 
     let deadline = Instant::now() + Duration::from_millis(KILL_WAIT_MS);
     while Instant::now() < deadline {
@@ -30,7 +37,7 @@ pub fn kill_quickshell() -> Result<()> {
         thread::sleep(Duration::from_millis(KILL_POLL_MS));
     }
 
-    run_pkill(&["-KILL", "-f", "^quickshell"])?;
+    run_pkill(&["-KILL", "-f", QS_MATCH_PATTERN])?;
     // Give SIGKILL a moment to land, then confirm the process is actually gone —
     // otherwise step 6 would race a still-alive quickshell and the user would see
     // two shells fighting over layer-shell surfaces.
@@ -60,7 +67,7 @@ fn run_pkill(args: &[&str]) -> Result<()> {
 }
 
 fn quickshell_running() -> Result<bool> {
-    pgrep_matches(&["-f", "^quickshell"])
+    pgrep_matches(&["-f", QS_MATCH_PATTERN])
 }
 
 // pgrep exit codes: 0 = matches found, 1 = no matches, 2 = syntax, 3 = fatal.
@@ -83,27 +90,39 @@ fn pgrep_matches(args: &[&str]) -> Result<bool> {
 }
 
 pub fn launch_detached(rice_dir: &Path, entry_rel: &Path, log_file: &Path) -> Result<()> {
+    let argv = vec![
+        "quickshell".to_string(),
+        "-p".to_string(),
+        format!("./{}", entry_rel.display()),
+    ];
+    launch_argv(&argv, rice_dir, log_file)
+}
+
+/// Relaunch a shell from a persisted argv+cwd pair. Used by `exit` to restore the
+/// user's pre-RiceCooker shell regardless of how it was invoked (`-p <path>` or
+/// `-c <name>`), since we keep the full argv we scraped from /proc.
+pub fn launch_argv(argv: &[String], cwd: &Path, log_file: &Path) -> Result<()> {
+    let (argv0, rest) = argv
+        .split_first()
+        .ok_or_else(|| anyhow!("empty argv; nothing to launch"))?;
     let log = fs::File::create(log_file)
         .with_context(|| format!("opening log {}", log_file.display()))?;
-    let entry_arg = format!("./{}", entry_rel.display());
     // `setsid -f` forks a new session leader and returns immediately — its exit code
     // reflects only whether setsid *spawned* successfully, NOT whether the child
-    // quickshell stayed alive. Quickshell health is checked separately by `verify()`.
+    // stayed alive. For the apply path, health is checked by `verify()`; for the
+    // exit/restore path we trust the user's prior shell to come back up.
     let status = Command::new("setsid")
         .arg("-f")
-        .arg("quickshell")
-        .arg("-p")
-        .arg(&entry_arg)
-        .current_dir(rice_dir)
+        .arg(argv0)
+        .args(rest)
+        .current_dir(cwd)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(log)
         .status()
-        .context("spawning setsid quickshell")?;
+        .with_context(|| format!("spawning setsid {argv0}"))?;
     if !status.success() {
-        return Err(anyhow!(
-            "setsid failed to spawn (exit {status}); quickshell health is checked by verify()"
-        ));
+        return Err(anyhow!("setsid failed to spawn (exit {status})"));
     }
     Ok(())
 }
@@ -131,6 +150,10 @@ pub fn verify(entry_rel: &Path, log_file: &Path) -> Result<VerifyResult> {
     })
 }
 
+// Hardcoded to `quickshell` (not `qs`): this pattern only verifies a shell *we*
+// launched via `launch_detached`, which always uses argv[0] = "quickshell". The
+// broader `QS_MATCH_PATTERN` above is for finding/killing arbitrary user-invoked
+// shells, which is a different question.
 pub fn quickshell_cmdline_pattern(entry_rel: &Path) -> String {
     let s = entry_rel.display().to_string();
     format!(r"^quickshell -p \./{}$", regex::escape(&s))
@@ -157,30 +180,19 @@ pub fn parse_cmdline(bytes: &[u8]) -> Vec<String> {
         .collect()
 }
 
-/// Given argv (including argv[0]), find the value after `-p`. Only `-p` is matched —
-/// `-c <name>` takes a config name, not a path, so recording it and later launching
-/// as `quickshell -p ./<name>` on `exit` would silently load the wrong thing.
-pub fn extract_entry_arg(argv: &[String]) -> Option<String> {
-    let mut iter = argv.iter().skip(1);
-    while let Some(arg) = iter.next() {
-        if arg == "-p" {
-            return iter.next().cloned();
-        }
-    }
-    None
-}
-
 pub struct QuickshellProc {
     pub cmdline: Vec<String>,
-    /// /proc/<pid>/cwd at scan time, used to resolve relative `-p` paths when
-    /// stamping `original`.
+    /// /proc/<pid>/cwd at scan time. Persisted with argv so `exit` can relaunch
+    /// with the same working directory — needed when the shell was started with
+    /// a relative `-p` path.
     pub cwd: Option<PathBuf>,
 }
 
-/// Scan /proc for a process whose argv[0] basename is exactly "quickshell".
-/// Returns the first match in /proc iteration order, which is kernel-dependent —
-/// relying on a *specific* match when two Quickshells run simultaneously is wrong.
-/// The design doc assumes one Quickshell at a time, so first-match is fine here.
+/// Scan /proc for a process whose argv[0] basename is "quickshell" or its `qs`
+/// symlink. Returns the first match in /proc iteration order, which is
+/// kernel-dependent — relying on a *specific* match when two shells run
+/// simultaneously is wrong. The design doc assumes one at a time, so first-match
+/// is fine here.
 ///
 /// No owner filtering: on single-user Linux laptops (our target) there's only one
 /// quickshell. `hidepid`, where enabled, masks other users' /proc entries; where
@@ -206,7 +218,7 @@ pub fn find_running_quickshell() -> Result<Option<QuickshellProc>> {
             .file_name()
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_default();
-        if argv0_basename == "quickshell" {
+        if matches!(argv0_basename.as_str(), "quickshell" | "qs") {
             let cwd = fs::read_link(format!("/proc/{pid}/cwd")).ok();
             return Ok(Some(QuickshellProc { cmdline: argv, cwd }));
         }
@@ -245,28 +257,30 @@ mod tests {
     }
 
     #[test]
-    fn extract_entry_arg_covers_every_shape() {
-        fn sv(xs: &[&str]) -> Vec<String> {
-            xs.iter().map(|s| s.to_string()).collect()
+    fn qs_match_pattern_matches_both_names_and_rejects_false_positives() {
+        let re = regex::Regex::new(QS_MATCH_PATTERN).expect("compiles");
+        // Accepts: bare names, path-prefixed invocations, both qs and quickshell,
+        // with and without trailing args.
+        for cmdline in [
+            "quickshell",
+            "quickshell -p ./shell.qml",
+            "qs",
+            "qs -c clock",
+            "/usr/bin/quickshell -p ./shell.qml",
+            "/usr/bin/qs -c clock",
+            "./qs -c clock",
+        ] {
+            assert!(re.is_match(cmdline), "should match: {cmdline}");
         }
-        // argv[0] is always skipped; only `-p` matches.
-        let cases: &[(&[&str], Option<&str>)] = &[
-            (&["quickshell", "-p", "./shell.qml"], Some("./shell.qml")),
-            (&["quickshell", "-c", "mybar"], None),
-            (&["quickshell", "-p"], None),
-            (&["quickshell"], None),
-            (&["quickshell", "--help"], None),
-            (
-                &["quickshell", "-c", "first", "-p", "second"],
-                Some("second"),
-            ),
-        ];
-        for (argv, expected) in cases {
-            assert_eq!(
-                extract_entry_arg(&sv(argv)).as_deref(),
-                *expected,
-                "argv = {argv:?}"
-            );
+        // Rejects: same prefix with extra letters, names embedded in other words,
+        // or appearing mid-cmdline without a component boundary.
+        for cmdline in [
+            "quickshellx -p foo",
+            "qsfoo",
+            "/usr/bin/qsfoo -c x",
+            "foo quickshell bar",
+        ] {
+            assert!(!re.is_match(cmdline), "should not match: {cmdline}");
         }
     }
 }
