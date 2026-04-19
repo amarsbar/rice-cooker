@@ -219,8 +219,9 @@ pub struct QuickshellProc {
 /// The design doc assumes one Quickshell at a time, so first-match is fine here.
 ///
 /// No owner filtering: on single-user Linux laptops (our target) there's only one
-/// quickshell, and `hidepid` already masks other users' /proc entries on most
-/// modern distros.
+/// quickshell. `hidepid`, where enabled, masks other users' /proc entries; where
+/// it isn't enabled we'd pick up another user's qs on a shared host — a threat
+/// model v0 doesn't defend against.
 pub fn find_running_quickshell() -> Result<Option<QuickshellProc>> {
     let proc_dir = fs::read_dir("/proc")?;
     for entry in proc_dir {

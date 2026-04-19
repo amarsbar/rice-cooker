@@ -32,8 +32,9 @@ pub fn clone_or_update(repo_url: &str, dest: &Path, log_file: &Path) -> anyhow::
     }
 
     // Fresh log per clone/update so a retry doesn't include stderr from the
-    // previous failed attempt. launch_detached truncates again at step 6 for
-    // qs stderr; this truncation covers the failed-retry-before-launch case.
+    // previous failed attempt. `launch_detached` truncates again when it opens
+    // the same file for qs stderr; this truncation covers the failed-before-launch
+    // window that truncation wouldn't otherwise touch.
     fs::write(log_file, b"")
         .with_context(|| format!("truncating git log {}", log_file.display()))?;
 
