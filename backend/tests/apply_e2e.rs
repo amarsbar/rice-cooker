@@ -161,6 +161,29 @@ fn apply_rejects_absolute_and_traversal_entry_with_distinct_reason() {
 }
 
 #[test]
+fn exit_refuses_to_replay_when_original_cwd_is_missing() {
+    // Seeds an OriginalShell with no cwd — simulates a /proc/<pid>/cwd read
+    // failure at capture time. Replaying from an arbitrary cwd would be wrong
+    // for a relative-`-p` invocation, so `exit` must fail loudly, not guess.
+    let h = Harness::new();
+    std::fs::create_dir_all(&h.cache_dir).unwrap();
+    std::fs::write(h.cache_dir.join("active"), "x\n").unwrap();
+    std::fs::write(
+        h.cache_dir.join("original"),
+        r#"{"argv":["qs","-c","clock"]}"#,
+    )
+    .unwrap();
+
+    let out = h.bin().arg("exit").output().unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let events = parse_ndjson(&out.stdout);
+    let last = last_event(&events);
+    assert_eq!(last["type"], "fail");
+    assert_eq!(last["stage"], "launch");
+    assert_eq!(last["reason"], "cwd_missing");
+}
+
+#[test]
 fn exit_replays_persisted_argv_via_setsid() {
     // Seeds the cache with a `qs -c clock` original, runs `exit`, and asserts
     // setsid got invoked with the persisted argv — the round-trip the whole
