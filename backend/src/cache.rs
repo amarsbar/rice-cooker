@@ -20,11 +20,7 @@ impl Cache {
         &self.root
     }
 
-    /// Resolve the on-disk directory for a rice by name. Rejects names that could
-    /// escape the `rices/` subdir — even under a curated catalog, a typo'd entry
-    /// (`..`, `/`, `\`, NUL) would otherwise write outside the cache root. The name
-    /// is part of a filesystem path, not a URL, so this check matters even when
-    /// the URL-side is trusted.
+    // Resolves file system path and rejects rice names that can affect the path
     pub fn rice_dir(&self, name: &str) -> Result<PathBuf> {
         if name.is_empty()
             || name == "."
