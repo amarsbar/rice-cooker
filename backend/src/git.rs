@@ -23,10 +23,6 @@ pub fn preflight() -> anyhow::Result<()> {
 }
 
 pub fn clone_or_update(repo_url: &str, dest: &Path, log_file: &Path) -> anyhow::Result<()> {
-    // Reject URLs starting with `-` up front: our message is clearer than whatever
-    // git would emit and the `--` separator below only guards the top-level URL,
-    // not e.g. submodule URLs. The `ext::` vector is separately blocked by the
-    // `-c protocol.ext.allow=never` config in git_cmd() — no need to double-check here.
     if repo_url.starts_with('-') {
         anyhow::bail!("refusing repo URL starting with '-': {}", repo_url);
     }

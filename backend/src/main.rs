@@ -29,10 +29,8 @@ enum Cmd {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Kill the active rice; restore the user's pre-RiceCooker shell if recorded.
-    Exit,
-    /// Print a single JSON object describing current state.
-    Status,
+    Exit, // Kill the active rice; restore the user's pre-RiceCooker shell if recorded.
+    Status, // Print a single JSON object describing current state.
 }
 
 fn main() -> ExitCode {
