@@ -124,6 +124,9 @@ fn exit_with_no_original_clears_state_and_reports_success() {
     let last = last_event(&events);
     assert_eq!(last["type"], "success");
     assert_eq!(h.read_cache_file("active"), None);
+    // Exit must also drop `original` so the next apply re-captures whatever is
+    // running then, rather than inheriting a stale record.
+    assert_eq!(h.read_cache_file("original"), None);
 }
 
 #[test]

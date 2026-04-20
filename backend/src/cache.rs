@@ -101,12 +101,24 @@ impl Cache {
     }
 
     pub fn clear_active(&self) -> Result<()> {
-        let p = self.root.join("active");
-        match fs::remove_file(&p) {
-            Ok(()) => Ok(()),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(e) => Err(e).with_context(|| format!("removing {}", p.display())),
-        }
+        remove_if_exists(&self.root.join("active"))
+    }
+
+    /// Drop the recorded "original" shell so the next `apply` preflight re-captures
+    /// whatever's currently running. Called from `exit` — after we've relaunched the
+    /// pre-rice shell, the recorded state is stale (the same value the user is now
+    /// back in, but we can't assume they won't manually switch shells before the
+    /// next apply).
+    pub fn clear_original(&self) -> Result<()> {
+        remove_if_exists(&self.root.join("original"))
+    }
+}
+
+fn remove_if_exists(p: &Path) -> Result<()> {
+    match fs::remove_file(p) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e).with_context(|| format!("removing {}", p.display())),
     }
 }
 
@@ -295,5 +307,16 @@ mod tests {
         assert!(cache.active().unwrap().is_none());
         // Idempotent: clearing a missing file is fine.
         cache.clear_active().unwrap();
+    }
+
+    #[test]
+    fn clear_original_resets_recorded_flag_and_is_idempotent() {
+        let (_dir, cache) = tmp_cache();
+        cache.set_original(None).unwrap();
+        assert!(cache.original_is_recorded());
+        cache.clear_original().unwrap();
+        assert!(!cache.original_is_recorded());
+        // Idempotent.
+        cache.clear_original().unwrap();
     }
 }

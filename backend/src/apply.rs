@@ -181,7 +181,11 @@ pub fn run_exit<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<
         step(events, Step::Launch, StepState::Done)?;
     }
 
-    try_stage!(events, "commit", "clear", cache.clear_active());
+    try_stage!(events, "commit", "clear_active", cache.clear_active());
+    // Drop the stale `original` record too: exit has relaunched the pre-rice shell,
+    // so on the next `apply`, preflight should re-capture whatever is currently
+    // running rather than inheriting what we captured on the previous apply.
+    try_stage!(events, "commit", "clear_original", cache.clear_original());
     events.emit(&Event::Success {
         active: None,
         dry_run: false,
