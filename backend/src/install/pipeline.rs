@@ -419,6 +419,17 @@ fn reverse_fs_diff(
             );
             continue;
         }
+        // Idempotent short-circuit: if the current content already matches
+        // pre-install (this can happen on a retry of a partially-completed
+        // uninstall, where we already restored this path on the first try),
+        // skip both the .rcsave and the restore. Without this, a retry
+        // would .rcsave the correctly-restored pre-install content as if
+        // it were user-modified.
+        if let Ok(current) = snapshot::hash_file(&m.path)
+            && current == m.pre_hash
+        {
+            continue;
+        }
 
         if is_runtime {
             // Runtime-regenerated: restore pre-install content if we have
