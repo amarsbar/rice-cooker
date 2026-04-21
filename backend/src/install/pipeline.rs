@@ -108,6 +108,18 @@ fn install_locked_inner(
         fs::remove_dir_all(&clone)
             .with_context(|| format!("removing stale clone {}", clone.display()))?;
     }
+    // Nuke any stale snapshot-dir too. R5 finding: a prior install that
+    // crashed after install_cmd leaves snapshot_dir in place (so the user
+    // can uninstall). If the user instead retries install, we MUST discard
+    // the stale content/ + manifest.json + .cmd-ran — they describe a
+    // different pre-snapshot than the one we're about to take, and
+    // trusting them would silently restore wrong content on the next
+    // uninstall.
+    let snap_dir = dirs.snapshot_dir(name);
+    if snap_dir.exists() {
+        fs::remove_dir_all(&snap_dir)
+            .with_context(|| format!("removing stale snapshot {}", snap_dir.display()))?;
+    }
     log_verbose(flags, &format!("cloning {} @ {}", entry.repo, entry.commit));
     git::clone_at_commit(&entry.repo, &entry.commit, &clone)?;
 
@@ -121,7 +133,6 @@ fn install_locked_inner(
     // Pre-snapshot.
     log_verbose(flags, "pre-snapshot");
     let pre = snapshot::take_snapshot(&walk_opts)?;
-    let snap_dir = dirs.snapshot_dir(name);
     fs::create_dir_all(snap_dir.join("content"))
         .with_context(|| format!("creating {}", snap_dir.display()))?;
     snapshot::save_manifest(&snap_dir.join("manifest.json"), &pre)?;
@@ -233,8 +244,35 @@ fn install_locked_inner(
         },
         log_path: log_path.clone(),
     };
-    save_record(&dirs.record_json(name), &record)?;
-    write_current(dirs, name)?;
+    // Past this point, install_cmd has deployed files to HOME. If the
+    // record / current.json write fails (disk full, permissions flipped),
+    // we MUST surface loud recovery guidance — silently returning Err
+    // would orphan the user with no state, no way to uninstall, and no
+    // idea what happened.
+    if let Err(e) = save_record(&dirs.record_json(name), &record) {
+        eprintln!(
+            "\n=== CRITICAL: install succeeded but saving the record FAILED ===\n\
+             error: {e:#}\n\
+             The rice has likely deployed files to $HOME but rice-cooker has no\n\
+             record to reverse them. Review the install log at {} and clean up\n\
+             HOME manually. The clone + snapshot dirs are preserved at:\n  {}\n  {}\n",
+            log_path.display(),
+            clone.display(),
+            snap_dir.display()
+        );
+        return Err(e);
+    }
+    if let Err(e) = write_current(dirs, name) {
+        eprintln!(
+            "\n=== CRITICAL: record saved but current.json write FAILED ===\n\
+             error: {e:#}\n\
+             The record exists at {} but rice-cooker won't find it via status/uninstall.\n\
+             Manually move it to current.json, or retry `install {name}` after\n\
+             resolving the underlying filesystem issue.\n",
+            dirs.record_json(name).display()
+        );
+        return Err(e);
+    }
 
     Ok(InstallOutcome {
         name: name.to_string(),
@@ -275,6 +313,8 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
         return Ok(UninstallOutcome {
             name,
             rcsave_paths: vec![],
+            crash_record: false,
+            preserved_snapshot_dir: None,
         });
     }
 
@@ -287,9 +327,24 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
     // 2. Disable systemd units.
     systemd::disable_units(&record.systemd_units_enabled)?;
 
-    // 3. Reverse fs diff. `rcsave_paths` is passed mutably so it's
-    //    populated in place — a mid-reversal Err still returns the
-    //    partial list on the error path via `.map_err` below.
+    // Detect the crash-record shape (partial + empty fs_diff + empty
+    // pacman_diff + empty systemd_units). write_partial_crashed_record
+    // produces records that look exactly like this. Uninstall's fs/pacman
+    // reversal is a no-op for these (correct — we don't know what to
+    // reverse), but the user needs a LOUD warning that HOME may still
+    // have leftover deployed files, and we preserve the snapshot dir's
+    // pre-content backups in case the user wants to manually recover.
+    let crash_record = record.partial
+        && record.fs_diff.added.is_empty()
+        && record.fs_diff.modified.is_empty()
+        && record.fs_diff.deleted.is_empty()
+        && record.fs_diff.symlinks_added.is_empty()
+        && record.fs_diff.dirs_added.is_empty()
+        && record.pacman_diff.added_explicit.is_empty()
+        && record.systemd_units_enabled.is_empty();
+
+    // 3. Reverse fs diff. `rcsave_paths` is passed mutably so a mid-
+    //    reversal Err still surfaces the partial list.
     let mut rcsave_paths: Vec<PathBuf> = Vec::new();
     if let Err(e) = reverse_fs_diff(dirs, &name, &record, flags, &mut rcsave_paths) {
         if !rcsave_paths.is_empty() {
@@ -303,15 +358,27 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
         return Err(e);
     }
 
-    // 4. Clean up cache dirs for this rice.
+    // 4. Clean up cache dirs. On crash-records, preserve snapshot_dir so
+    //    the user can manually recover — it may hold the only copy of
+    //    pre-install content for files the rice modified before crashing.
     let _ = fs::remove_dir_all(dirs.clone_dir(&name));
-    let _ = fs::remove_dir_all(dirs.snapshot_dir(&name));
+    let preserved_snapshot_dir = if crash_record && dirs.snapshot_dir(&name).exists() {
+        Some(dirs.snapshot_dir(&name))
+    } else {
+        let _ = fs::remove_dir_all(dirs.snapshot_dir(&name));
+        None
+    };
 
     // 5. Retire record.
     retire_to_previous(dirs, &name)?;
     clear_current(dirs)?;
 
-    Ok(UninstallOutcome { name, rcsave_paths })
+    Ok(UninstallOutcome {
+        name,
+        rcsave_paths,
+        crash_record,
+        preserved_snapshot_dir,
+    })
 }
 
 /// Atomic switch: uninstall the current rice and install <to> under a
@@ -655,6 +722,17 @@ pub struct InstallOutcome {
 pub struct UninstallOutcome {
     pub name: String,
     pub rcsave_paths: Vec<PathBuf>,
+    /// Set when the record being uninstalled looked like a crash-record
+    /// (partial + empty fs_diff). Caller should warn the user loudly —
+    /// HOME may still have files the rice deployed; rice-cooker has no
+    /// record of them. The `preserved_snapshot_dir` below points at the
+    /// manual-recovery content if we kept it.
+    pub crash_record: bool,
+    /// When `crash_record` is true, this is the preserved snapshot dir
+    /// where pre-install content backups (if any made it to disk) still
+    /// live, so the user can manually recover. None when no recovery
+    /// data exists.
+    pub preserved_snapshot_dir: Option<PathBuf>,
 }
 
 #[derive(Debug)]
