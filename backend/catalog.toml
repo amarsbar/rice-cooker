@@ -1,0 +1,134 @@
+# rice-cooker catalog — one file, keyed by rice name.
+# Filename stem of each [table] is the CLI id: `rice-cooker install <stem>`.
+#
+# `commit` MUST be a full hex SHA — no branch names, no "HEAD". Pinning is
+# what lets us reproduce the install and hash the rice's intended state.
+# When upgrading a rice, bump `commit` (and any fields that depend on it).
+#
+# `install_cmd` is run as `sh -c "<install_cmd>"` in the cloned rice's
+# directory. For rices without a bespoke installer, synthesize one that
+# deploys the shell dir into $HOME/.config/quickshell/<name>/ so `qs -c
+# <name>` picks it up.
+#
+# `commit` values below are placeholders pinned during v2 curation; bump
+# them when upgrading a rice.
+
+[caelestia]
+display_name = "Caelestia"
+description = "Segsy Quickshell rice with install.fish"
+repo = "https://github.com/caelestia-dots/shell"
+commit = "0000000000000000000000000000000000000001"
+install_cmd = "./install.fish --noconfirm --aur-helper=paru"
+interactive = false
+shell_type = "quickshell"
+partial_ownership = ["~/.zshrc", "~/.bashrc", "~/.config/mimeapps.list"]
+runtime_regenerated = [
+  "~/.config/gtk-3.0/settings.ini",
+  "~/.config/gtk-3.0/colors.css",
+  "~/.config/gtk-4.0/settings.ini",
+  "~/.config/qt5ct/qt5ct.conf",
+]
+documented_system_effects = [
+  "installs caelestia-meta from AUR (via install.fish → paru)",
+]
+
+[noctalia]
+display_name = "Noctalia"
+description = "Minimal dark Quickshell"
+repo = "https://github.com/noctalia-dev/noctalia-shell"
+commit = "0000000000000000000000000000000000000002"
+install_cmd = "mkdir -p \"$HOME/.config/quickshell\" && ln -sfnT \"$PWD\" \"$HOME/.config/quickshell/noctalia\""
+
+[dms]
+display_name = "DankMaterialShell"
+description = "Material-design Quickshell"
+repo = "https://github.com/AvengeMedia/DankMaterialShell"
+commit = "0000000000000000000000000000000000000003"
+install_cmd = "mkdir -p \"$HOME/.config/quickshell\" && ln -sfnT \"$PWD/quickshell\" \"$HOME/.config/quickshell/dms\""
+
+[end-4]
+display_name = "illogical-impulse (end-4 dots-hyprland)"
+description = "End-4's Quickshell-based dotfiles"
+repo = "https://github.com/end-4/dots-hyprland"
+commit = "0000000000000000000000000000000000000004"
+install_cmd = "mkdir -p \"$HOME/.config/quickshell\" && ln -sfnT \"$PWD/.config/quickshell/ii\" \"$HOME/.config/quickshell/end-4\""
+documented_system_effects = [
+  "upstream installer also modifies waybar/hypr/gtk configs (we do not run it)",
+]
+
+[Ambxst]
+display_name = "Ambxst"
+description = "Axenide's Quickshell rice"
+repo = "https://github.com/Axenide/Ambxst"
+commit = "0000000000000000000000000000000000000005"
+install_cmd = "mkdir -p \"$HOME/.config/quickshell\" && ln -sfnT \"$PWD\" \"$HOME/.config/quickshell/Ambxst\""
+
+[iNiR]
+display_name = "iNiR"
+description = "Snowarch's Quickshell rice"
+repo = "https://github.com/snowarch/iNiR"
+commit = "0000000000000000000000000000000000000006"
+install_cmd = "mkdir -p \"$HOME/.config/quickshell\" && ln -sfnT \"$PWD\" \"$HOME/.config/quickshell/iNiR\""
+
+[nucleus]
+display_name = "Nucleus"
+description = "Nucleus HQ's Quickshell rice"
+repo = "https://github.com/nucleus-hq/nucleus-shell"
+commit = "0000000000000000000000000000000000000007"
+install_cmd = "mkdir -p \"$HOME/.config/quickshell\" && ln -sfnT \"$PWD\" \"$HOME/.config/quickshell/nucleus\""
+
+[NibrasShell]
+display_name = "NibrasShell"
+description = "Ahmed Saadi's Quickshell rice"
+repo = "https://github.com/AhmedSaadi0/NibrasShell"
+commit = "0000000000000000000000000000000000000008"
+install_cmd = "mkdir -p \"$HOME/.config/quickshell\" && ln -sfnT \"$PWD\" \"$HOME/.config/quickshell/NibrasShell\""
+
+[linux-retroism]
+display_name = "linux-retroism"
+description = "Diinki's Quickshell rice"
+repo = "https://github.com/diinki/linux-retroism"
+commit = "0000000000000000000000000000000000000009"
+install_cmd = "mkdir -p \"$HOME/.config/quickshell\" && ln -sfnT \"$PWD\" \"$HOME/.config/quickshell/linux-retroism\""
+
+[Zaphkiel]
+display_name = "Zaphkiel"
+description = "Rexcrazy's Quickshell rice"
+repo = "https://github.com/Rexcrazy804/Zaphkiel"
+commit = "000000000000000000000000000000000000000a"
+install_cmd = "mkdir -p \"$HOME/.config/quickshell\" && ln -sfnT \"$PWD\" \"$HOME/.config/quickshell/Zaphkiel\""
+
+[eqsh]
+display_name = "eqsh"
+description = "eq-desktop's Quickshell rice"
+repo = "https://github.com/eq-desktop/eqsh"
+commit = "000000000000000000000000000000000000000b"
+install_cmd = "mkdir -p \"$HOME/.config/quickshell\" && ln -sfnT \"$PWD\" \"$HOME/.config/quickshell/eqsh\""
+
+[dotfiles-hyprland]
+display_name = "dotfiles-hyprland"
+description = "cxOrz's dotfiles-hyprland Quickshell rice"
+repo = "https://github.com/cxOrz/dotfiles-hyprland"
+commit = "000000000000000000000000000000000000000c"
+install_cmd = "mkdir -p \"$HOME/.config/quickshell\" && ln -sfnT \"$PWD/.config/quickshell\" \"$HOME/.config/quickshell/dotfiles-hyprland\""
+
+[whisker]
+display_name = "whisker"
+description = "corecathx's Quickshell rice"
+repo = "https://github.com/corecathx/whisker"
+commit = "000000000000000000000000000000000000000d"
+install_cmd = "mkdir -p \"$HOME/.config/quickshell\" && ln -sfnT \"$PWD\" \"$HOME/.config/quickshell/whisker\""
+
+[dhrruvsharma-shell]
+display_name = "dhrruvsharma-shell"
+description = "dhrruvsharma's shell"
+repo = "https://github.com/dhrruvsharma/shell"
+commit = "000000000000000000000000000000000000000e"
+install_cmd = "mkdir -p \"$HOME/.config/quickshell\" && ln -sfnT \"$PWD\" \"$HOME/.config/quickshell/dhrruvsharma-shell\""
+
+[Moonveil]
+display_name = "Moonveil"
+description = "notcandy001's Quickshell rice"
+repo = "https://github.com/notcandy001/Moonveil"
+commit = "000000000000000000000000000000000000000f"
+install_cmd = "mkdir -p \"$HOME/.config/quickshell\" && ln -sfnT \"$PWD/.config/quickshell\" \"$HOME/.config/quickshell/Moonveil\""

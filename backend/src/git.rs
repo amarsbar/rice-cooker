@@ -82,6 +82,39 @@ pub fn clone_or_update(repo_url: &str, dest: &Path, log_file: &Path) -> anyhow::
     Ok(())
 }
 
+/// Clone a repo and check out a specific commit. `dest` must not already
+/// exist — caller is responsible for deleting it first.
+pub fn clone_at_commit(repo_url: &str, commit: &str, dest: &Path) -> anyhow::Result<()> {
+    if repo_url.starts_with('-') {
+        anyhow::bail!("refusing repo URL starting with '-': {repo_url}");
+    }
+    // Full clone (not shallow), since we need a specific historical SHA.
+    // --no-checkout so we land without a working tree and can check out
+    // the pinned commit explicitly.
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("creating {}", parent.display()))?;
+    }
+    let status = git_cmd()
+        .args(["clone", "--no-checkout", "--", repo_url])
+        .arg(dest)
+        .status()
+        .context("git clone")?;
+    if !status.success() {
+        anyhow::bail!("git clone failed: exit {:?}", status.code());
+    }
+    let checkout = git_cmd()
+        .args(["-C"])
+        .arg(dest)
+        .args(["checkout", "--detach", commit])
+        .status()
+        .context("git checkout")?;
+    if !checkout.success() {
+        anyhow::bail!("git checkout {commit} failed: exit {:?}", checkout.code());
+    }
+    Ok(())
+}
+
 // Preconfigured `git` invocation. `-c protocol.ext.allow=never` forbids the `ext::`
 // protocol (arbitrary-command RCE) — cheap defense-in-depth in case a curated entry
 // or upstream rename ever sneaks one in. The terminal/askpass env guards were

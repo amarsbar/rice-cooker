@@ -1,0 +1,235 @@
+//! Install record: the JSON file at
+//! `~/.local/share/rice-cooker/installs/<name>.json` plus the `current.json`
+//! "what's installed now?" pointer.
+
+use std::fs;
+use std::path::{Path, PathBuf};
+
+use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
+use time::OffsetDateTime;
+use time::format_description::well_known::Rfc3339;
+
+use super::diff::FsDiff;
+use super::env::Dirs;
+
+pub const SCHEMA_VERSION: u32 = 1;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InstallRecord {
+    pub schema_version: u32,
+    pub name: String,
+    /// Pinned catalog commit.
+    pub commit: String,
+    /// BLAKE3 of the catalog entry's TOML, so `status` can tell if the
+    /// catalog changed since this rice was installed.
+    pub catalog_entry_hash: String,
+    /// RFC3339 timestamp.
+    pub installed_at: String,
+    pub install_cmd: String,
+    pub exit_code: i32,
+    /// True if install.sh exited non-zero; we still wrote this record so
+    /// uninstall has the state to reverse.
+    pub partial: bool,
+    pub fs_diff: FsDiff,
+    pub pacman_diff: PacmanDiff,
+    /// Catalog's `partial_ownership` and `runtime_regenerated` paths, HOME-
+    /// expanded at record time. Uninstall reads these to apply per-path
+    /// reversal rules without re-reading the catalog (catalog may have
+    /// changed by then).
+    #[serde(default)]
+    pub partial_ownership_paths: Vec<PathBuf>,
+    #[serde(default)]
+    pub runtime_regenerated_paths: Vec<PathBuf>,
+    /// Systemd user units enabled during this install (detected via
+    /// `~/.config/systemd/user/**/*.target.wants/*.service` symlinks in the
+    /// fs_diff).
+    #[serde(default)]
+    pub systemd_units_enabled: Vec<String>,
+    /// Path to the log file that captured install.sh stdout+stderr.
+    pub log_path: PathBuf,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PacmanDiff {
+    #[serde(default)]
+    pub added_explicit: Vec<String>,
+    #[serde(default)]
+    pub removed_explicit: Vec<String>,
+}
+
+impl InstallRecord {
+    pub fn now_rfc3339() -> String {
+        OffsetDateTime::now_utc()
+            .format(&Rfc3339)
+            .unwrap_or_else(|_| "0000-00-00T00:00:00Z".into())
+    }
+}
+
+pub fn save_record(path: &Path, r: &InstallRecord) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("creating {}", parent.display()))?;
+    }
+    let body = serde_json::to_string_pretty(r).context("serializing install record")?;
+    let mut tmp = path.as_os_str().to_os_string();
+    tmp.push(".tmp");
+    let tmp = PathBuf::from(tmp);
+    fs::write(&tmp, body.as_bytes())
+        .with_context(|| format!("writing {}", tmp.display()))?;
+    fs::rename(&tmp, path)
+        .with_context(|| format!("renaming {} -> {}", tmp.display(), path.display()))?;
+    Ok(())
+}
+
+pub fn load_record(path: &Path) -> Result<InstallRecord> {
+    let body = fs::read_to_string(path)
+        .with_context(|| format!("reading {}", path.display()))?;
+    let r: InstallRecord = serde_json::from_str(&body)
+        .with_context(|| format!("parsing install record at {}", path.display()))?;
+    if r.schema_version != SCHEMA_VERSION {
+        return Err(anyhow::anyhow!(
+            "install record at {} is schema_version {}, tool supports {}",
+            path.display(),
+            r.schema_version,
+            SCHEMA_VERSION
+        ));
+    }
+    Ok(r)
+}
+
+/// Atomically mark a rice as the currently-installed one. Writes
+/// `current.json` with the record's name inside — uninstall / status read
+/// this to find the active rice without scanning the installs dir.
+pub fn write_current(dirs: &Dirs, name: &str) -> Result<()> {
+    let body = serde_json::json!({ "name": name }).to_string();
+    let mut tmp = dirs.current_json().as_os_str().to_os_string();
+    tmp.push(".tmp");
+    let tmp = PathBuf::from(tmp);
+    fs::create_dir_all(dirs.installs_dir())
+        .with_context(|| format!("creating {}", dirs.installs_dir().display()))?;
+    fs::write(&tmp, body)
+        .with_context(|| format!("writing {}", tmp.display()))?;
+    fs::rename(&tmp, dirs.current_json()).context("renaming current.json")?;
+    Ok(())
+}
+
+pub fn read_current(dirs: &Dirs) -> Result<Option<String>> {
+    match fs::read_to_string(dirs.current_json()) {
+        Ok(s) => {
+            #[derive(Deserialize)]
+            struct Cur {
+                name: String,
+            }
+            let c: Cur = serde_json::from_str(&s)
+                .context("parsing current.json")?;
+            Ok(Some(c.name))
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e).context("reading current.json"),
+    }
+}
+
+pub fn clear_current(dirs: &Dirs) -> Result<()> {
+    match fs::remove_file(dirs.current_json()) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e).context("removing current.json"),
+    }
+}
+
+/// Move `<name>.json` to `previous.json`, overwriting any existing one.
+/// Called from uninstall to retire the record.
+pub fn retire_to_previous(dirs: &Dirs, name: &str) -> Result<()> {
+    let from = dirs.record_json(name);
+    let to = dirs.previous_json();
+    // If the record is missing entirely, nothing to retire.
+    if !from.exists() {
+        return Ok(());
+    }
+    fs::rename(&from, &to)
+        .with_context(|| format!("retiring {} -> {}", from.display(), to.display()))?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    fn tmp_dirs() -> (tempfile::TempDir, Dirs) {
+        let t = tempdir().unwrap();
+        let d = Dirs {
+            home: t.path().to_path_buf(),
+            cache: t.path().join("cache"),
+            data: t.path().join("data"),
+        };
+        d.ensure().unwrap();
+        (t, d)
+    }
+
+    fn sample_record() -> InstallRecord {
+        InstallRecord {
+            schema_version: SCHEMA_VERSION,
+            name: "caelestia".into(),
+            commit: "a3f4b2c9e1d7".into(),
+            catalog_entry_hash: "HASH".into(),
+            installed_at: InstallRecord::now_rfc3339(),
+            install_cmd: "./install.fish".into(),
+            exit_code: 0,
+            partial: false,
+            fs_diff: FsDiff::default(),
+            pacman_diff: PacmanDiff::default(),
+            partial_ownership_paths: vec![],
+            runtime_regenerated_paths: vec![],
+            systemd_units_enabled: vec![],
+            log_path: PathBuf::from("/tmp/log"),
+        }
+    }
+
+    #[test]
+    fn record_round_trips_through_json() {
+        let (_t, d) = tmp_dirs();
+        let r = sample_record();
+        let path = d.record_json(&r.name);
+        save_record(&path, &r).unwrap();
+        let back = load_record(&path).unwrap();
+        assert_eq!(back, r);
+    }
+
+    #[test]
+    fn current_json_roundtrip() {
+        let (_t, d) = tmp_dirs();
+        assert_eq!(read_current(&d).unwrap(), None);
+        write_current(&d, "caelestia").unwrap();
+        assert_eq!(read_current(&d).unwrap().as_deref(), Some("caelestia"));
+        clear_current(&d).unwrap();
+        assert_eq!(read_current(&d).unwrap(), None);
+        // Idempotent.
+        clear_current(&d).unwrap();
+    }
+
+    #[test]
+    fn retire_moves_to_previous() {
+        let (_t, d) = tmp_dirs();
+        let r = sample_record();
+        save_record(&d.record_json(&r.name), &r).unwrap();
+        assert!(d.record_json("caelestia").exists());
+        retire_to_previous(&d, "caelestia").unwrap();
+        assert!(!d.record_json("caelestia").exists());
+        assert!(d.previous_json().exists());
+    }
+
+    #[test]
+    fn load_rejects_future_schema_version() {
+        let (_t, d) = tmp_dirs();
+        let path = d.record_json("x");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(
+            &path,
+            r#"{"schema_version":99,"name":"x","commit":"a","catalog_entry_hash":"","installed_at":"","install_cmd":"","exit_code":0,"partial":false,"fs_diff":{},"pacman_diff":{},"log_path":"/"}"#,
+        )
+        .unwrap();
+        assert!(load_record(&path).is_err());
+    }
+}
