@@ -46,6 +46,12 @@ pub struct InstallRecord {
     /// fs_diff).
     #[serde(default)]
     pub systemd_units_enabled: Vec<String>,
+    /// Paths whose pre-install content couldn't be trusted for restore
+    /// (TOCTOU race during pre-content capture, permission denied, etc).
+    /// Uninstall SKIPS restore for these paths and leaves a message so the
+    /// user knows. Empty in the common case.
+    #[serde(default)]
+    pub unrestorable_paths: Vec<PathBuf>,
     /// Path to the log file that captured install.sh stdout+stderr.
     pub log_path: PathBuf,
 }
@@ -183,6 +189,7 @@ mod tests {
             partial_ownership_paths: vec![],
             runtime_regenerated_paths: vec![],
             systemd_units_enabled: vec![],
+            unrestorable_paths: vec![],
             log_path: PathBuf::from("/tmp/log"),
         }
     }

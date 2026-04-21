@@ -2,8 +2,11 @@
 //!
 //! `sh -c "<install_cmd>"` in the clone dir, with stdin/stdout/stderr
 //! routed per catalog's `interactive` flag:
-//!   interactive=false → stdin=/dev/null; stdout+stderr teed to log file
-//!     AND the parent's stderr so the user sees progress.
+//!   interactive=false → stdin=/dev/null; the child's stdout+stderr are
+//!     merged via `2>&1` and piped through `tee -a <log>` so the bytes
+//!     land BOTH in the log file and on the parent process's stdout
+//!     (inherited from tee). The child's exit code propagates out of
+//!     the pipeline via `set -o pipefail`.
 //!   interactive=true  → stdin/stdout/stderr inherited from parent tty,
 //!     and the log file captures a simulated header/footer so we have a
 //!     record.

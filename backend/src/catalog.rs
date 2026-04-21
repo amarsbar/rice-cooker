@@ -105,12 +105,20 @@ impl Catalog {
     }
 }
 
+/// Shape-check the catalog's pinned commit. All-zero hex is a placeholder
+/// used during catalog bring-up; installs refuse with a clear message
+/// instead of letting git surface `fatal: reference is not a tree`.
+pub fn is_placeholder_commit(commit: &str) -> bool {
+    commit.chars().all(|c| c == '0')
+}
+
 /// Rice names are path-segment-safe (they become cache/clone/log
 /// directory names). Same rule as the v1 cache id validator.
 pub fn validate_name(name: &str) -> Result<()> {
     if name.is_empty()
         || name == "."
         || name == ".."
+        || name.starts_with('-')
         || name.chars().any(|c| matches!(c, '/' | '\\' | '\0'))
     {
         return Err(anyhow!("invalid rice name {name:?}"));
@@ -130,6 +138,8 @@ fn validate_entry(name: &str, entry: &RiceEntry) -> Result<()> {
         return Err(anyhow!("{name}: commit is empty"));
     }
     // Commit must be a plausible hex SHA (≥7 hex chars). No branch names.
+    // All-zero hex slips past parse (we let it) and is caught at install
+    // time by `is_placeholder_commit` with a clearer, named error.
     if !entry.commit.chars().all(|c| c.is_ascii_hexdigit()) || entry.commit.len() < 7 {
         return Err(anyhow!(
             "{name}: commit must be a hex SHA (≥7 chars), got {:?}",
