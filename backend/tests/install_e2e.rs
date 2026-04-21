@@ -449,7 +449,16 @@ runtime_regenerated = ["~/.config/gtk-3.0/settings.ini"]
 #[test]
 fn install_uninstall_round_trip_for_each_of_the_15_shipped_rices() {
     let cat_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("catalog.toml");
-    let cat_body = fs::read_to_string(&cat_path).unwrap();
+    let shipped_body = fs::read_to_string(&cat_path).unwrap();
+    // Shipped commits are bring-up placeholders (`000...0001` through
+    // `...000f`). `install()`'s placeholder gate would block every one.
+    // Rewrite to non-placeholder SHAs for the test — the fake git ignores
+    // the SHA anyway, so this isn't exercising commit-resolution, just
+    // pipeline shape.
+    let cat_body = shipped_body.replace(
+        "0000000000000000000000000000000000000",
+        "abc456789abc123456789abc123456789abc1",
+    );
     let cat = rice_cooker_backend::catalog::Catalog::from_str(&cat_body).unwrap();
     let mut failures: Vec<String> = Vec::new();
 
