@@ -59,19 +59,21 @@ pub fn install(
 ///   the clone + snapshot dir alive so `uninstall` can reverse whatever
 ///   did land. The inner path attempts a best-effort record write so the
 ///   user has something to uninstall even if later steps failed.
+///
+/// The phase boundary is tracked via an in-memory `AtomicBool` passed
+/// through as `cmd_ran`. Using an in-memory flag (rather than the
+/// previous on-disk `.cmd-ran` sentinel) closes R6-I-2: a sentinel-create
+/// failure can't silently put us on the wrong side of the phase.
 fn install_locked(
     cat: &Catalog,
     dirs: &Dirs,
     name: &str,
     flags: Flags,
 ) -> Result<InstallOutcome> {
-    let result = install_locked_inner(cat, dirs, name, flags);
-    // Only clean up when the error AND the rice hasn't yet deployed
-    // anything. install_locked_inner signals this by removing its own
-    // sentinel on post-install-cmd success; by the time we get here the
-    // sentinel's presence (or absence) tells us whether we're allowed to
-    // clean up.
-    if result.is_err() && !dirs.snapshot_dir(name).join(".cmd-ran").exists() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let cmd_ran = AtomicBool::new(false);
+    let result = install_locked_inner(cat, dirs, name, flags, &cmd_ran);
+    if result.is_err() && !cmd_ran.load(Ordering::SeqCst) {
         let _ = fs::remove_dir_all(dirs.snapshot_dir(name));
         let _ = fs::remove_dir_all(dirs.clone_dir(name));
     }
@@ -83,6 +85,7 @@ fn install_locked_inner(
     dirs: &Dirs,
     name: &str,
     flags: Flags,
+    cmd_ran: &std::sync::atomic::AtomicBool,
 ) -> Result<InstallOutcome> {
 
     let entry = cat
@@ -179,8 +182,9 @@ fn install_locked_inner(
 
     // Install_cmd has run. From here on, the rice may have deployed files
     // to HOME — the outer install_locked wrapper must NOT clean up cache
-    // state on subsequent error. Drop a sentinel the wrapper reads.
-    let _ = fs::File::create(snap_dir.join(".cmd-ran"));
+    // state on subsequent error. Flip the in-memory flag so that guard
+    // doesn't depend on a sentinel file that could fail to create.
+    cmd_ran.store(true, std::sync::atomic::Ordering::SeqCst);
 
     // Post-snapshot. If this fails, best-effort record below still runs.
     log_verbose(flags, "post-snapshot");
@@ -242,6 +246,7 @@ fn install_locked_inner(
             v.sort();
             v
         },
+        crash_recovery: false,
         log_path: log_path.clone(),
     };
     // Past this point, install_cmd has deployed files to HOME. If the
@@ -327,21 +332,12 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
     // 2. Disable systemd units.
     systemd::disable_units(&record.systemd_units_enabled)?;
 
-    // Detect the crash-record shape (partial + empty fs_diff + empty
-    // pacman_diff + empty systemd_units). write_partial_crashed_record
-    // produces records that look exactly like this. Uninstall's fs/pacman
-    // reversal is a no-op for these (correct — we don't know what to
-    // reverse), but the user needs a LOUD warning that HOME may still
-    // have leftover deployed files, and we preserve the snapshot dir's
-    // pre-content backups in case the user wants to manually recover.
-    let crash_record = record.partial
-        && record.fs_diff.added.is_empty()
-        && record.fs_diff.modified.is_empty()
-        && record.fs_diff.deleted.is_empty()
-        && record.fs_diff.symlinks_added.is_empty()
-        && record.fs_diff.dirs_added.is_empty()
-        && record.pacman_diff.added_explicit.is_empty()
-        && record.systemd_units_enabled.is_empty();
+    // Crash-record detection: use the explicit field written by
+    // `write_partial_crashed_record`. Previous heuristic (partial + empty
+    // diffs) misfired on legitimate "install_cmd exits non-zero before
+    // deploying anything" records — those are still normal records the
+    // user can uninstall cleanly; no bogus warning needed.
+    let crash_record = record.crash_recovery;
 
     // 3. Reverse fs diff. `rcsave_paths` is passed mutably so a mid-
     //    reversal Err still surfaces the partial list.
@@ -678,10 +674,23 @@ fn write_partial_crashed_record(
         partial: true,
         fs_diff: FsDiff::default(),
         pacman_diff: PacmanDiff::default(),
-        partial_ownership_paths: vec![],
-        runtime_regenerated_paths: vec![],
+        // Populate from the catalog entry for forensic value — even
+        // though we don't have per-install state, knowing which paths
+        // the rice *declared* as partial / runtime helps the user
+        // diagnose what might be out in $HOME.
+        partial_ownership_paths: entry
+            .partial_ownership
+            .iter()
+            .map(|s| expand_home(s, &dirs.home))
+            .collect(),
+        runtime_regenerated_paths: entry
+            .runtime_regenerated
+            .iter()
+            .map(|s| expand_home(s, &dirs.home))
+            .collect(),
         systemd_units_enabled: vec![],
         unrestorable_paths: vec![],
+        crash_recovery: true,
         log_path: log_path.to_path_buf(),
     };
     if let Err(e) = save_record(&dirs.record_json(name), &record) {
