@@ -1,75 +1,92 @@
-//! Rice catalog: parses per-rice `rice.toml` entries shipped in-tree.
+//! Rice catalog — single `catalog.toml` file keyed by rice name.
 //!
-//! Each catalog entry describes a curated Quickshell rice — where to clone
-//! from, which file is the entry point, optional pacman dep hints, and
-//! optional per-file deployment overrides. If no `[[files]]` table is
-//! present, the install pipeline falls back to the default rule: symlink
-//! the parent directory of `rice.entry` into
-//! `$XDG_CONFIG_HOME/quickshell/<id>/`.
+//! Hand-maintained in Rice Cooker's repo. Each entry describes the rice's
+//! upstream, the pinned commit, the install command to run, and any
+//! metadata the install/uninstall pipeline needs to treat paths correctly
+//! (runtime-regenerated, partial-ownership, extra watched roots,
+//! documented system effects that Rice Cooker cannot reverse).
 
+use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 
-/// A parsed catalog entry.
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+/// Top-level catalog: name → entry.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Catalog {
-    pub rice: RiceMeta,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub dependencies: Option<Deps>,
-    /// Per-file deployment overrides. Empty = use the default rule.
-    #[serde(default, rename = "files", skip_serializing_if = "Vec::is_empty")]
-    pub files: Vec<FileSpec>,
+    #[serde(flatten)]
+    pub rices: BTreeMap<String, RiceEntry>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub struct RiceMeta {
-    pub id: String,
-    pub name: String,
-    pub upstream: String,
-    /// Path to the rice's `shell.qml` relative to the repo root. Defaults to
-    /// `"shell.qml"`. Mirrors the `--entry` flag on `apply`.
-    #[serde(default = "default_entry")]
-    pub entry: String,
-}
-
-fn default_entry() -> String {
-    "shell.qml".to_string()
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub struct Deps {
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RiceEntry {
+    pub display_name: String,
     #[serde(default)]
-    pub pacman: Vec<String>,
+    pub description: String,
+    pub repo: String,
+    /// Full commit SHA — pinned for reproducibility. No "main" / "HEAD"
+    /// aliases accepted; the catalog must declare a fixed point.
+    pub commit: String,
+    /// Command run in the clone dir as `/bin/sh -c "<install_cmd>"`. May
+    /// reference any binary on PATH. For rices without a bespoke installer,
+    /// synthesize something minimal like
+    /// `mkdir -p "$HOME/.config/quickshell/<name>" && cp -rT . "$HOME/.config/quickshell/<name>"`.
+    pub install_cmd: String,
+    /// If true, pass the parent's tty through so install.sh can prompt.
+    /// Otherwise stdin is /dev/null and stdout/stderr are captured to the
+    /// log file (teed to the parent's stderr for visibility).
+    #[serde(default)]
+    pub interactive: bool,
+    /// Determines how `try` launches this rice for preview.
+    #[serde(default = "default_shell_type")]
+    pub shell_type: ShellType,
+    /// Paths the rice regenerates at runtime (theme engines, wallpaper
+    /// hooks). On uninstall: restore pre-install content unconditionally,
+    /// never `.rcsave` the current content.
+    #[serde(default)]
+    pub runtime_regenerated: Vec<String>,
+    /// Paths with partial ownership — user may share the file with the
+    /// rice. On uninstall: always `.rcsave` the current content, even if
+    /// it matches the post-install hash.
+    #[serde(default)]
+    pub partial_ownership: Vec<String>,
+    /// Extra watched roots beyond the defaults (~/.config, ~/.local/share,
+    /// ~/.local/bin, ~/.local/lib). Must stay under `$HOME`.
+    #[serde(default)]
+    pub extra_watched_roots: Vec<String>,
+    /// Purely informational: rendered in `list` / `status` so users know
+    /// which effects Rice Cooker cannot reverse.
+    #[serde(default)]
+    pub documented_system_effects: Vec<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum Mode {
-    Symlink,
-    Copy,
+pub enum ShellType {
+    Quickshell,
+    Ags,
+    Eww,
+    Waybar,
+    None,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub struct FileSpec {
-    /// Path relative to the rice's repo root.
-    pub src: String,
-    /// Destination path. Supports `$XDG_CONFIG_HOME` and `$HOME` placeholders,
-    /// resolved at deploy time against the running process's environment.
-    pub dest: String,
-    pub mode: Mode,
+fn default_shell_type() -> ShellType {
+    ShellType::Quickshell
 }
 
 impl Catalog {
-    /// Parse a catalog from TOML bytes. Rejects entries whose `rice.id`
-    /// contains path-dangerous characters — the id is used both as a
-    /// filesystem path segment (cache dir, quickshell target dir) and as a
-    /// catalog filename stem, so the guarantee must match `Cache::rice_dir`.
+    // Intentionally NOT an impl of `FromStr` (infallible `Err = Infallible`
+    // doesn't match our fallible story; `Catalog::from_str(body)` reads
+    // better than `body.parse()` at call sites).
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Result<Self> {
-        let cat: Catalog = toml::from_str(s).context("parsing rice catalog TOML")?;
-        validate_id(&cat.rice.id)?;
+        let cat: Catalog = toml::from_str(s).context("parsing catalog.toml")?;
+        for (name, entry) in &cat.rices {
+            validate_name(name)?;
+            validate_entry(name, entry)?;
+        }
         Ok(cat)
     }
 
@@ -79,217 +96,179 @@ impl Catalog {
         Self::from_str(&body)
     }
 
-    /// The default deployment target directory: `$XDG_CONFIG_HOME/quickshell/<id>/`.
-    /// Used when `files` is empty.
-    pub fn default_deploy_dest(&self, xdg_config_home: &Path) -> PathBuf {
-        xdg_config_home.join("quickshell").join(&self.rice.id)
+    pub fn get(&self, name: &str) -> Option<&RiceEntry> {
+        self.rices.get(name)
     }
 
-    /// The rice-repo-relative source directory for the default deployment rule:
-    /// the parent of `entry`. For `entry = "shell.qml"` this is the repo root
-    /// (`""`); for `entry = "quickshell/shell.qml"` it's `"quickshell"`.
-    pub fn default_deploy_src(&self) -> PathBuf {
-        Path::new(&self.rice.entry)
-            .parent()
-            .map(|p| p.to_path_buf())
-            .unwrap_or_default()
+    pub fn names(&self) -> impl Iterator<Item = &str> {
+        self.rices.keys().map(|s| s.as_str())
     }
 }
 
-fn validate_id(id: &str) -> Result<()> {
-    if id.is_empty()
-        || id == "."
-        || id == ".."
-        || id.chars().any(|c| matches!(c, '/' | '\\' | '\0'))
+/// Rice names are path-segment-safe (they become cache/clone/log
+/// directory names). Same rule as the v1 cache id validator.
+pub fn validate_name(name: &str) -> Result<()> {
+    if name.is_empty()
+        || name == "."
+        || name == ".."
+        || name.chars().any(|c| matches!(c, '/' | '\\' | '\0'))
     {
-        return Err(anyhow!("invalid rice id {id:?}"));
+        return Err(anyhow!("invalid rice name {name:?}"));
     }
     Ok(())
 }
 
-/// Expand `$XDG_CONFIG_HOME` and `$HOME` inside a catalog `dest` string using
-/// the supplied environment values. Unset/empty `XDG_CONFIG_HOME` falls back
-/// to `$HOME/.config` per XDG spec. Other env vars are *not* expanded — we
-/// only want the two the schema documents, so typos like `$XGD_CONFIG_HOME`
-/// surface as an error rather than silently resolving to an empty string.
-pub fn expand_dest(dest: &str, home: Option<&str>, xdg_config_home: Option<&str>) -> Result<PathBuf> {
-    let home = home.filter(|s| !s.is_empty());
-    let xdg = xdg_config_home.filter(|s| !s.is_empty());
-    let mut out = dest.to_string();
-    // Longer token first so `$XDG_CONFIG_HOME` doesn't partial-match `$HOME`.
-    if out.contains("$XDG_CONFIG_HOME") {
-        let replacement = match (xdg, home) {
-            (Some(x), _) => x.to_string(),
-            (None, Some(h)) => format!("{h}/.config"),
-            (None, None) => {
-                return Err(anyhow!(
-                    "dest uses $XDG_CONFIG_HOME but neither XDG_CONFIG_HOME nor HOME is set"
-                ));
-            }
-        };
-        out = out.replace("$XDG_CONFIG_HOME", &replacement);
+fn validate_entry(name: &str, entry: &RiceEntry) -> Result<()> {
+    // Non-empty required fields.
+    if entry.display_name.is_empty() {
+        return Err(anyhow!("{name}: display_name is empty"));
     }
-    if out.contains("$HOME") {
-        let h = home.ok_or_else(|| anyhow!("dest uses $HOME but HOME is not set"))?;
-        out = out.replace("$HOME", h);
+    if entry.repo.is_empty() {
+        return Err(anyhow!("{name}: repo is empty"));
     }
-    if out.contains('$') {
+    if entry.commit.is_empty() {
+        return Err(anyhow!("{name}: commit is empty"));
+    }
+    // Commit must be a plausible hex SHA (≥7 hex chars). No branch names.
+    if !entry.commit.chars().all(|c| c.is_ascii_hexdigit()) || entry.commit.len() < 7 {
         return Err(anyhow!(
-            "dest contains an unrecognized placeholder (only $HOME and $XDG_CONFIG_HOME supported): {dest:?}"
+            "{name}: commit must be a hex SHA (≥7 chars), got {:?}",
+            entry.commit
         ));
     }
-    Ok(PathBuf::from(out))
+    if entry.install_cmd.is_empty() {
+        return Err(anyhow!("{name}: install_cmd is empty"));
+    }
+    // Extra watched roots must look like absolute paths or start with ~
+    // (expanded later). Refuse system paths explicitly.
+    for root in &entry.extra_watched_roots {
+        if !(root.starts_with('~') || root.starts_with('/')) {
+            return Err(anyhow!(
+                "{name}: extra_watched_root must start with ~ or /, got {root:?}"
+            ));
+        }
+        for forbidden in ["/etc", "/usr", "/var", "/boot", "/opt", "/"] {
+            if root == forbidden || root.starts_with(&format!("{forbidden}/")) {
+                return Err(anyhow!(
+                    "{name}: extra_watched_root cannot be under {forbidden}: {root:?}"
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    const MINIMAL: &str = r#"
+        [noctalia]
+        display_name = "Noctalia"
+        repo = "https://github.com/noctalia-dev/noctalia-shell"
+        commit = "0123456789abcdef0123456789abcdef01234567"
+        install_cmd = "true"
+    "#;
+
     #[test]
-    fn parses_minimal_entry_with_default_entry_path() {
-        let toml = r#"
-            [rice]
-            id = "noctalia"
-            name = "Noctalia"
-            upstream = "https://github.com/noctalia-dev/noctalia-shell"
-        "#;
-        let cat = Catalog::from_str(toml).unwrap();
-        assert_eq!(cat.rice.id, "noctalia");
-        assert_eq!(cat.rice.name, "Noctalia");
-        assert_eq!(cat.rice.upstream, "https://github.com/noctalia-dev/noctalia-shell");
-        assert_eq!(cat.rice.entry, "shell.qml");
-        assert!(cat.dependencies.is_none());
-        assert!(cat.files.is_empty());
+    fn parses_minimal() {
+        let c = Catalog::from_str(MINIMAL).unwrap();
+        assert_eq!(c.rices.len(), 1);
+        let e = c.get("noctalia").unwrap();
+        assert_eq!(e.display_name, "Noctalia");
+        assert_eq!(e.shell_type, ShellType::Quickshell);
+        assert!(e.runtime_regenerated.is_empty());
+        assert!(!e.interactive);
     }
 
     #[test]
-    fn parses_full_entry_with_deps_and_files() {
-        let toml = r#"
-            [rice]
-            id = "caelestia"
-            name = "Caelestia"
-            upstream = "https://github.com/caelestia-dots/shell"
-            entry = "quickshell/shell.qml"
-
-            [dependencies]
-            pacman = ["quickshell", "qt6-5compat"]
-
-            [[files]]
-            src = "quickshell"
-            dest = "$XDG_CONFIG_HOME/quickshell/caelestia"
-            mode = "symlink"
-
-            [[files]]
-            src = "btop/btop.conf"
-            dest = "$XDG_CONFIG_HOME/btop/btop.conf"
-            mode = "copy"
+    fn rejects_empty_required_fields() {
+        let t = r#"
+            [x]
+            display_name = ""
+            repo = "https://x"
+            commit = "abcdef1"
+            install_cmd = "true"
         "#;
-        let cat = Catalog::from_str(toml).unwrap();
-        assert_eq!(cat.rice.entry, "quickshell/shell.qml");
-        let deps = cat.dependencies.unwrap();
-        assert_eq!(deps.pacman, vec!["quickshell", "qt6-5compat"]);
-        assert_eq!(cat.files.len(), 2);
-        assert_eq!(cat.files[0].mode, Mode::Symlink);
-        assert_eq!(cat.files[1].mode, Mode::Copy);
+        assert!(Catalog::from_str(t).is_err());
     }
 
     #[test]
-    fn rejects_missing_required_rice_fields() {
-        // Missing `name` + `upstream` — both required (no default).
-        let toml = r#"
-            [rice]
-            id = "x"
-        "#;
-        assert!(Catalog::from_str(toml).is_err());
-    }
-
-    #[test]
-    fn rejects_id_with_path_traversal_or_separator() {
-        for bad in ["", ".", "..", "a/b", r"a\b", "a\0b"] {
-            let toml = format!(
+    fn rejects_non_sha_commit() {
+        for bad in ["main", "HEAD", "v1.0", "abc"] {
+            let t = format!(
                 r#"
-                [rice]
-                id = "{}"
-                name = "X"
-                upstream = "https://example.com/x"
-                "#,
-                bad.replace('\0', r"\0").replace('\\', r"\\"),
+                [x]
+                display_name = "X"
+                repo = "https://x"
+                commit = "{bad}"
+                install_cmd = "true"
+                "#
             );
-            let result = Catalog::from_str(&toml);
-            // Either TOML parse fails (e.g. for backslash / nul escapes) or our
-            // validator rejects. Either outcome is acceptable — we just don't
-            // want any of these ids to round-trip.
-            assert!(result.is_err(), "accepted bad id {bad:?}");
+            assert!(Catalog::from_str(&t).is_err(), "accepted bad commit {bad:?}");
         }
     }
 
     #[test]
-    fn default_deploy_src_is_entry_parent() {
-        let mut cat = Catalog {
-            rice: RiceMeta {
-                id: "x".into(),
-                name: "X".into(),
-                upstream: "u".into(),
-                entry: "shell.qml".into(),
-            },
-            dependencies: None,
-            files: Vec::new(),
-        };
-        assert_eq!(cat.default_deploy_src(), PathBuf::new());
-        cat.rice.entry = "quickshell/shell.qml".into();
-        assert_eq!(cat.default_deploy_src(), PathBuf::from("quickshell"));
-        cat.rice.entry = ".config/quickshell/shell.qml".into();
-        assert_eq!(
-            cat.default_deploy_src(),
-            PathBuf::from(".config/quickshell")
-        );
+    fn rejects_system_extra_watched_roots() {
+        for bad in ["/etc/hypr", "/usr/share/x", "/", "/boot/bad"] {
+            let t = format!(
+                r#"
+                [x]
+                display_name = "X"
+                repo = "https://x"
+                commit = "0123456789abcdef0123456789abcdef01234567"
+                install_cmd = "true"
+                extra_watched_roots = ["{bad}"]
+                "#
+            );
+            assert!(
+                Catalog::from_str(&t).is_err(),
+                "accepted system root {bad:?}"
+            );
+        }
     }
 
     #[test]
-    fn default_deploy_dest_is_xdg_config_quickshell_id() {
-        let cat = Catalog {
-            rice: RiceMeta {
-                id: "caelestia".into(),
-                name: "Caelestia".into(),
-                upstream: "u".into(),
-                entry: "shell.qml".into(),
-            },
-            dependencies: None,
-            files: Vec::new(),
-        };
-        let xdg = Path::new("/home/x/.config");
-        assert_eq!(
-            cat.default_deploy_dest(xdg),
-            PathBuf::from("/home/x/.config/quickshell/caelestia")
-        );
+    fn accepts_full_entry() {
+        let t = r#"
+            [caelestia]
+            display_name = "Caelestia"
+            description = "the segsy rice"
+            repo = "https://github.com/caelestia-dots/caelestia"
+            commit = "a3f4b2c9e1d7000000000000000000000000abcd"
+            install_cmd = "./install.fish --noconfirm --aur-helper=paru"
+            interactive = false
+            shell_type = "quickshell"
+            runtime_regenerated = ["~/.config/gtk-3.0/colors.css"]
+            partial_ownership = ["~/.zshrc"]
+            extra_watched_roots = ["~/Pictures/wallpapers"]
+            documented_system_effects = ["installs caelestia-meta from AUR"]
+        "#;
+        let c = Catalog::from_str(t).unwrap();
+        let e = c.get("caelestia").unwrap();
+        assert_eq!(e.partial_ownership, vec!["~/.zshrc"]);
+        assert_eq!(e.runtime_regenerated.len(), 1);
+        assert_eq!(e.documented_system_effects.len(), 1);
     }
 
     #[test]
-    fn expand_dest_resolves_xdg_and_home() {
-        assert_eq!(
-            expand_dest("$XDG_CONFIG_HOME/quickshell/x", Some("/h"), Some("/c")).unwrap(),
-            PathBuf::from("/c/quickshell/x")
-        );
-        // XDG unset → falls back to HOME/.config.
-        assert_eq!(
-            expand_dest("$XDG_CONFIG_HOME/quickshell/x", Some("/h"), None).unwrap(),
-            PathBuf::from("/h/.config/quickshell/x")
-        );
-        // Empty string is treated like unset.
-        assert_eq!(
-            expand_dest("$XDG_CONFIG_HOME/x", Some("/h"), Some("")).unwrap(),
-            PathBuf::from("/h/.config/x")
-        );
-        // $HOME expansion.
-        assert_eq!(
-            expand_dest("$HOME/.config/x", Some("/h"), None).unwrap(),
-            PathBuf::from("/h/.config/x")
-        );
-        // Both unset + uses $XDG_CONFIG_HOME → error.
-        assert!(expand_dest("$XDG_CONFIG_HOME/x", None, None).is_err());
-        // Uses $HOME without HOME set → error.
-        assert!(expand_dest("$HOME/x", None, Some("/c")).is_err());
-        // Typo'd placeholder → error (avoids silent empty-string expansion).
-        assert!(expand_dest("$XGD_CONFIG_HOME/x", Some("/h"), Some("/c")).is_err());
+    fn names_are_sorted_and_validated() {
+        let t = r#"
+            [zebra]
+            display_name = "Z"
+            repo = "https://z"
+            commit = "0123456789abcdef0123456789abcdef01234567"
+            install_cmd = "true"
+
+            [alpha]
+            display_name = "A"
+            repo = "https://a"
+            commit = "0123456789abcdef0123456789abcdef01234567"
+            install_cmd = "true"
+        "#;
+        let c = Catalog::from_str(t).unwrap();
+        let names: Vec<_> = c.names().collect();
+        assert_eq!(names, vec!["alpha", "zebra"]);
     }
 }
