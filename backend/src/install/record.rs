@@ -16,6 +16,7 @@ use super::env::Dirs;
 pub const SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct InstallRecord {
     pub schema_version: u32,
     pub name: String,

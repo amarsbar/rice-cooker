@@ -105,11 +105,20 @@ impl Catalog {
     }
 }
 
-/// Shape-check the catalog's pinned commit. All-zero hex is a placeholder
-/// used during catalog bring-up; installs refuse with a clear message
-/// instead of letting git surface `fatal: reference is not a tree`.
+/// Shape-check the catalog's pinned commit for placeholder patterns.
+/// Real git SHAs have near-uniform hex distribution (first digit `0` is a
+/// 1-in-16 event); a commit that begins with 30+ consecutive `0`s is
+/// astronomically unlikely to be real and is almost certainly a
+/// placeholder written during catalog bring-up. Install refuses with a
+/// clear message instead of letting git surface the cryptic
+/// `fatal: reference is not a tree: <commit>`.
+///
+/// The 30-zero threshold is lenient enough that a real SHA starting with
+/// many zeros (rare but possible for someone grinding commits) still
+/// passes so long as it has variety in the back half — at 30+ leading
+/// zeros on a 40-char SHA, the attacker has ground 120 bits of work.
 pub fn is_placeholder_commit(commit: &str) -> bool {
-    commit.chars().all(|c| c == '0')
+    commit.chars().take_while(|c| *c == '0').count() >= 30
 }
 
 /// Rice names are path-segment-safe (they become cache/clone/log

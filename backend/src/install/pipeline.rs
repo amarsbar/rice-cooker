@@ -47,9 +47,26 @@ pub fn install(
     install_locked(cat, dirs, name, flags)
 }
 
-/// Install pipeline WITHOUT acquiring the lock. Caller must already hold it.
-/// Exists so `run_switch` can hold the lock across uninstall+install.
+/// Install pipeline WITHOUT acquiring the lock. Caller must already hold
+/// it. Exists so `switch` can hold the lock across uninstall+install.
+/// Cleans up the per-rice `snapshot_dir` on error so a retry starts fresh
+/// instead of re-using stale pre-content backups keyed against a different
+/// pre-snapshot.
 fn install_locked(
+    cat: &Catalog,
+    dirs: &Dirs,
+    name: &str,
+    flags: Flags,
+) -> Result<InstallOutcome> {
+    let result = install_locked_inner(cat, dirs, name, flags);
+    if result.is_err() {
+        let _ = fs::remove_dir_all(dirs.snapshot_dir(name));
+        let _ = fs::remove_dir_all(dirs.clone_dir(name));
+    }
+    result
+}
+
+fn install_locked_inner(
     cat: &Catalog,
     dirs: &Dirs,
     name: &str,
@@ -240,8 +257,21 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
     // 2. Disable systemd units.
     systemd::disable_units(&record.systemd_units_enabled)?;
 
-    // 3. Reverse fs diff.
-    let rcsave_paths = reverse_fs_diff(dirs, &name, &record, flags)?;
+    // 3. Reverse fs diff. `rcsave_paths` is passed mutably so it's
+    //    populated in place — a mid-reversal Err still returns the
+    //    partial list on the error path via `.map_err` below.
+    let mut rcsave_paths: Vec<PathBuf> = Vec::new();
+    if let Err(e) = reverse_fs_diff(dirs, &name, &record, flags, &mut rcsave_paths) {
+        if !rcsave_paths.is_empty() {
+            eprintln!(
+                "uninstall reversed partially before failure; preserved user content at:"
+            );
+            for p in &rcsave_paths {
+                eprintln!("  {}", p.display());
+            }
+        }
+        return Err(e);
+    }
 
     // 4. Clean up cache dirs for this rice.
     let _ = fs::remove_dir_all(dirs.clone_dir(&name));
@@ -307,15 +337,18 @@ pub fn status(dirs: &Dirs) -> Result<StatusRow> {
 // ── Internals ──────────────────────────────────────────────────────────────
 
 /// Order: deletes first, modifications, re-creations, symlinks.
-/// Returns the list of `.rcsave-<ts>` paths created during reversal.
+/// Fills `rcsave_paths` with `.rcsave-<ts>` paths created during reversal.
+/// The out-param pattern preserves information on early Err return — a
+/// mid-reversal failure leaves rcsave files on disk, and the caller needs
+/// to tell the user about them even if a later op blew up.
 fn reverse_fs_diff(
     dirs: &Dirs,
     name: &str,
     record: &InstallRecord,
     flags: Flags,
-) -> Result<Vec<PathBuf>> {
+    rcsave_paths: &mut Vec<PathBuf>,
+) -> Result<()> {
     let diff = &record.fs_diff;
-    let mut rcsave_paths: Vec<PathBuf> = Vec::new();
     let partial_ownership: HashSet<&PathBuf> = record.partial_ownership_paths.iter().collect();
     let runtime_regen: HashSet<&PathBuf> = record.runtime_regenerated_paths.iter().collect();
     let unrestorable: HashSet<&PathBuf> = record.unrestorable_paths.iter().collect();
@@ -481,7 +514,7 @@ fn reverse_fs_diff(
         let _ = fs::remove_dir(d); // silently ignore non-empty
     }
 
-    Ok(rcsave_paths)
+    Ok(())
 }
 
 fn rcsave_path(original: &Path) -> PathBuf {
