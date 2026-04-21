@@ -52,8 +52,12 @@ pub struct RiceEntry {
     /// it matches the post-install hash.
     #[serde(default)]
     pub partial_ownership: Vec<String>,
-    /// Extra watched roots beyond the defaults (~/.config, ~/.local/share,
-    /// ~/.local/bin, ~/.local/lib). Must stay under `$HOME`.
+    /// Extra watched roots beyond the defaults. Defaults live in
+    /// `snapshot::DEFAULT_WATCHED_ROOTS` — `.config`, `.local/bin`,
+    /// `.local/lib`, and the five `.local/share/{applications,fonts,
+    /// icons,quickshell,themes}` dirs rices typically write into. A
+    /// rice that deploys into other paths (e.g. `.local/share/matugen`)
+    /// must declare them here. Must stay under `$HOME`.
     #[serde(default)]
     pub extra_watched_roots: Vec<String>,
     /// Purely informational: rendered in `list` / `status` so users know
