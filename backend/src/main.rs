@@ -125,6 +125,22 @@ fn run() -> Result<()> {
             f.dry_run = *dry_run;
             f.force = *force;
             let out = install::uninstall(&dirs, f)?;
+            if out.crash_record {
+                eprintln!(
+                    "\n=== WARNING: uninstall of crash-record {} ===\n\
+                     The install of this rice crashed before rice-cooker could\n\
+                     observe what it deployed. Files may remain in $HOME that\n\
+                     rice-cooker did NOT reverse — review the install log and\n\
+                     clean up manually.\n",
+                    out.name
+                );
+                if let Some(snap) = &out.preserved_snapshot_dir {
+                    eprintln!(
+                        "Pre-install content backups preserved at (delete when done):\n  {}\n",
+                        snap.display()
+                    );
+                }
+            }
             println!("uninstalled: {}", out.name);
             if !out.rcsave_paths.is_empty() {
                 println!("preserved user-modified content at:");
