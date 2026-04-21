@@ -34,7 +34,7 @@ pub struct Flags {
     pub skip_pacman: bool,
 }
 
-/// Install <name> from the catalog.
+/// Install <name> from the catalog. Acquires the lock.
 pub fn install(
     cat: &Catalog,
     dirs: &Dirs,
@@ -44,10 +44,28 @@ pub fn install(
     dirs.ensure()?;
     let _lock = ApplyLock::try_acquire(&dirs.lock_file())
         .map_err(|e| anyhow!("lock: {e}"))?;
+    install_locked(cat, dirs, name, flags)
+}
+
+/// Install pipeline WITHOUT acquiring the lock. Caller must already hold it.
+/// Exists so `run_switch` can hold the lock across uninstall+install.
+fn install_locked(
+    cat: &Catalog,
+    dirs: &Dirs,
+    name: &str,
+    flags: Flags,
+) -> Result<InstallOutcome> {
 
     let entry = cat
         .get(name)
         .ok_or_else(|| anyhow!("{name}: not in catalog"))?;
+
+    if crate::catalog::is_placeholder_commit(&entry.commit) {
+        return Err(anyhow!(
+            "{name}: catalog commit is a placeholder ({}). Pin a real SHA in catalog.toml before installing.",
+            entry.commit
+        ));
+    }
 
     if let Some(cur) = read_current(dirs)? {
         return Err(anyhow!(
@@ -79,11 +97,12 @@ pub fn install(
         .with_context(|| format!("creating {}", snap_dir.display()))?;
     snapshot::save_manifest(&snap_dir.join("manifest.json"), &pre)?;
 
-    // Back up pre-install content for every tracked file so uninstall can
-    // restore regardless of what install.sh does to them. Best-effort —
-    // files we can't read get skipped with a warning.
+    // Back up pre-install content (hardlink-first, copy fallback). Any
+    // path that couldn't be trusted (TOCTOU race between snapshot and
+    // backup, permission denied) is returned and threaded into the record
+    // so uninstall can SKIP restore rather than restoring wrong content.
     log_verbose(flags, "pre-content backup");
-    capture_pre_content(&snap_dir, &pre)?;
+    let unrestorable = capture_pre_content(&snap_dir, &pre)?;
 
     // Pre-pacman state (skippable for tests).
     let pre_pacman = if flags.skip_pacman {
@@ -160,6 +179,11 @@ pub fn install(
             .map(|s| expand_home(s, &dirs.home))
             .collect(),
         systemd_units_enabled: units,
+        unrestorable_paths: {
+            let mut v: Vec<PathBuf> = unrestorable.into_iter().collect();
+            v.sort();
+            v
+        },
         log_path: log_path.clone(),
     };
     save_record(&dirs.record_json(name), &record)?;
@@ -174,7 +198,7 @@ pub fn install(
     })
 }
 
-/// Uninstall the currently-installed rice.
+/// Uninstall the currently-installed rice. Acquires the lock.
 pub fn uninstall(
     dirs: &Dirs,
     flags: Flags,
@@ -182,6 +206,11 @@ pub fn uninstall(
     dirs.ensure()?;
     let _lock = ApplyLock::try_acquire(&dirs.lock_file())
         .map_err(|e| anyhow!("lock: {e}"))?;
+    uninstall_locked(dirs, flags)
+}
+
+/// Uninstall WITHOUT acquiring the lock. Caller must already hold it.
+fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
 
     let name = read_current(dirs)?
         .ok_or_else(|| anyhow!("no rice installed"))?;
@@ -225,16 +254,20 @@ pub fn uninstall(
     Ok(UninstallOutcome { name, rcsave_paths })
 }
 
+/// Atomic switch: uninstall the current rice and install <to> under a
+/// single lock acquisition so another rice-cooker process can't slip an
+/// install/apply between the two halves.
 pub fn switch(
     cat: &Catalog,
     dirs: &Dirs,
     to: &str,
     flags: Flags,
 ) -> Result<SwitchOutcome> {
-    // Both sides use the same lock (acquired inside each pipeline call).
-    // install → fails if current is already set, so uninstall first.
-    let uninstall_out = uninstall(dirs, flags)?;
-    let install_out = install(cat, dirs, to, flags)?;
+    dirs.ensure()?;
+    let _lock = ApplyLock::try_acquire(&dirs.lock_file())
+        .map_err(|e| anyhow!("lock: {e}"))?;
+    let uninstall_out = uninstall_locked(dirs, flags)?;
+    let install_out = install_locked(cat, dirs, to, flags)?;
     Ok(SwitchOutcome {
         from: uninstall_out.name,
         to: install_out.name,
@@ -285,14 +318,38 @@ fn reverse_fs_diff(
     let mut rcsave_paths: Vec<PathBuf> = Vec::new();
     let partial_ownership: HashSet<&PathBuf> = record.partial_ownership_paths.iter().collect();
     let runtime_regen: HashSet<&PathBuf> = record.runtime_regenerated_paths.iter().collect();
+    let unrestorable: HashSet<&PathBuf> = record.unrestorable_paths.iter().collect();
 
     // Content backup dir (for modifications + deletions we could restore).
     let content_dir = dirs.snapshot_dir(name).join("content");
 
     // 3a. Added files: remove iff current hash matches our recorded
-    //     post-install hash. Else move to .rcsave.
+    //     post-install hash. Else .rcsave to preserve user edits.
+    //     Catalog policies still apply even though pre didn't exist:
+    //     runtime_regenerated → unconditional remove (no .rcsave;
+    //       the path is expected to drift at runtime and user isn't
+    //       authoring it).
+    //     partial_ownership    → always .rcsave (user is the co-owner;
+    //       their edits are sacred even if hash happens to match).
     for a in &diff.added {
         if !a.path.exists() {
+            continue;
+        }
+        if runtime_regen.contains(&a.path) {
+            fs::remove_file(&a.path)
+                .with_context(|| format!("removing {}", a.path.display()))?;
+            log_verbose(flags, &format!("added→removed (runtime_regen) {}", a.path.display()));
+            continue;
+        }
+        if partial_ownership.contains(&a.path) {
+            let dest = rcsave_path(&a.path);
+            fs::rename(&a.path, &dest)
+                .with_context(|| format!("rcsave {} -> {}", a.path.display(), dest.display()))?;
+            rcsave_paths.push(dest);
+            log_verbose(
+                flags,
+                &format!("added→rcsave (partial_ownership) {}", a.path.display()),
+            );
             continue;
         }
         let current_hash = match snapshot::hash_file(&a.path) {
@@ -319,6 +376,16 @@ fn reverse_fs_diff(
         let backup = content_dir.join(path_key(&m.path));
         let is_partial = partial_ownership.contains(&m.path);
         let is_runtime = runtime_regen.contains(&m.path);
+        if unrestorable.contains(&m.path) {
+            // We couldn't trust the pre-content backup (race or copy
+            // failure at install time). Leave the file alone; user is
+            // told what we skipped.
+            eprintln!(
+                "skipping restore of {}: pre-install content wasn't trustworthy",
+                m.path.display()
+            );
+            continue;
+        }
 
         if is_runtime {
             // Runtime-regenerated: restore pre-install content if we have
@@ -367,11 +434,17 @@ fn reverse_fs_diff(
 
     // 3c. Deleted files: restore pre content from backup.
     for d in &diff.deleted {
+        if unrestorable.contains(&d.path) {
+            eprintln!(
+                "skipping restore of {}: pre-install content wasn't trustworthy",
+                d.path.display()
+            );
+            continue;
+        }
         let backup = content_dir.join(path_key(&d.path));
         if backup.exists() {
             copy_file(&backup, &d.path, d.pre_mode)?;
         } else {
-            // No backup captured. Log so the user knows.
             eprintln!(
                 "no pre-install backup for deleted file {} — cannot restore",
                 d.path.display()
@@ -429,9 +502,12 @@ fn copy_file(src: &Path, dest: &Path, mode: u32) -> Result<()> {
     }
     fs::copy(src, dest)
         .with_context(|| format!("copy {} -> {}", src.display(), dest.display()))?;
-    let mut perms = fs::metadata(dest)?.permissions();
+    let mut perms = fs::metadata(dest)
+        .with_context(|| format!("stat {} to set mode", dest.display()))?
+        .permissions();
     perms.set_mode(mode);
-    fs::set_permissions(dest, perms).ok();
+    fs::set_permissions(dest, perms)
+        .with_context(|| format!("chmod {} to {:o}", dest.display(), mode))?;
     Ok(())
 }
 
@@ -489,41 +565,64 @@ pub struct StatusRow {
     pub installed: Option<InstallRecord>,
 }
 
-/// Take a "content backup" of each file in the pre-snapshot that will
-/// eventually be modified. Called from install() right after pre-snapshot,
-/// before running install.sh. Copies current file content into
-/// `snap_dir/content/<path_key>`.
+/// Back up every file in the pre-snapshot so uninstall can restore any
+/// `modified` or `deleted` entry. Uses `fs::copy` for independent inodes —
+/// we can't use hardlinks because `> file` shell redirection (the most
+/// common install-script write pattern) truncates the shared inode,
+/// corrupting the backup along with the target.
 ///
-/// The spec's idealized model does this at pre-snapshot time for ALL
-/// watched files, but that's gigabytes of I/O. We instead back up every
-/// file in the pre-manifest (files in watched roots that might be touched
-/// by install.sh). In practice rice installs touch ~dozens to hundreds of
-/// files; 50-150k full HOME + .local/share might be too much, but
-/// backed-up only files are hashed + then copied once.
+/// Re-hashes each copy and compares against the pre-snapshot's recorded
+/// hash to catch TOCTOU races (a daemon writing to the file between
+/// take_snapshot and fs::copy). Mismatches → drop the backup and record
+/// the path as unrestorable so uninstall skips it instead of restoring
+/// wrong content.
 ///
-/// v1 compromise: back up every FILE in the pre-snapshot. For each file
-/// in `manifest.entries` of kind=File, `fs::copy` it into content dir.
-pub fn capture_pre_content(snap_dir: &Path, pre: &Manifest) -> Result<()> {
+/// Returns the set of paths whose backup couldn't be trusted.
+pub fn capture_pre_content(
+    snap_dir: &Path,
+    pre: &Manifest,
+) -> Result<std::collections::HashSet<PathBuf>> {
+    use std::collections::HashSet;
     let content_dir = snap_dir.join("content");
     fs::create_dir_all(&content_dir)
         .with_context(|| format!("creating {}", content_dir.display()))?;
+    let mut unrestorable: HashSet<PathBuf> = HashSet::new();
     for (path, entry) in &pre.entries {
-        if !entry.is_file() {
+        let snapshot::Entry::File { hash: pre_hash, .. } = entry else {
             continue;
-        }
+        };
         let dest = content_dir.join(path_key(path));
         if dest.exists() {
-            continue; // already backed up (duplicate path_key — astronomically rare)
+            continue;
         }
-        // Best-effort: skip files we can't read (perms, vanished).
         if let Err(e) = fs::copy(path, &dest) {
             eprintln!(
-                "pre-content backup: skipping {}: {e}",
+                "pre-content backup skip {}: copy failed: {e}",
                 path.display()
             );
+            unrestorable.insert(path.clone());
+            continue;
+        }
+        // Verify the backup matches the pre-snapshot hash.
+        let backup_hash = match snapshot::hash_file(&dest) {
+            Ok(h) => h,
+            Err(e) => {
+                eprintln!("pre-content verify {}: {e}", path.display());
+                unrestorable.insert(path.clone());
+                let _ = fs::remove_file(&dest);
+                continue;
+            }
+        };
+        if &backup_hash != pre_hash {
+            eprintln!(
+                "pre-content race on {}: pre-snapshot hash {pre_hash} but backup hash {backup_hash}; skipping restore",
+                path.display()
+            );
+            unrestorable.insert(path.clone());
+            let _ = fs::remove_file(&dest);
         }
     }
-    Ok(())
+    Ok(unrestorable)
 }
 
 #[cfg(test)]
