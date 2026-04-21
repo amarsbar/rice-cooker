@@ -276,6 +276,34 @@ fn status_empty_when_nothing_installed() {
     assert!(stdout.contains("nothing installed"), "{stdout}");
 }
 
+/// Release gate: fails if any shipped catalog entry still carries a
+/// placeholder SHA. Marked #[ignore] so day-to-day `cargo test` passes
+/// while the catalog is in bring-up; run via
+/// `cargo test -- --ignored placeholder` before tagging a release.
+#[test]
+#[ignore]
+fn no_shipped_catalog_entry_carries_a_placeholder_commit() {
+    let cat_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("catalog.toml");
+    let body = fs::read_to_string(&cat_path).unwrap();
+    let cat = rice_cooker_backend::catalog::Catalog::from_str(&body).unwrap();
+    let placeholders: Vec<(&str, &str)> = cat
+        .rices
+        .iter()
+        .filter(|(_, e)| rice_cooker_backend::catalog::is_placeholder_commit(&e.commit))
+        .map(|(n, e)| (n.as_str(), e.commit.as_str()))
+        .collect();
+    assert!(
+        placeholders.is_empty(),
+        "{} catalog entries still have placeholder commits:\n  {}",
+        placeholders.len(),
+        placeholders
+            .iter()
+            .map(|(n, c)| format!("{n} @ {c}"))
+            .collect::<Vec<_>>()
+            .join("\n  ")
+    );
+}
+
 #[test]
 fn ships_the_in_tree_catalog_with_15_rices() {
     let cat_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("catalog.toml");

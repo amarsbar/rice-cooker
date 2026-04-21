@@ -49,9 +49,16 @@ pub fn install(
 
 /// Install pipeline WITHOUT acquiring the lock. Caller must already hold
 /// it. Exists so `switch` can hold the lock across uninstall+install.
-/// Cleans up the per-rice `snapshot_dir` on error so a retry starts fresh
-/// instead of re-using stale pre-content backups keyed against a different
-/// pre-snapshot.
+///
+/// Error-cleanup semantics have two phases:
+/// - PRE-install_cmd (clone, pre-snapshot, pre-content backup): on error,
+///   nuke `snapshot_dir` and `clone_dir` so a retry starts from scratch.
+///   Nothing is on the user's filesystem yet except git clone state.
+/// - POST-install_cmd (post-snapshot, diff compute, record write): on
+///   error, DO NOT clean up. The rice has written files to HOME. We need
+///   the clone + snapshot dir alive so `uninstall` can reverse whatever
+///   did land. The inner path attempts a best-effort record write so the
+///   user has something to uninstall even if later steps failed.
 fn install_locked(
     cat: &Catalog,
     dirs: &Dirs,
@@ -59,7 +66,12 @@ fn install_locked(
     flags: Flags,
 ) -> Result<InstallOutcome> {
     let result = install_locked_inner(cat, dirs, name, flags);
-    if result.is_err() {
+    // Only clean up when the error AND the rice hasn't yet deployed
+    // anything. install_locked_inner signals this by removing its own
+    // sentinel on post-install-cmd success; by the time we get here the
+    // sentinel's presence (or absence) tells us whether we're allowed to
+    // clean up.
+    if result.is_err() && !dirs.snapshot_dir(name).join(".cmd-ran").exists() {
         let _ = fs::remove_dir_all(dirs.snapshot_dir(name));
         let _ = fs::remove_dir_all(dirs.clone_dir(name));
     }
@@ -154,9 +166,27 @@ fn install_locked_inner(
     )?;
     let partial = exit_code != 0;
 
-    // Post-snapshot.
+    // Install_cmd has run. From here on, the rice may have deployed files
+    // to HOME — the outer install_locked wrapper must NOT clean up cache
+    // state on subsequent error. Drop a sentinel the wrapper reads.
+    let _ = fs::File::create(snap_dir.join(".cmd-ran"));
+
+    // Post-snapshot. If this fails, best-effort record below still runs.
     log_verbose(flags, "post-snapshot");
-    let post = snapshot::take_snapshot(&walk_opts)?;
+    let post = match snapshot::take_snapshot(&walk_opts) {
+        Ok(p) => p,
+        Err(e) => {
+            // We ran install_cmd but can't observe what it did. Write a
+            // minimal record so the user has a way to retry uninstall or
+            // manually clean up.
+            write_partial_crashed_record(
+                dirs, name, entry, exit_code, &log_path, &format!("post_snapshot_failed: {e:#}"),
+            );
+            return Err(anyhow::anyhow!(
+                "install post-snapshot failed: {e:#}. Files may have been deployed to HOME; `status` shows what we have."
+            ));
+        }
+    };
     let diff = diff::compute(&pre, &post);
 
     // Pre content was backed up wholesale above. Modified/deleted files
@@ -553,6 +583,46 @@ fn copy_file(src: &Path, dest: &Path, mode: u32) -> Result<()> {
     fs::set_permissions(dest, perms)
         .with_context(|| format!("chmod {} to {:o}", dest.display(), mode))?;
     Ok(())
+}
+
+/// Best-effort record write when the install pipeline crashed AFTER
+/// install_cmd succeeded. The record carries an empty fs_diff (we don't
+/// know what changed) but points at the log, so the user has something
+/// to read and at least a `current.json` entry pointing at this rice.
+/// Errors writing the record are eprintln'd — we're already on the error
+/// path and the user is better off with a best-effort write than a
+/// silent orphan.
+fn write_partial_crashed_record(
+    dirs: &Dirs,
+    name: &str,
+    entry: &RiceEntry,
+    exit_code: i32,
+    log_path: &Path,
+    error: &str,
+) {
+    let record = InstallRecord {
+        schema_version: SCHEMA_VERSION,
+        name: name.to_string(),
+        commit: entry.commit.clone(),
+        catalog_entry_hash: hash_catalog_entry(entry),
+        installed_at: InstallRecord::now_rfc3339(),
+        install_cmd: entry.install_cmd.clone(),
+        exit_code,
+        partial: true,
+        fs_diff: FsDiff::default(),
+        pacman_diff: PacmanDiff::default(),
+        partial_ownership_paths: vec![],
+        runtime_regenerated_paths: vec![],
+        systemd_units_enabled: vec![],
+        unrestorable_paths: vec![],
+        log_path: log_path.to_path_buf(),
+    };
+    if let Err(e) = save_record(&dirs.record_json(name), &record) {
+        eprintln!("failed to save crash-record for {name}: {e:#} (original error: {error})");
+    }
+    if let Err(e) = write_current(dirs, name) {
+        eprintln!("failed to write current.json for {name}: {e:#}");
+    }
 }
 
 fn hash_catalog_entry(entry: &RiceEntry) -> String {
