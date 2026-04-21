@@ -53,6 +53,15 @@ pub struct InstallRecord {
     /// user knows. Empty in the common case.
     #[serde(default)]
     pub unrestorable_paths: Vec<PathBuf>,
+    /// True when this record was written by `write_partial_crashed_record`
+    /// — i.e. install_cmd ran but the pipeline crashed before we could
+    /// take the post-snapshot, so `fs_diff` is empty-by-omission rather
+    /// than empty-because-install-did-nothing. Uninstall consults this to
+    /// surface a loud "files may remain in HOME" warning and preserve
+    /// snapshot_dir for manual recovery. Defaults to false for backwards
+    /// compatibility with records written before this field existed.
+    #[serde(default)]
+    pub crash_recovery: bool,
     /// Path to the log file that captured install.sh stdout+stderr.
     pub log_path: PathBuf,
 }
@@ -191,6 +200,7 @@ mod tests {
             runtime_regenerated_paths: vec![],
             systemd_units_enabled: vec![],
             unrestorable_paths: vec![],
+            crash_recovery: false,
             log_path: PathBuf::from("/tmp/log"),
         }
     }
