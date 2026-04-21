@@ -9,7 +9,11 @@ use anyhow::{Context, Result, anyhow};
 const NOTIFIERS: &[&str] = &["dunst", "mako", "swaync"];
 const KILL_POLL_MS: u64 = 50;
 const KILL_WAIT_MS: u64 = 500;
-const VERIFY_WAIT_MS: u64 = 300;
+// Bumped from 300ms to 1200ms. Quickshell's QML import resolution takes
+// time; ERROR-level failures reliably appear in the runtime log within
+// ~1s but less reliably at 300ms. Visual-verify tests showed false
+// positives (pgrep alive, log-scan saw no errors yet) at 300ms.
+const VERIFY_WAIT_MS: u64 = 1200;
 const LOG_TAIL_LINES: usize = 20;
 
 // Match both `quickshell` and its `qs` symlink (shipped by the same package), with
@@ -137,23 +141,41 @@ pub fn verify(rice_dir: &Path, entry_rel: &Path, log_file: &Path) -> Result<Veri
     thread::sleep(Duration::from_millis(VERIFY_WAIT_MS));
     let pat = quickshell_cmdline_pattern(entry_rel);
     let alive = pgrep_matches(&["-xf", &pat])?;
-    if alive {
-        return Ok(VerifyResult::Ok);
-    }
-    // Quickshell writes its authoritative startup log to
-    // `$XDG_RUNTIME_DIR/quickshell/by-id/<id>/log.log`, NOT to stderr — the
-    // stderr file we redirect into via `setsid` is empty for the important
-    // cases (missing QML module, parse error, etc). Prefer the runtime log
-    // when we can find one matching our entry path, and fall back to our
-    // stderr capture if not.
     let entry_abs = rice_dir.join(entry_rel);
+
+    // Quickshell writes its authoritative startup log to
+    // `$XDG_RUNTIME_DIR/quickshell/by-id/<id>/log.log`, NOT to stderr.
+    // Even when pgrep says the process is alive, quickshell doesn't
+    // exit on a QML import error or "Failed to load configuration" —
+    // it keeps the process up with nothing visible on screen. We MUST
+    // inspect the runtime log on the alive path too, else we'd report
+    // success for broken shells (observed on iNiR under Hyprland,
+    // dotfiles repos with unresolved imports, etc).
     let log_contents = find_quickshell_runtime_log(&entry_abs)
         .and_then(|p| fs::read_to_string(&p).ok())
         .or_else(|| fs::read_to_string(log_file).ok())
         .unwrap_or_else(|| format!("<no log content for {}>", entry_abs.display()));
-    Ok(VerifyResult::Dead {
-        log_tail: tail_lines(&log_contents, LOG_TAIL_LINES),
-    })
+
+    if !alive {
+        return Ok(VerifyResult::Dead {
+            log_tail: tail_lines(&log_contents, LOG_TAIL_LINES),
+        });
+    }
+
+    // Alive-but-broken detection. `ERROR:` is the level prefix quickshell
+    // emits for fatal-to-the-shell conditions (load failure, module
+    // unavailable, import resolution). A matching line anywhere in our
+    // rice's log means the shell isn't actually rendering, even though
+    // the process is still there.
+    if log_contents
+        .lines()
+        .any(|l| l.contains("ERROR:") || l.contains("Failed to load configuration"))
+    {
+        return Ok(VerifyResult::Dead {
+            log_tail: tail_lines(&log_contents, LOG_TAIL_LINES),
+        });
+    }
+    Ok(VerifyResult::Ok)
 }
 
 /// Locate the `log.log` quickshell wrote for a specific entry path by scanning
