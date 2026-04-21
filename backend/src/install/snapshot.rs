@@ -14,13 +14,26 @@ use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 
 /// Default watched roots relative to `$HOME`. Chosen to cover everywhere a
-/// Quickshell rice is expected to deploy, and excluded from everywhere a
-/// rice would write only transient state.
+/// Quickshell rice is expected to deploy.
+///
+/// We deliberately do NOT watch all of `.local/share`: on a seasoned
+/// system that tree holds gigabytes of per-app state (Steam, Flatpak,
+/// Electron-app DBs, browser profiles) that no Quickshell rice touches.
+/// Wholesale pre-content backup across all of `.local/share` would stall
+/// install for minutes and burn disk equal to the copied tree. We instead
+/// list the `.local/share` subdirs rices typically deploy into
+/// (applications, icons, fonts, themes, plus `quickshell` itself) and
+/// invite rices with different needs to declare `extra_watched_roots` in
+/// their catalog entry.
 pub const DEFAULT_WATCHED_ROOTS: &[&str] = &[
     ".config",
-    ".local/share",
     ".local/bin",
     ".local/lib",
+    ".local/share/applications",
+    ".local/share/fonts",
+    ".local/share/icons",
+    ".local/share/quickshell",
+    ".local/share/themes",
 ];
 
 /// Path suffixes (relative to HOME) that never enter a snapshot regardless
