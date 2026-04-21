@@ -1,5 +1,0 @@
-[rice]
-id = "minecraft"
-name = "Minecraft Style"
-upstream = "https://github.com/hooss-only/dotfiles-minecraft-style"
-entry = "shell.qml"
