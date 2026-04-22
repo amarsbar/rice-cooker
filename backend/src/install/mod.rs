@@ -12,6 +12,7 @@ pub mod pipeline;
 pub mod record;
 pub mod run;
 pub mod snapshot;
+pub mod symlink;
 pub mod systemd;
 
 pub use env::{Dirs, resolve_dirs};

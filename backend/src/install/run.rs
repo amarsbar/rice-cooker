@@ -128,14 +128,7 @@ mod tests {
     fn runs_simple_command_and_captures_exit_code() {
         let tmp = tempdir().unwrap();
         let log = tmp.path().join("log");
-        let code = run_install_cmd(
-            tmp.path(),
-            "true",
-            false,
-            &log,
-            &[],
-        )
-        .unwrap();
+        let code = run_install_cmd(tmp.path(), "true", false, &log, &[]).unwrap();
         assert_eq!(code, 0);
         let body = fs::read_to_string(&log).unwrap();
         assert!(body.contains("rice-cooker install log"));
@@ -145,14 +138,7 @@ mod tests {
     fn non_zero_exit_is_reported_not_failed() {
         let tmp = tempdir().unwrap();
         let log = tmp.path().join("log");
-        let code = run_install_cmd(
-            tmp.path(),
-            "exit 7",
-            false,
-            &log,
-            &[],
-        )
-        .unwrap();
+        let code = run_install_cmd(tmp.path(), "exit 7", false, &log, &[]).unwrap();
         assert_eq!(code, 7);
     }
 

@@ -105,8 +105,16 @@ pub fn compute(pre: &Manifest, post: &Manifest) -> FsDiff {
                 // adds first, restore deletes last) handles it.
                 match (pre_entry, post_entry) {
                     (
-                        Entry::File { hash: ph, size: ps, mode: pm },
-                        Entry::File { hash: h, size: s, mode: m },
+                        Entry::File {
+                            hash: ph,
+                            size: ps,
+                            mode: pm,
+                        },
+                        Entry::File {
+                            hash: h,
+                            size: s,
+                            mode: m,
+                        },
                     ) => {
                         if ph != h || ps != s || pm != m {
                             diff.modified.push(ModifiedFile {
@@ -160,11 +168,13 @@ pub fn compute(pre: &Manifest, post: &Manifest) -> FsDiff {
                                 size: *size,
                                 mode: *mode,
                             }),
-                            Entry::Symlink { target, mode } => diff.symlinks_added.push(AddedSymlink {
-                                path: path.clone(),
-                                target: target.clone(),
-                                mode: *mode,
-                            }),
+                            Entry::Symlink { target, mode } => {
+                                diff.symlinks_added.push(AddedSymlink {
+                                    path: path.clone(),
+                                    target: target.clone(),
+                                    mode: *mode,
+                                })
+                            }
                             Entry::Dir { mode } => diff.dirs_added.push(AddedDir {
                                 path: path.clone(),
                                 mode: *mode,
@@ -242,10 +252,10 @@ mod tests {
             ("/h/c", file("C", 3, 0o644)),
         ]);
         let post = mk(vec![
-            ("/h/a", file("A", 1, 0o644)),       // unchanged
-            ("/h/b", file("Bnew", 2, 0o644)),    // modified
-            ("/h/d", file("D", 4, 0o644)),       // added
-            // /h/c is gone
+            ("/h/a", file("A", 1, 0o644)),    // unchanged
+            ("/h/b", file("Bnew", 2, 0o644)), // modified
+            ("/h/d", file("D", 4, 0o644)),    // added
+                                              // /h/c is gone
         ]);
         let d = compute(&pre, &post);
         assert_eq!(d.added.len(), 1);

@@ -10,10 +10,16 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
 
+use crate::catalog::Shape;
+
 use super::diff::FsDiff;
 use super::env::Dirs;
 
 pub const SCHEMA_VERSION: u32 = 1;
+
+fn default_shape() -> Shape {
+    Shape::Dotfiles
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -22,6 +28,17 @@ pub struct InstallRecord {
     pub name: String,
     /// Pinned catalog commit.
     pub commit: String,
+    /// Install shape this record was written with. Defaults to `Dotfiles`
+    /// for backwards compatibility with pre-shape records.
+    #[serde(default = "default_shape")]
+    pub shape: Shape,
+    /// `Symlink` shape only: the `ln -sfnT` destination we created. Empty
+    /// for dotfiles. Uninstall removes this symlink.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symlink_path: Option<PathBuf>,
+    /// `Symlink` shape only: what the symlink points at. Informational.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symlink_target: Option<PathBuf>,
     /// BLAKE3 of the catalog entry's TOML, so `status` can tell if the
     /// catalog changed since this rice was installed.
     pub catalog_entry_hash: String,
@@ -84,23 +101,20 @@ impl InstallRecord {
 
 pub fn save_record(path: &Path, r: &InstallRecord) -> Result<()> {
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("creating {}", parent.display()))?;
+        fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
     }
     let body = serde_json::to_string_pretty(r).context("serializing install record")?;
     let mut tmp = path.as_os_str().to_os_string();
     tmp.push(".tmp");
     let tmp = PathBuf::from(tmp);
-    fs::write(&tmp, body.as_bytes())
-        .with_context(|| format!("writing {}", tmp.display()))?;
+    fs::write(&tmp, body.as_bytes()).with_context(|| format!("writing {}", tmp.display()))?;
     fs::rename(&tmp, path)
         .with_context(|| format!("renaming {} -> {}", tmp.display(), path.display()))?;
     Ok(())
 }
 
 pub fn load_record(path: &Path) -> Result<InstallRecord> {
-    let body = fs::read_to_string(path)
-        .with_context(|| format!("reading {}", path.display()))?;
+    let body = fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
     let r: InstallRecord = serde_json::from_str(&body)
         .with_context(|| format!("parsing install record at {}", path.display()))?;
     if r.schema_version != SCHEMA_VERSION {
@@ -124,8 +138,7 @@ pub fn write_current(dirs: &Dirs, name: &str) -> Result<()> {
     let tmp = PathBuf::from(tmp);
     fs::create_dir_all(dirs.installs_dir())
         .with_context(|| format!("creating {}", dirs.installs_dir().display()))?;
-    fs::write(&tmp, body)
-        .with_context(|| format!("writing {}", tmp.display()))?;
+    fs::write(&tmp, body).with_context(|| format!("writing {}", tmp.display()))?;
     fs::rename(&tmp, dirs.current_json()).context("renaming current.json")?;
     Ok(())
 }
@@ -137,8 +150,7 @@ pub fn read_current(dirs: &Dirs) -> Result<Option<String>> {
             struct Cur {
                 name: String,
             }
-            let c: Cur = serde_json::from_str(&s)
-                .context("parsing current.json")?;
+            let c: Cur = serde_json::from_str(&s).context("parsing current.json")?;
             Ok(Some(c.name))
         }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
@@ -189,6 +201,9 @@ mod tests {
             schema_version: SCHEMA_VERSION,
             name: "caelestia".into(),
             commit: "a3f4b2c9e1d7".into(),
+            shape: Shape::Dotfiles,
+            symlink_path: None,
+            symlink_target: None,
             catalog_entry_hash: "HASH".into(),
             installed_at: InstallRecord::now_rfc3339(),
             install_cmd: "./install.fish".into(),

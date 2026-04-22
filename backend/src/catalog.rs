@@ -29,11 +29,25 @@ pub struct RiceEntry {
     /// Full commit SHA — pinned for reproducibility. No "main" / "HEAD"
     /// aliases accepted; the catalog must declare a fixed point.
     pub commit: String,
-    /// Command run in the clone dir as `/bin/sh -c "<install_cmd>"`. May
-    /// reference any binary on PATH. For rices without a bespoke installer,
-    /// synthesize something minimal like
-    /// `mkdir -p "$HOME/.config/quickshell/<name>" && cp -rT . "$HOME/.config/quickshell/<name>"`.
+    /// How this rice gets deployed. `Symlink` = one `ln -sfnT` from the
+    /// user's config dir into the cached clone, no fs-diff tracking.
+    /// `Dotfiles` = run `install_cmd` and diff pre/post snapshots of
+    /// auto-scanned tracked paths. Default is `Dotfiles` for backwards
+    /// compatibility with the pre-shape catalog schema.
+    #[serde(default = "default_shape")]
+    pub shape: Shape,
+    /// Command run in the clone dir as `/bin/sh -c "<install_cmd>"`.
+    /// Required for `Dotfiles`, forbidden for `Symlink`.
+    #[serde(default)]
     pub install_cmd: String,
+    /// For `Symlink` shape: path inside the clone to point at. Typically
+    /// `"."` (repo root is the shell config). Relative to the clone dir.
+    #[serde(default)]
+    pub symlink_src: String,
+    /// For `Symlink` shape: absolute `ln -sfnT` destination, typically
+    /// under `~/.config/quickshell/<name>`. Tilde-expanded at install.
+    #[serde(default)]
+    pub symlink_dst: String,
     /// If true, pass the parent's tty through so install.sh can prompt.
     /// Otherwise stdin is /dev/null and stdout/stderr are captured to the
     /// log file (teed to the parent's stderr for visibility).
@@ -44,12 +58,12 @@ pub struct RiceEntry {
     pub shell_type: ShellType,
     /// Paths the rice regenerates at runtime (theme engines, wallpaper
     /// hooks). On uninstall: restore pre-install content unconditionally,
-    /// never `.rcsave` the current content.
+    /// never `.rcsave` the current content. Dotfiles shape only.
     #[serde(default)]
     pub runtime_regenerated: Vec<String>,
     /// Paths with partial ownership — user may share the file with the
     /// rice. On uninstall: always `.rcsave` the current content, even if
-    /// it matches the post-install hash.
+    /// it matches the post-install hash. Dotfiles shape only.
     #[serde(default)]
     pub partial_ownership: Vec<String>,
     /// Extra watched roots beyond the defaults. Defaults live in
@@ -57,13 +71,31 @@ pub struct RiceEntry {
     /// `.local/lib`, and the five `.local/share/{applications,fonts,
     /// icons,quickshell,themes}` dirs rices typically write into. A
     /// rice that deploys into other paths (e.g. `.local/share/matugen`)
-    /// must declare them here. Must stay under `$HOME`.
+    /// must declare them here. Must stay under `$HOME`. Dotfiles shape
+    /// only.
     #[serde(default)]
     pub extra_watched_roots: Vec<String>,
     /// Purely informational: rendered in `list` / `status` so users know
     /// which effects Rice Cooker cannot reverse.
     #[serde(default)]
     pub documented_system_effects: Vec<String>,
+}
+
+/// Install shape — determines how the rice is deployed and tracked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Shape {
+    /// One `ln -sfnT <clone>/<symlink_src> <symlink_dst>`. No snapshot.
+    /// Uninstall removes the symlink (after git-status-based rcsave of
+    /// user edits inside the clone).
+    Symlink,
+    /// Run `install_cmd` and diff pre/post snapshots of watched roots.
+    /// Uninstall reverses the fs-diff.
+    Dotfiles,
+}
+
+fn default_shape() -> Shape {
+    Shape::Dotfiles
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -159,8 +191,64 @@ fn validate_entry(name: &str, entry: &RiceEntry) -> Result<()> {
             entry.commit
         ));
     }
-    if entry.install_cmd.is_empty() {
-        return Err(anyhow!("{name}: install_cmd is empty"));
+    // Shape rules: symlink needs symlink_src+dst and forbids install_cmd;
+    // dotfiles requires install_cmd and ignores symlink_* fields.
+    match entry.shape {
+        Shape::Symlink => {
+            if !entry.install_cmd.is_empty() {
+                return Err(anyhow!(
+                    "{name}: install_cmd is forbidden for shape = \"symlink\" (use shape = \"dotfiles\" if the rice needs more than a symlink)"
+                ));
+            }
+            if entry.symlink_src.is_empty() {
+                return Err(anyhow!(
+                    "{name}: symlink_src is required for shape = \"symlink\""
+                ));
+            }
+            if entry.symlink_dst.is_empty() {
+                return Err(anyhow!(
+                    "{name}: symlink_dst is required for shape = \"symlink\""
+                ));
+            }
+            if !(entry.symlink_dst.starts_with('~') || entry.symlink_dst.starts_with('/')) {
+                return Err(anyhow!(
+                    "{name}: symlink_dst must start with ~ or /, got {:?}",
+                    entry.symlink_dst
+                ));
+            }
+            // symlink_dst must be strictly under $HOME (expanded form), not
+            // ~ itself, and not under /etc, /usr, etc.
+            let dst = &entry.symlink_dst;
+            if dst == "~" || dst == "~/" || dst == "/" {
+                return Err(anyhow!(
+                    "{name}: symlink_dst cannot be $HOME or / itself: {dst:?}"
+                ));
+            }
+            for forbidden in ["/etc", "/usr", "/var", "/boot", "/opt"] {
+                if dst == forbidden || dst.starts_with(&format!("{forbidden}/")) {
+                    return Err(anyhow!(
+                        "{name}: symlink_dst cannot be under {forbidden}: {dst:?}"
+                    ));
+                }
+            }
+            if dst.contains("..") {
+                return Err(anyhow!(
+                    "{name}: symlink_dst must not contain .. segments: {dst:?}"
+                ));
+            }
+        }
+        Shape::Dotfiles => {
+            if entry.install_cmd.is_empty() {
+                return Err(anyhow!(
+                    "{name}: install_cmd is required for shape = \"dotfiles\""
+                ));
+            }
+            if !entry.symlink_src.is_empty() || !entry.symlink_dst.is_empty() {
+                return Err(anyhow!(
+                    "{name}: symlink_src/symlink_dst are only valid for shape = \"symlink\""
+                ));
+            }
+        }
     }
     // Extra watched roots must look like absolute paths or start with ~
     // (expanded later). Refuse system paths explicitly.
@@ -200,8 +288,91 @@ mod tests {
         let e = c.get("noctalia").unwrap();
         assert_eq!(e.display_name, "Noctalia");
         assert_eq!(e.shell_type, ShellType::Quickshell);
+        // Default shape is Dotfiles (backwards-compat with pre-shape catalogs).
+        assert_eq!(e.shape, Shape::Dotfiles);
         assert!(e.runtime_regenerated.is_empty());
         assert!(!e.interactive);
+    }
+
+    #[test]
+    fn parses_symlink_shape() {
+        let t = r#"
+            [dms]
+            display_name = "DMS"
+            repo = "https://github.com/x/y"
+            commit = "0123456789abcdef0123456789abcdef01234567"
+            shape = "symlink"
+            symlink_src = "."
+            symlink_dst = "~/.config/quickshell/dms"
+        "#;
+        let c = Catalog::from_str(t).unwrap();
+        let e = c.get("dms").unwrap();
+        assert_eq!(e.shape, Shape::Symlink);
+        assert_eq!(e.symlink_src, ".");
+        assert_eq!(e.symlink_dst, "~/.config/quickshell/dms");
+        assert!(e.install_cmd.is_empty());
+    }
+
+    #[test]
+    fn symlink_shape_rejects_install_cmd() {
+        let t = r#"
+            [x]
+            display_name = "X"
+            repo = "https://x"
+            commit = "0123456789abcdef0123456789abcdef01234567"
+            shape = "symlink"
+            symlink_src = "."
+            symlink_dst = "~/.config/x"
+            install_cmd = "true"
+        "#;
+        assert!(Catalog::from_str(t).is_err());
+    }
+
+    #[test]
+    fn symlink_shape_requires_symlink_fields() {
+        let t = r#"
+            [x]
+            display_name = "X"
+            repo = "https://x"
+            commit = "0123456789abcdef0123456789abcdef01234567"
+            shape = "symlink"
+        "#;
+        assert!(Catalog::from_str(t).is_err());
+    }
+
+    #[test]
+    fn symlink_shape_rejects_system_symlink_dst() {
+        for bad in ["/etc/x", "/usr/share/x", "/", "~", "~/../escape"] {
+            let t = format!(
+                r#"
+                [x]
+                display_name = "X"
+                repo = "https://x"
+                commit = "0123456789abcdef0123456789abcdef01234567"
+                shape = "symlink"
+                symlink_src = "."
+                symlink_dst = "{bad}"
+                "#
+            );
+            assert!(
+                Catalog::from_str(&t).is_err(),
+                "accepted unsafe symlink_dst {bad:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn dotfiles_shape_forbids_symlink_fields() {
+        let t = r#"
+            [x]
+            display_name = "X"
+            repo = "https://x"
+            commit = "0123456789abcdef0123456789abcdef01234567"
+            shape = "dotfiles"
+            install_cmd = "true"
+            symlink_src = "."
+        "#;
+        assert!(Catalog::from_str(t).is_err());
     }
 
     #[test]
@@ -228,7 +399,10 @@ mod tests {
                 install_cmd = "true"
                 "#
             );
-            assert!(Catalog::from_str(&t).is_err(), "accepted bad commit {bad:?}");
+            assert!(
+                Catalog::from_str(&t).is_err(),
+                "accepted bad commit {bad:?}"
+            );
         }
     }
 

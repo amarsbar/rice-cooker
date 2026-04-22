@@ -106,11 +106,7 @@ fn run() -> Result<()> {
                      uninstall with --force to reverse what happened."
                 );
             }
-            println!(
-                "installed: {} (log: {})",
-                out.name,
-                out.log_path.display()
-            );
+            println!("installed: {} (log: {})", out.name, out.log_path.display());
             if !out.pacman_diff.added_explicit.is_empty() {
                 println!(
                     "pacman: added {} explicit: {:?}",
@@ -149,7 +145,11 @@ fn run() -> Result<()> {
                 }
             }
         }
-        Cmd::Switch { name, dry_run, force } => {
+        Cmd::Switch {
+            name,
+            dry_run,
+            force,
+        } => {
             let dirs = install::resolve_dirs()?;
             let cat = Catalog::from_file(&catalog_path(cli.catalog.as_deref())?)?;
             let mut f = flags;

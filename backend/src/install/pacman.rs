@@ -57,10 +57,7 @@ pub fn snapshot_explicit() -> Result<ExplicitSet> {
         .output()
         .context("running pacman -Qqe")?;
     if !out.status.success() {
-        return Err(anyhow!(
-            "pacman -Qqe exited {:?}",
-            out.status.code()
-        ));
+        return Err(anyhow!("pacman -Qqe exited {:?}", out.status.code()));
     }
     let s = String::from_utf8(out.stdout).context("pacman -Qqe output not UTF-8")?;
     Ok(ExplicitSet::from_lines(&s))
@@ -85,6 +82,22 @@ pub fn diff_sets(pre: &ExplicitSet, post: &ExplicitSet) -> PacmanDiff {
     }
 }
 
+/// Best-effort `pacman -Q <pkg>` check. Returns `Ok(true)` if pacman
+/// reports the package as installed, `Ok(false)` if not. Any other
+/// outcome (pacman missing, exec error) surfaces as `Err`, so callers
+/// that want the retry-safe "assume installed on failure" behaviour
+/// should `.unwrap_or(true)` at the call site.
+pub fn is_installed(pkg: &str) -> Result<bool> {
+    let out = Command::new(pacman_bin())
+        .args(["-Q", pkg])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .with_context(|| format!("running pacman -Q {pkg}"))?;
+    Ok(out.success())
+}
+
 /// Remove the packages added by the install using `sudo pacman -Rns`.
 /// `--noconfirm` is forwarded only when `no_confirm` is true — by default
 /// the user sees the usual pacman confirmation prompt.
@@ -100,14 +113,9 @@ pub fn remove_added(pkgs: &[String], no_confirm: bool) -> Result<()> {
     }
     cmd.args(pkgs);
     // Inherit stdin/stdout/stderr so sudo + pacman can prompt the user.
-    let status = cmd
-        .status()
-        .context("spawning sudo pacman -Rns")?;
+    let status = cmd.status().context("spawning sudo pacman -Rns")?;
     if !status.success() {
-        return Err(anyhow!(
-            "sudo pacman -Rns exited {:?}",
-            status.code()
-        ));
+        return Err(anyhow!("sudo pacman -Rns exited {:?}", status.code()));
     }
     Ok(())
 }
