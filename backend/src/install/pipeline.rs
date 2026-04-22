@@ -137,23 +137,29 @@ fn install_locked(cat: &Catalog, dirs: &Dirs, name: &str, flags: Flags) -> Resul
     let post_explicit = pacman_explicit().context("pacman -Qqe post-snapshot")?;
     let added_explicit = diff_explicit(&pre_explicit, &post_explicit);
 
-    // Create symlink.
-    let paths = symlink_shape::create_symlink(&clone, entry, &dirs.home)?;
-
-    // Write record.
+    // Persist ownership BEFORE create_symlink so a symlink failure still
+    // leaves a record that uninstall can use to remove the just-installed
+    // packages. Symlink paths are deterministic from the entry + home,
+    // so we can compute them without actually making the symlink yet.
+    let symlink_path = expand_home(&entry.symlink_dst, &dirs.home);
+    let symlink_target = clone.join(&entry.symlink_src);
     let record = InstallRecord {
         schema_version: SCHEMA_VERSION,
         name: name.to_string(),
         commit: entry.commit.clone(),
         installed_at: InstallRecord::now_rfc3339(),
-        symlink_path: paths.symlink_path.clone(),
-        symlink_target: paths.symlink_target.clone(),
+        symlink_path,
+        symlink_target,
         pacman_diff: PacmanDiff {
             added_explicit: added_explicit.clone(),
         },
     };
     save_record(&dirs.record_json(name), &record)?;
     write_current(dirs, name)?;
+
+    // Now create the symlink. If it fails, the record is already on
+    // disk so uninstall can roll back the packages.
+    symlink_shape::create_symlink(&clone, entry, &dirs.home)?;
 
     Ok(InstallOutcome {
         name: name.to_string(),
@@ -232,15 +238,35 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
         None
     };
 
-    // Remove symlink (NotFound is idempotent-OK, propagate real errors).
-    match fs::remove_file(&record.symlink_path) {
-        Ok(()) => {}
+    // Remove symlink — but only if it's still OUR symlink. User could
+    // have replaced it with a regular file/dir since install; we don't
+    // want to clobber that. NotFound is idempotent-OK; type mismatch or
+    // target mismatch is skipped with a warning; real IO errors bubble.
+    match fs::symlink_metadata(&record.symlink_path) {
+        Ok(md) if md.file_type().is_symlink() => {
+            let target_ok = fs::read_link(&record.symlink_path)
+                .map(|t| t == record.symlink_target)
+                .unwrap_or(false);
+            if target_ok {
+                fs::remove_file(&record.symlink_path).with_context(|| {
+                    format!("removing symlink {}", record.symlink_path.display())
+                })?;
+            } else {
+                eprintln!(
+                    "rice-cooker: skipping {}: symlink target no longer matches record (user-retargeted?)",
+                    record.symlink_path.display()
+                );
+            }
+        }
+        Ok(_) => {
+            eprintln!(
+                "rice-cooker: skipping {}: not a symlink anymore (user-replaced?)",
+                record.symlink_path.display()
+            );
+        }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
         Err(e) => {
-            return Err(anyhow!(
-                "removing symlink {}: {e}",
-                record.symlink_path.display()
-            ));
+            return Err(anyhow!("reading {}: {e}", record.symlink_path.display()));
         }
     }
     // Clone must actually be gone before we retire the record. The
@@ -296,6 +322,42 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
 pub fn switch(cat: &Catalog, dirs: &Dirs, to: &str, flags: Flags) -> Result<SwitchOutcome> {
     dirs.ensure()?;
     let _lock = ApplyLock::try_acquire(&dirs.lock_file()).map_err(|e| anyhow!("lock: {e}"))?;
+
+    // Dry-run needs its own path. If we called uninstall_locked+install_locked
+    // in dry-run mode, uninstall_locked prints "would remove" but leaves
+    // current.json set, then install_locked reads it as "already installed"
+    // and errors out — the combined plan never prints.
+    if flags.dry_run {
+        let from = read_current(dirs)?.unwrap_or_default();
+        let entry = cat.get(to).ok_or_else(|| anyhow!("{to}: not in catalog"))?;
+        if !from.is_empty()
+            && let Ok(rec) = load_record(&dirs.record_json(&from))
+        {
+            println!("would remove symlink {}", rec.symlink_path.display());
+            if !rec.pacman_diff.added_explicit.is_empty() {
+                println!(
+                    "would remove packages: {}",
+                    rec.pacman_diff.added_explicit.join(" ")
+                );
+            }
+        }
+        let dst = expand_home(&entry.symlink_dst, &dirs.home);
+        let src = dirs.clone_dir(to).join(&entry.symlink_src);
+        println!("would symlink: {} -> {}", dst.display(), src.display());
+        let missing_deps =
+            deps::missing(&[entry.pacman_deps.clone(), entry.aur_deps.clone()].concat())?;
+        if !missing_deps.is_empty() {
+            println!("would install deps: {}", missing_deps.join(" "));
+        } else {
+            println!("deps already satisfied, zero polkit prompts");
+        }
+        return Ok(SwitchOutcome {
+            from,
+            to: to.to_string(),
+            rcsave_dir: None,
+        });
+    }
+
     let uo = uninstall_locked(dirs, flags)?;
     let io = install_locked(cat, dirs, to, flags)?;
     Ok(SwitchOutcome {

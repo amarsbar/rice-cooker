@@ -176,12 +176,22 @@ pub fn verify(rice_dir: &Path, entry_rel: &Path, log_file: &Path) -> Result<Veri
     loop {
         thread::sleep(Duration::from_millis(VERIFY_POLL_MS));
 
-        let pids = pgrep_pids(&["-xf", &pat]).unwrap_or_default();
+        // pgrep failures (syntax error, EPERM on /proc, etc.) must not
+        // be silently collapsed to "process dead" — that would hide
+        // real environment problems as false qs_exited failures.
+        let pids = pgrep_pids(&["-xf", &pat])?;
         let alive = !pids.is_empty();
 
-        let log_contents = find_quickshell_runtime_log(&entry_abs)
-            .and_then(|p| fs::read_to_string(&p).ok())
-            .or_else(|| fs::read_to_string(log_file).ok())
+        // Prefer the per-launch log_file; fall back to quickshell's
+        // runtime log only if ours is missing or empty. The runtime log
+        // path can match a previous run of the same config and leak
+        // stale ERROR lines into this verify window.
+        let log_contents = fs::read_to_string(log_file)
+            .ok()
+            .filter(|s| !s.is_empty())
+            .or_else(|| {
+                find_quickshell_runtime_log(&entry_abs).and_then(|p| fs::read_to_string(&p).ok())
+            })
             .unwrap_or_default();
 
         // Process died → Dead.

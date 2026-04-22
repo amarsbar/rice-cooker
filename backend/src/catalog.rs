@@ -157,6 +157,26 @@ fn validate_entry(name: &str, entry: &RiceEntry) -> Result<()> {
     if entry.symlink_src.is_empty() {
         return Err(anyhow!("{name}: symlink_src is required"));
     }
+    // symlink_src is joined onto clone_dir at install time. Reject
+    // absolute paths (which Path::join would treat as a full replacement,
+    // escaping clone_dir entirely) and any `..` component (which could
+    // traverse out of clone_dir via resolved parent links).
+    let src = std::path::Path::new(&entry.symlink_src);
+    if src.is_absolute() {
+        return Err(anyhow!(
+            "{name}: symlink_src must be relative to the clone dir, got {:?}",
+            entry.symlink_src
+        ));
+    }
+    if src
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return Err(anyhow!(
+            "{name}: symlink_src must not contain .. segments, got {:?}",
+            entry.symlink_src
+        ));
+    }
     if entry.symlink_dst.is_empty() {
         return Err(anyhow!("{name}: symlink_dst is required"));
     }

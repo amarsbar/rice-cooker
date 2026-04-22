@@ -154,26 +154,31 @@ pub fn run_exit<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<
         None => return Ok(false),
     };
 
-    step(events, Step::KillQuickshell, StepState::Start)?;
-    try_stage!(events, "kill_quickshell", process::kill_quickshell());
-    step(events, Step::KillQuickshell, StepState::Done)?;
-
+    // Read + validate the replay record BEFORE killing the active shell.
+    // If cwd wasn't captured we can't safely replay (relative `-p` paths
+    // would load the wrong shell.qml from the backend's own cwd), and
+    // killing the user's existing shell only to then fail leaves them
+    // with nothing running. Validate first, kill second.
     let original = try_stage!(events, "commit", "read_original", cache.original());
-    if let Some(shell) = original {
-        // Refuse to replay when cwd was not captured: the backend's own cwd is
-        // rarely the right place to launch from (relative `-p` paths would load
-        // the wrong shell.qml). This only trips if /proc/<pid>/cwd read failed
-        // when we recorded the original — rare but worth failing loudly.
-        let cwd = match shell.cwd.as_deref() {
-            Some(c) => PathBuf::from(c),
+    let replay = match original {
+        Some(shell) => match shell.cwd.as_deref() {
+            Some(c) => Some((shell.argv.clone(), PathBuf::from(c))),
             None => {
                 emit_fail(events, "launch", "cwd_missing", None, None)?;
                 return Ok(false);
             }
-        };
+        },
+        None => None,
+    };
+
+    step(events, Step::KillQuickshell, StepState::Start)?;
+    try_stage!(events, "kill_quickshell", process::kill_quickshell());
+    step(events, Step::KillQuickshell, StepState::Done)?;
+
+    if let Some((argv, cwd)) = replay {
         let log_file = cache.last_run_log();
         step(events, Step::Launch, StepState::Start)?;
-        if let Err(e) = process::launch_argv(&shell.argv, &cwd, &log_file) {
+        if let Err(e) = process::launch_argv(&argv, &cwd, &log_file) {
             let tail = read_tail(&log_file);
             emit_fail(events, "launch", &format!("{e:#}"), None, Some(tail))?;
             return Ok(false);

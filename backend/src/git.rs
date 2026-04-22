@@ -88,6 +88,9 @@ pub fn clone_at_commit(repo_url: &str, commit: &str, dest: &Path) -> anyhow::Res
     if repo_url.starts_with('-') {
         anyhow::bail!("refusing repo URL starting with '-': {repo_url}");
     }
+    if commit.starts_with('-') {
+        anyhow::bail!("refusing commit starting with '-': {commit}");
+    }
     // Full clone (not shallow), since we need a specific historical SHA.
     // --no-checkout so we land without a working tree and can check out
     // the pinned commit explicitly.

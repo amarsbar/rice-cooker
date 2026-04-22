@@ -31,18 +31,29 @@ pub fn create_symlink(clone_dir: &Path, entry: &RiceEntry, home: &Path) -> Resul
             .with_context(|| format!("creating parent of {}", dst.display()))?;
     }
 
-    if let Ok(md) = fs::symlink_metadata(&dst)
-        && md.file_type().is_dir()
-    {
-        return Err(anyhow!(
-            "{} exists as a directory; refusing to replace with a symlink",
-            dst.display()
-        ));
-    }
-    match fs::remove_file(&dst) {
-        Ok(()) => {}
+    match fs::symlink_metadata(&dst) {
+        Ok(md) => {
+            let ft = md.file_type();
+            if ft.is_dir() {
+                return Err(anyhow!(
+                    "{} exists as a directory; refusing to replace with a symlink",
+                    dst.display()
+                ));
+            }
+            if !ft.is_symlink() {
+                // Real file (not a symlink). Could be user-created config.
+                // Refuse rather than silently clobber.
+                return Err(anyhow!(
+                    "{} exists as a regular file; refusing to replace with a symlink (move or remove it first)",
+                    dst.display()
+                ));
+            }
+            // Stale symlink — safe to replace.
+            fs::remove_file(&dst)
+                .map_err(|e| anyhow!("clearing stale symlink {}: {e}", dst.display()))?;
+        }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-        Err(e) => return Err(anyhow!("clearing {}: {e}", dst.display())),
+        Err(e) => return Err(anyhow!("reading {}: {e}", dst.display())),
     }
     symlink(&src, &dst)
         .with_context(|| format!("symlink {} -> {}", dst.display(), src.display()))?;

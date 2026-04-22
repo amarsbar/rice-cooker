@@ -202,9 +202,15 @@ fn catalog_path(flag: Option<&std::path::Path>) -> Result<PathBuf> {
     {
         return Ok(PathBuf::from(p));
     }
-    let cwd = std::env::current_dir()?.join("catalog.toml");
-    if cwd.exists() {
-        return Ok(cwd);
+    // Resolve against CWD. Running from the repo root is the typical
+    // dev invocation (`backend/catalog.toml`), running from `backend/`
+    // is the typical script invocation (`catalog.toml`). Check both.
+    let cwd = std::env::current_dir()?;
+    for rel in ["backend/catalog.toml", "catalog.toml"] {
+        let p = cwd.join(rel);
+        if p.exists() {
+            return Ok(p);
+        }
     }
-    Ok(PathBuf::from("catalog.toml"))
+    Ok(PathBuf::from("backend/catalog.toml"))
 }
