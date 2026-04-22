@@ -3,6 +3,7 @@ name = "rice-cooker-backend"
 version = "0.1.0"
 edition = "2024"
 publish = false
+license = "BSD-3-Clause"
 
 [[bin]]
 name = "rice-cooker-backend"
