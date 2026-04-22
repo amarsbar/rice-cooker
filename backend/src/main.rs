@@ -13,9 +13,6 @@ use rice_cooker_backend::install::{self, Flags};
 #[derive(Parser)]
 #[command(name = "rice-cooker-backend", about = "Quickshell rice install engine")]
 struct Cli {
-    /// Print each operation as it happens.
-    #[arg(long, global = true)]
-    verbose: bool,
     /// Alternate catalog file path (default: backend/catalog.toml).
     #[arg(long, global = true)]
     catalog: Option<PathBuf>,
@@ -81,7 +78,6 @@ fn run() -> Result<()> {
     let flags = Flags {
         dry_run: false,
         force: false,
-        verbose: cli.verbose,
     };
     match &cli.cmd {
         Cmd::Install { name, dry_run } => {

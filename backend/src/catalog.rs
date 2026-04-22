@@ -44,11 +44,7 @@ pub struct RiceEntry {
     /// install refuses in v1.
     #[serde(default)]
     pub interactive: bool,
-    /// Determines how `try` launches this rice for preview. Unused by
-    /// install (symlink is the only install shape).
-    #[serde(default = "default_shell_type")]
-    pub shell_type: ShellType,
-    /// Entry point used by `try`.
+    /// Entry point used by `try` / `apply`.
     #[serde(default)]
     pub entry: EntryPoint,
     /// Purely informational — shown in `list` / `status` for effects
@@ -58,28 +54,10 @@ pub struct RiceEntry {
     pub documented_system_effects: Vec<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ShellType {
-    Quickshell,
-    Ags,
-    Eww,
-    Waybar,
-    None,
-}
-
-fn default_shell_type() -> ShellType {
-    ShellType::Quickshell
-}
-
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct EntryPoint {
     #[serde(default)]
     pub path: String,
-    #[serde(default)]
-    pub config: String,
-    #[serde(default)]
-    pub style: String,
 }
 
 impl Catalog {
@@ -102,17 +80,13 @@ impl Catalog {
     pub fn get(&self, name: &str) -> Option<&RiceEntry> {
         self.rices.get(name)
     }
-
-    pub fn names(&self) -> impl Iterator<Item = &str> {
-        self.rices.keys().map(String::as_str)
-    }
 }
 
 /// Install-time refusal: commit contains "PLACEHOLDER" (uncurated
-/// catalog entry). Preserved from v1; catches catalog bring-up errors
-/// before paru does network work.
+/// catalog entry). Catches catalog bring-up errors before paru does
+/// network work.
 pub fn is_placeholder_commit(commit: &str) -> bool {
-    commit.contains("PLACEHOLDER") || commit.chars().take_while(|c| *c == '0').count() >= 30
+    commit.contains("PLACEHOLDER")
 }
 
 pub fn validate_name(name: &str) -> Result<()> {
@@ -225,7 +199,6 @@ mod tests {
         let c = Catalog::from_str(MINIMAL).unwrap();
         let e = c.get("dms").unwrap();
         assert_eq!(e.display_name, "DMS");
-        assert_eq!(e.shell_type, ShellType::Quickshell);
         assert!(e.aur_deps.is_empty());
         assert!(e.pacman_deps.is_empty());
         assert!(!e.interactive);
@@ -262,11 +235,9 @@ mod tests {
     }
 
     #[test]
-    fn is_placeholder_detects_placeholder_text_and_all_zeros() {
+    fn is_placeholder_detects_placeholder_text() {
         assert!(is_placeholder_commit("PLACEHOLDER..."));
-        assert!(is_placeholder_commit(
-            "0000000000000000000000000000000000000000"
-        ));
+        assert!(is_placeholder_commit("abcPLACEHOLDERdef"));
         assert!(!is_placeholder_commit(
             "0123456789abcdef0123456789abcdef01234567"
         ));

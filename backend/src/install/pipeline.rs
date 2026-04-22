@@ -28,7 +28,6 @@ use super::symlink as symlink_shape;
 pub struct Flags {
     pub dry_run: bool,
     pub force: bool,
-    pub verbose: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -113,7 +112,7 @@ fn install_locked(cat: &Catalog, dirs: &Dirs, name: &str, flags: Flags) -> Resul
         remove_dir_all_forceful(&clone)
             .with_context(|| format!("removing stale clone {}", clone.display()))?;
     }
-    log_verbose(flags, &format!("cloning {} @ {}", entry.repo, entry.commit));
+    println!("cloning {} @ {}", entry.repo, entry.commit);
     git::clone_at_commit(&entry.repo, &entry.commit, &clone)?;
 
     // pacman -Qqe diff captures whatever paru pulled (including
@@ -128,10 +127,10 @@ fn install_locked(cat: &Catalog, dirs: &Dirs, name: &str, flags: Flags) -> Resul
     let all_deps: Vec<String> = [entry.pacman_deps.clone(), entry.aur_deps.clone()].concat();
     let missing_deps = deps::missing(&all_deps)?;
     if !missing_deps.is_empty() {
-        log_verbose(flags, &format!("install deps: {}", missing_deps.join(" ")));
+        println!("install deps: {}", missing_deps.join(" "));
         deps::install_packages(&missing_deps)?;
     } else if !all_deps.is_empty() {
-        log_verbose(flags, "deps already satisfied");
+        println!("deps already satisfied");
     }
 
     let post_explicit = pacman_explicit().context("pacman -Qqe post-snapshot")?;
@@ -207,10 +206,7 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
     if !record.pacman_diff.added_explicit.is_empty() {
         let still_installed = deps::installed(&record.pacman_diff.added_explicit)?;
         if !still_installed.is_empty() {
-            log_verbose(
-                flags,
-                &format!("remove packages: {}", still_installed.join(" ")),
-            );
+            println!("remove packages: {}", still_installed.join(" "));
             deps::remove_packages(&still_installed)?;
         }
     }
@@ -489,12 +485,6 @@ fn now_ts_compact() -> String {
         .format(&Rfc3339)
         .expect("RFC3339 formatting of OffsetDateTime::now_utc cannot fail")
         .replace(':', "")
-}
-
-fn log_verbose(flags: Flags, msg: &str) {
-    if flags.verbose {
-        eprintln!("rice-cooker: {msg}");
-    }
 }
 
 #[cfg(test)]

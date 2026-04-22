@@ -67,7 +67,7 @@ pub fn create_symlink(clone_dir: &Path, entry: &RiceEntry, home: &Path) -> Resul
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::catalog::{EntryPoint, ShellType};
+    use crate::catalog::EntryPoint;
     use tempfile::tempdir;
 
     fn mk_entry(src: &str, dst: &str) -> RiceEntry {
@@ -81,7 +81,6 @@ mod tests {
             aur_deps: vec![],
             pacman_deps: vec![],
             interactive: false,
-            shell_type: ShellType::Quickshell,
             entry: EntryPoint::default(),
             documented_system_effects: vec![],
         }
