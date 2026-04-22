@@ -116,6 +116,14 @@ fn install_locked(cat: &Catalog, dirs: &Dirs, name: &str, flags: Flags) -> Resul
     log_verbose(flags, &format!("cloning {} @ {}", entry.repo, entry.commit));
     git::clone_at_commit(&entry.repo, &entry.commit, &clone)?;
 
+    // pacman -Qqe diff captures whatever paru pulled (including
+    // transitive AUR deps). MUST happen before install_packages so
+    // `post - pre` reflects only this install's additions — capturing
+    // pre-state after the install would always yield an empty diff
+    // and uninstall would leave packages orphaned.
+    let pre_explicit = pacman_explicit()
+        .context("pacman -Qqe pre-snapshot (refusing to install without a reliable baseline)")?;
+
     // Install deps. Skip paru entirely if nothing's missing.
     let all_deps: Vec<String> = [entry.pacman_deps.clone(), entry.aur_deps.clone()].concat();
     let missing_deps = deps::missing(&all_deps);
@@ -126,15 +134,11 @@ fn install_locked(cat: &Catalog, dirs: &Dirs, name: &str, flags: Flags) -> Resul
         log_verbose(flags, "deps already satisfied");
     }
 
-    // pacman -Qqe diff captures whatever paru pulled (including transitive).
-    let pre_explicit = pacman_explicit();
-    let _ = pre_explicit; // placeholder; see below
+    let post_explicit = pacman_explicit().context("pacman -Qqe post-snapshot")?;
+    let added_explicit = diff_explicit(&pre_explicit, &post_explicit);
 
     // Create symlink.
     let paths = symlink_shape::create_symlink(&clone, entry, &dirs.home)?;
-
-    let post_explicit = pacman_explicit();
-    let added_explicit = diff_explicit(&pre_explicit, &post_explicit);
 
     // Write record.
     let record = InstallRecord {
@@ -203,12 +207,16 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
     let clone = dirs.clone_dir(&name);
     let rcsave_dir = if clone.exists() {
         fs::create_dir_all(&rcsave).with_context(|| format!("creating {}", rcsave.display()))?;
+        // `-a` preserves mode, ownership, timestamps, symlinks — rice
+        // trees commonly ship executable scripts and internal symlinks,
+        // and `-r` alone loses both. `-T` prevents the copy-into-target
+        // footgun where target gets nested under itself.
         let status = Command::new("cp")
-            .args(["-rT"])
+            .args(["-aT"])
             .arg(&clone)
             .arg(&rcsave)
             .status()
-            .context("cp -rT")?;
+            .context("cp -aT")?;
         if !status.success() {
             return Err(anyhow!(
                 "cp -rT {} {} exited {:?}",
@@ -222,9 +230,26 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
         None
     };
 
-    // Remove symlink, clone, retire record.
-    let _ = fs::remove_file(&record.symlink_path);
-    let _ = remove_dir_all_forceful(&clone);
+    // Remove symlink (NotFound is idempotent-OK, propagate real errors).
+    match fs::remove_file(&record.symlink_path) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => {
+            return Err(anyhow!(
+                "removing symlink {}: {e}",
+                record.symlink_path.display()
+            ));
+        }
+    }
+    // rm -rf is idempotent for missing paths; propagate only real failure.
+    if clone.exists()
+        && let Err(e) = remove_dir_all_forceful(&clone)
+    {
+        eprintln!(
+            "rice-cooker: could not remove clone dir {}: {e} (manual cleanup required)",
+            clone.display()
+        );
+    }
     retire_to_previous(dirs, &name)?;
     clear_current(dirs)?;
 
@@ -269,17 +294,25 @@ pub fn status(dirs: &Dirs) -> Result<StatusRow> {
     })
 }
 
-fn pacman_explicit() -> Vec<String> {
-    let out = match Command::new("pacman").args(["-Qqe"]).output() {
-        Ok(o) if o.status.success() => o,
-        _ => return Vec::new(),
-    };
-    String::from_utf8_lossy(&out.stdout)
+fn pacman_explicit() -> Result<Vec<String>> {
+    // Propagates failures: pre-snapshot failure is fatal — running an
+    // install against an unreliable baseline would persist a bogus
+    // pacman_diff and uninstall would either miss real packages or
+    // attempt to -Rns the user's whole explicit set (depending on
+    // whether pre or post failed). Better to abort the install.
+    let out = Command::new("pacman")
+        .args(["-Qqe"])
+        .output()
+        .context("running pacman -Qqe")?;
+    if !out.status.success() {
+        return Err(anyhow!("pacman -Qqe exited {:?}", out.status.code()));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout)
         .lines()
         .map(str::trim)
         .filter(|l| !l.is_empty())
         .map(String::from)
-        .collect()
+        .collect())
 }
 
 fn diff_explicit(pre: &[String], post: &[String]) -> Vec<String> {
