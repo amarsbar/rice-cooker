@@ -59,8 +59,7 @@ impl Dirs {
             &self.installs_dir(),
             &self.logs_dir(),
         ] {
-            std::fs::create_dir_all(d)
-                .map_err(|e| anyhow!("creating {}: {e}", d.display()))?;
+            std::fs::create_dir_all(d).map_err(|e| anyhow!("creating {}: {e}", d.display()))?;
         }
         Ok(())
     }
@@ -131,7 +130,10 @@ mod tests {
             cache: PathBuf::from("/home/x/.cache/rice-cooker"),
             data: PathBuf::from("/home/x/.local/share/rice-cooker"),
         };
-        assert_eq!(d.rices_dir(), PathBuf::from("/home/x/.cache/rice-cooker/rices"));
+        assert_eq!(
+            d.rices_dir(),
+            PathBuf::from("/home/x/.cache/rice-cooker/rices")
+        );
         assert_eq!(
             d.current_json(),
             PathBuf::from("/home/x/.local/share/rice-cooker/installs/current.json")

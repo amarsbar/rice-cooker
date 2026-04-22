@@ -122,10 +122,7 @@ impl WalkOpts {
         runtime_regenerated: &[String],
     ) -> Result<Self> {
         use super::env::expand_home;
-        let mut roots: Vec<PathBuf> = DEFAULT_WATCHED_ROOTS
-            .iter()
-            .map(|r| home.join(r))
-            .collect();
+        let mut roots: Vec<PathBuf> = DEFAULT_WATCHED_ROOTS.iter().map(|r| home.join(r)).collect();
         for extra in extra_roots {
             let p = expand_home(extra, home);
             if !p.starts_with(home) {
@@ -140,9 +137,7 @@ impl WalkOpts {
         for s in partial_ownership.iter().chain(runtime_regenerated.iter()) {
             let p = expand_home(s, home);
             if !p.starts_with(home) {
-                return Err(anyhow!(
-                    "catalog path {s:?} resolves outside $HOME"
-                ));
+                return Err(anyhow!("catalog path {s:?} resolves outside $HOME"));
             }
             extra_files.push(p);
         }
@@ -179,8 +174,7 @@ pub fn take_snapshot(opts: &WalkOpts) -> Result<Manifest> {
         let mode = meta.permissions().mode() & 0o7777;
         let ft = meta.file_type();
         let record = if ft.is_symlink() {
-            let target = fs::read_link(p)
-                .with_context(|| format!("readlink {}", p.display()))?;
+            let target = fs::read_link(p).with_context(|| format!("readlink {}", p.display()))?;
             Entry::Symlink { target, mode }
         } else if ft.is_file() {
             if meta.len() > opts.max_file_bytes {
@@ -204,11 +198,7 @@ pub fn take_snapshot(opts: &WalkOpts) -> Result<Manifest> {
     })
 }
 
-fn walk_root(
-    root: &Path,
-    opts: &WalkOpts,
-    entries: &mut BTreeMap<PathBuf, Entry>,
-) -> Result<()> {
+fn walk_root(root: &Path, opts: &WalkOpts, entries: &mut BTreeMap<PathBuf, Entry>) -> Result<()> {
     // Missing root is fine — treat as empty. A rice might not deploy to
     // ~/.local/bin, for instance.
     if !root.exists() {
@@ -252,8 +242,8 @@ fn walk_root(
         let mode = meta.permissions().mode() & 0o7777;
         let ft = meta.file_type();
         let record = if ft.is_symlink() {
-            let target = fs::read_link(&path)
-                .with_context(|| format!("readlink {}", path.display()))?;
+            let target =
+                fs::read_link(&path).with_context(|| format!("readlink {}", path.display()))?;
             Entry::Symlink { target, mode }
         } else if ft.is_dir() {
             Entry::Dir { mode }
@@ -300,8 +290,7 @@ fn is_excluded(path: &Path, opts: &WalkOpts, _root: &Path) -> bool {
 }
 
 pub fn hash_file(path: &Path) -> Result<String> {
-    let f = fs::File::open(path)
-        .with_context(|| format!("opening {} for hash", path.display()))?;
+    let f = fs::File::open(path).with_context(|| format!("opening {} for hash", path.display()))?;
     let mut hasher = blake3::Hasher::new();
     let mut reader = BufReader::new(f);
     let mut buf = [0u8; 64 * 1024];
@@ -329,23 +318,20 @@ pub fn path_key(path: &Path) -> String {
 /// Persist a manifest to disk as pretty JSON, atomic temp+rename.
 pub fn save_manifest(path: &Path, m: &Manifest) -> Result<()> {
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("creating {}", parent.display()))?;
+        fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
     }
     let body = serde_json::to_string_pretty(m).context("serializing manifest")?;
     let mut tmp = path.as_os_str().to_os_string();
     tmp.push(".tmp");
     let tmp = PathBuf::from(tmp);
-    fs::write(&tmp, body.as_bytes())
-        .with_context(|| format!("writing {}", tmp.display()))?;
+    fs::write(&tmp, body.as_bytes()).with_context(|| format!("writing {}", tmp.display()))?;
     fs::rename(&tmp, path)
         .with_context(|| format!("renaming {} -> {}", tmp.display(), path.display()))?;
     Ok(())
 }
 
 pub fn load_manifest(path: &Path) -> Result<Manifest> {
-    let body = fs::read_to_string(path)
-        .with_context(|| format!("reading {}", path.display()))?;
+    let body = fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
     serde_json::from_str(&body).context("parsing manifest JSON")
 }
 
@@ -390,11 +376,13 @@ mod tests {
         let e = manifest.entries.get(&hypr).unwrap();
         assert!(e.is_file(), "hypr not a file: {e:?}");
         // bin/script too.
-        assert!(manifest
-            .entries
-            .get(&home.join(".local/bin/script"))
-            .unwrap()
-            .is_file());
+        assert!(
+            manifest
+                .entries
+                .get(&home.join(".local/bin/script"))
+                .unwrap()
+                .is_file()
+        );
         // symlink is present and not followed.
         let sym = home.join(".config/quickshell/noctalia");
         let e = manifest.entries.get(&sym).unwrap();
@@ -402,13 +390,17 @@ mod tests {
         // .cache/junk excluded.
         assert!(!manifest.entries.contains_key(&home.join(".cache/junk")));
         // .git/HEAD excluded via component filter.
-        assert!(!manifest
-            .entries
-            .contains_key(&home.join(".config/something/.git/HEAD")));
+        assert!(
+            !manifest
+                .entries
+                .contains_key(&home.join(".config/something/.git/HEAD"))
+        );
         // The .git dir itself is also filtered.
-        assert!(!manifest
-            .entries
-            .contains_key(&home.join(".config/something/.git")));
+        assert!(
+            !manifest
+                .entries
+                .contains_key(&home.join(".config/something/.git"))
+        );
     }
 
     #[test]
@@ -436,20 +428,17 @@ mod tests {
 
     #[test]
     fn extra_watched_root_outside_home_rejected() {
-        let r = WalkOpts::for_home(
-            Path::new("/home/x"),
-            &["/etc/hypr".into()],
-        );
+        let r = WalkOpts::for_home(Path::new("/home/x"), &["/etc/hypr".into()]);
         assert!(r.is_err());
     }
 
     #[test]
     fn extra_watched_root_inside_home_accepted() {
-        let r = WalkOpts::for_home(
-            Path::new("/home/x"),
-            &["~/Pictures/wallpapers".into()],
-        )
-        .unwrap();
-        assert!(r.roots.contains(&PathBuf::from("/home/x/Pictures/wallpapers")));
+        let r =
+            WalkOpts::for_home(Path::new("/home/x"), &["~/Pictures/wallpapers".into()]).unwrap();
+        assert!(
+            r.roots
+                .contains(&PathBuf::from("/home/x/Pictures/wallpapers"))
+        );
     }
 }

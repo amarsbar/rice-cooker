@@ -26,6 +26,99 @@ install_cmd = "{install_cmd}"
     )
 }
 
+fn symlink_catalog_for(name: &str, src: &str, dst: &str) -> String {
+    format!(
+        r#"
+[{name}]
+display_name = "{name}"
+repo = "https://example/{name}"
+commit = "0123456789abcdef0123456789abcdef01234567"
+shape = "symlink"
+symlink_src = "{src}"
+symlink_dst = "{dst}"
+"#
+    )
+}
+
+#[test]
+fn install_symlink_shape_creates_link_and_records_paths() {
+    let h = Harness::new();
+    h.with_rice_file("shell.qml", SHELL_QML);
+    let cat = symlink_catalog_for("dms", ".", "~/.config/quickshell/dms");
+    h.with_catalog(&cat);
+
+    let out = h.bin().args(["install", "dms"]).output().unwrap();
+    assert!(
+        out.status.success(),
+        "install failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let dest = h.home_path(".config/quickshell/dms");
+    assert!(dest.is_symlink(), "dest should be a symlink");
+
+    let rec = read_json(&h.record_json("dms"));
+    assert_eq!(rec["shape"], "symlink");
+    assert!(rec["symlink_path"].is_string(), "symlink_path recorded");
+    assert!(rec["symlink_target"].is_string(), "symlink_target recorded");
+    // Symlink shape doesn't take an fs-diff.
+    let added = rec["fs_diff"]["added"].as_array().unwrap();
+    assert!(added.is_empty(), "symlink shape should have empty fs_diff");
+}
+
+#[test]
+fn uninstall_symlink_shape_removes_link_and_preserves_user_edits() {
+    let h = Harness::new();
+    h.with_rice_file("shell.qml", SHELL_QML);
+    let cat = symlink_catalog_for("dms", ".", "~/.config/quickshell/dms");
+    h.with_catalog(&cat);
+
+    h.bin().args(["install", "dms"]).output().unwrap();
+    let dest = h.home_path(".config/quickshell/dms");
+    assert!(dest.is_symlink());
+
+    // Simulate a user edit through the symlinked path. Since the harness's
+    // fake git doesn't init a real repo, git-status falls back to
+    // whole-clone preservation with the -unverified suffix.
+    let edited = dest.join("my-custom.qml");
+    fs::write(&edited, b"// user edit\n").unwrap();
+
+    let out = h.bin().arg("uninstall").output().unwrap();
+    assert!(
+        out.status.success(),
+        "uninstall failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(!dest.exists(), "symlink should be gone after uninstall");
+    assert!(!h.current_json().exists(), "current.json cleared");
+}
+
+#[test]
+fn symlink_shape_rejects_install_cmd_in_catalog() {
+    let h = Harness::new();
+    h.with_rice_file("shell.qml", SHELL_QML);
+    let cat = r#"
+[bad]
+display_name = "bad"
+repo = "https://example/bad"
+commit = "0123456789abcdef0123456789abcdef01234567"
+shape = "symlink"
+symlink_src = "."
+symlink_dst = "~/.config/quickshell/bad"
+install_cmd = "true"
+"#;
+    h.with_catalog(cat);
+    let out = h.bin().args(["install", "bad"]).output().unwrap();
+    assert!(
+        !out.status.success(),
+        "catalog with forbidden install_cmd must fail"
+    );
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        err.contains("install_cmd is forbidden"),
+        "expected install_cmd-forbidden error, got: {err}"
+    );
+}
+
 #[test]
 fn install_happy_path_creates_current_and_record() {
     let h = Harness::new();
@@ -178,17 +271,17 @@ fn uninstall_preserves_user_modifications_via_rcsave() {
     fs::write(&deployed, b"USER EDITED").unwrap();
 
     let out = h.bin().arg("uninstall").output().unwrap();
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     // The user's version should be preserved at .rcsave-<ts>.
     let parent = deployed.parent().unwrap();
     let rcsaves: Vec<_> = fs::read_dir(parent)
         .unwrap()
         .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.file_name()
-                .to_string_lossy()
-                .contains(".rcsave-")
-        })
+        .filter(|e| e.file_name().to_string_lossy().contains(".rcsave-"))
         .collect();
     assert_eq!(rcsaves.len(), 1, "expected one .rcsave, got {rcsaves:?}");
     let body = fs::read_to_string(rcsaves[0].path()).unwrap();
@@ -393,7 +486,10 @@ runtime_regenerated = ["~/.config/gtk-3.0/settings.ini"]
         String::from_utf8_lossy(&out.stderr)
     );
     // Deployed shell + modified gtk + appended zshrc.
-    assert!(h.home_path(".config/quickshell/caelestia/shell.qml").exists());
+    assert!(
+        h.home_path(".config/quickshell/caelestia/shell.qml")
+            .exists()
+    );
     let gtk = fs::read_to_string(h.home_path(".config/gtk-3.0/settings.ini")).unwrap();
     assert!(gtk.contains("Caelestia"));
     let zsh = fs::read_to_string(h.home_path(".zshrc")).unwrap();
@@ -406,7 +502,10 @@ runtime_regenerated = ["~/.config/gtk-3.0/settings.ini"]
     let po = rec["partial_ownership_paths"].as_array().unwrap();
     assert!(po.iter().any(|v| v.as_str().unwrap().ends_with(".zshrc")));
     let rr = rec["runtime_regenerated_paths"].as_array().unwrap();
-    assert!(rr.iter().any(|v| v.as_str().unwrap().ends_with("settings.ini")));
+    assert!(
+        rr.iter()
+            .any(|v| v.as_str().unwrap().ends_with("settings.ini"))
+    );
 
     // User edits the deployed shell.qml post-install.
     fs::write(
@@ -440,7 +539,11 @@ runtime_regenerated = ["~/.config/gtk-3.0/settings.ini"]
     let zsh_rcsave = fs::read_dir(&home_dir)
         .unwrap()
         .filter_map(|e| e.ok())
-        .any(|e| e.file_name().to_string_lossy().starts_with(".zshrc.rcsave-"));
+        .any(|e| {
+            e.file_name()
+                .to_string_lossy()
+                .starts_with(".zshrc.rcsave-")
+        });
     assert!(
         zsh_rcsave,
         "partial_ownership path should have been .rcsave'd"

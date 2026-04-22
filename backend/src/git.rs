@@ -92,8 +92,7 @@ pub fn clone_at_commit(repo_url: &str, commit: &str, dest: &Path) -> anyhow::Res
     // --no-checkout so we land without a working tree and can check out
     // the pinned commit explicitly.
     if let Some(parent) = dest.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("creating {}", parent.display()))?;
+        fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
     }
     let status = git_cmd()
         .args(["clone", "--no-checkout", "--", repo_url])

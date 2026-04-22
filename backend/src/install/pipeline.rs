@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, anyhow};
 
-use crate::catalog::{Catalog, RiceEntry};
+use crate::catalog::{Catalog, RiceEntry, Shape};
 use crate::git;
 use crate::lock::ApplyLock;
 
@@ -19,6 +19,7 @@ use super::record::{
 };
 use super::run;
 use super::snapshot::{self, Manifest, WalkOpts, path_key};
+use super::symlink as symlink_shape;
 use super::systemd;
 
 /// Flags shared across the mutating subcommands.
@@ -35,15 +36,9 @@ pub struct Flags {
 }
 
 /// Install <name> from the catalog. Acquires the lock.
-pub fn install(
-    cat: &Catalog,
-    dirs: &Dirs,
-    name: &str,
-    flags: Flags,
-) -> Result<InstallOutcome> {
+pub fn install(cat: &Catalog, dirs: &Dirs, name: &str, flags: Flags) -> Result<InstallOutcome> {
     dirs.ensure()?;
-    let _lock = ApplyLock::try_acquire(&dirs.lock_file())
-        .map_err(|e| anyhow!("lock: {e}"))?;
+    let _lock = ApplyLock::try_acquire(&dirs.lock_file()).map_err(|e| anyhow!("lock: {e}"))?;
     install_locked(cat, dirs, name, flags)
 }
 
@@ -64,12 +59,7 @@ pub fn install(
 /// through as `cmd_ran`. Using an in-memory flag (rather than the
 /// previous on-disk `.cmd-ran` sentinel) closes R6-I-2: a sentinel-create
 /// failure can't silently put us on the wrong side of the phase.
-fn install_locked(
-    cat: &Catalog,
-    dirs: &Dirs,
-    name: &str,
-    flags: Flags,
-) -> Result<InstallOutcome> {
+fn install_locked(cat: &Catalog, dirs: &Dirs, name: &str, flags: Flags) -> Result<InstallOutcome> {
     use std::sync::atomic::{AtomicBool, Ordering};
     let cmd_ran = AtomicBool::new(false);
     let result = install_locked_inner(cat, dirs, name, flags, &cmd_ran);
@@ -87,7 +77,6 @@ fn install_locked_inner(
     flags: Flags,
     cmd_ran: &std::sync::atomic::AtomicBool,
 ) -> Result<InstallOutcome> {
-
     let entry = cat
         .get(name)
         .ok_or_else(|| anyhow!("{name}: not in catalog"))?;
@@ -103,6 +92,13 @@ fn install_locked_inner(
         return Err(anyhow!(
             "{cur} is already installed — run uninstall or switch first"
         ));
+    }
+
+    // Shape dispatch: symlink-shape rices take a fast path (clone +
+    // `ln -sfnT`, no filesystem snapshot). Dotfiles rices continue
+    // through the existing pre/post-snapshot pipeline.
+    if entry.shape == Shape::Symlink {
+        return install_symlink_locked(dirs, name, entry, flags, cmd_ran);
     }
 
     // Clone / re-clone.
@@ -195,7 +191,12 @@ fn install_locked_inner(
             // minimal record so the user has a way to retry uninstall or
             // manually clean up.
             write_partial_crashed_record(
-                dirs, name, entry, exit_code, &log_path, &format!("post_snapshot_failed: {e:#}"),
+                dirs,
+                name,
+                entry,
+                exit_code,
+                &log_path,
+                &format!("post_snapshot_failed: {e:#}"),
             );
             return Err(anyhow::anyhow!(
                 "install post-snapshot failed: {e:#}. Files may have been deployed to HOME; `status` shows what we have."
@@ -223,6 +224,9 @@ fn install_locked_inner(
         schema_version: SCHEMA_VERSION,
         name: name.to_string(),
         commit: entry.commit.clone(),
+        shape: entry.shape,
+        symlink_path: None,
+        symlink_target: None,
         catalog_entry_hash: hash_catalog_entry(entry),
         installed_at: InstallRecord::now_rfc3339(),
         install_cmd: entry.install_cmd.clone(),
@@ -288,22 +292,205 @@ fn install_locked_inner(
     })
 }
 
-/// Uninstall the currently-installed rice. Acquires the lock.
-pub fn uninstall(
+/// Symlink-shape install: clone the repo, create the symlink. No
+/// filesystem snapshot, no install_cmd (forbidden by catalog validation),
+/// no pacman_deps handling via install.sh — packages declared in the
+/// catalog are still installed via the dotfiles path's pacman helper once
+/// the helper binary lands; for now, a symlink rice with pacman_deps will
+/// be caught by the dotfiles pacman step being skipped here. Future work
+/// in the v2 spec's Phase 1 (helper binary) moves shared dep install
+/// upstream of this dispatch.
+fn install_symlink_locked(
     dirs: &Dirs,
+    name: &str,
+    entry: &RiceEntry,
+    flags: Flags,
+    cmd_ran: &std::sync::atomic::AtomicBool,
+) -> Result<InstallOutcome> {
+    // Clone / re-clone.
+    let clone = dirs.clone_dir(name);
+    if clone.exists() {
+        fs::remove_dir_all(&clone)
+            .with_context(|| format!("removing stale clone {}", clone.display()))?;
+    }
+    log_verbose(flags, &format!("cloning {} @ {}", entry.repo, entry.commit));
+    git::clone_at_commit(&entry.repo, &entry.commit, &clone)?;
+
+    // Pre-pacman state: populate so the uninstall record can reverse
+    // anything that got installed via pacman_deps (wired in the helper
+    // binary path — today, symlink rices with pacman_deps skip this).
+    let pre_pacman = if flags.skip_pacman {
+        ExplicitSet::default()
+    } else {
+        pacman::snapshot_explicit().unwrap_or_default()
+    };
+
+    if flags.dry_run {
+        let dst = expand_home(&entry.symlink_dst, &dirs.home);
+        let src = clone.join(&entry.symlink_src);
+        println!("would symlink: {} -> {}", dst.display(), src.display());
+        return Ok(InstallOutcome {
+            name: name.to_string(),
+            partial: false,
+            fs_diff: FsDiff::default(),
+            pacman_diff: PacmanDiff::default(),
+            log_path: PathBuf::new(),
+        });
+    }
+
+    // Create the symlink — this is the entire "install" for this shape.
+    // After this point, there's user-visible state on disk; do NOT let
+    // the outer install_locked cleanup nuke the clone dir if a later
+    // record-write fails.
+    let paths = symlink_shape::create_symlink(&clone, entry, &dirs.home)?;
+    cmd_ran.store(true, std::sync::atomic::Ordering::SeqCst);
+
+    let post_pacman = if flags.skip_pacman {
+        ExplicitSet::default()
+    } else {
+        pacman::snapshot_explicit().unwrap_or_default()
+    };
+    let pacman_diff = pacman::diff_sets(&pre_pacman, &post_pacman);
+
+    // Log path: symlink installs don't run install.sh but the record
+    // requires a log_path field. Point at a placeholder that logs_dir
+    // manages so `status` has something readable.
+    let log_path = run::log_path(&dirs.logs_dir(), name);
+    // Touch the log so it exists (otherwise `status` reports a missing
+    // file). Failure is non-fatal.
+    let _ = fs::write(
+        &log_path,
+        b"symlink-shape install: no install.sh executed\n",
+    );
+
+    let record = InstallRecord {
+        schema_version: SCHEMA_VERSION,
+        name: name.to_string(),
+        commit: entry.commit.clone(),
+        shape: Shape::Symlink,
+        symlink_path: Some(paths.symlink_path.clone()),
+        symlink_target: Some(paths.symlink_target.clone()),
+        catalog_entry_hash: hash_catalog_entry(entry),
+        installed_at: InstallRecord::now_rfc3339(),
+        install_cmd: String::new(),
+        exit_code: 0,
+        partial: false,
+        fs_diff: FsDiff::default(),
+        pacman_diff: pacman_diff.clone(),
+        partial_ownership_paths: vec![],
+        runtime_regenerated_paths: vec![],
+        systemd_units_enabled: vec![],
+        unrestorable_paths: vec![],
+        crash_recovery: false,
+        log_path: log_path.clone(),
+    };
+    if let Err(e) = save_record(&dirs.record_json(name), &record) {
+        eprintln!(
+            "\n=== CRITICAL: symlink installed but saving the record FAILED ===\n\
+             error: {e:#}\n\
+             The symlink exists at {} but rice-cooker can't reverse it via\n\
+             uninstall. Remove it manually with:\n  rm {}\n",
+            paths.symlink_path.display(),
+            paths.symlink_path.display()
+        );
+        return Err(e);
+    }
+    if let Err(e) = write_current(dirs, name) {
+        eprintln!(
+            "\n=== CRITICAL: record saved but current.json write FAILED ===\n\
+             error: {e:#}\n\
+             Manually move {} to current.json, or retry `install {name}`.\n",
+            dirs.record_json(name).display()
+        );
+        return Err(e);
+    }
+    Ok(InstallOutcome {
+        name: name.to_string(),
+        partial: false,
+        fs_diff: FsDiff::default(),
+        pacman_diff,
+        log_path,
+    })
+}
+
+/// Uninstall the currently-installed rice. Acquires the lock.
+pub fn uninstall(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
+    dirs.ensure()?;
+    let _lock = ApplyLock::try_acquire(&dirs.lock_file()).map_err(|e| anyhow!("lock: {e}"))?;
+    uninstall_locked(dirs, flags)
+}
+
+/// Symlink-shape uninstall: pacman pre-filter → rcsave user edits →
+/// remove symlink → delete clone → retire record. All steps idempotent;
+/// safe to retry after a mid-way crash.
+fn uninstall_symlink_locked(
+    dirs: &Dirs,
+    name: String,
+    record: InstallRecord,
     flags: Flags,
 ) -> Result<UninstallOutcome> {
-    dirs.ensure()?;
-    let _lock = ApplyLock::try_acquire(&dirs.lock_file())
-        .map_err(|e| anyhow!("lock: {e}"))?;
-    uninstall_locked(dirs, flags)
+    if flags.dry_run {
+        let sym = record
+            .symlink_path
+            .as_ref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "<unknown>".into());
+        println!("would remove symlink {sym}");
+        return Ok(UninstallOutcome {
+            name,
+            rcsave_paths: vec![],
+            crash_record: false,
+            preserved_snapshot_dir: None,
+        });
+    }
+
+    // 1. Reverse pacman diff. Pre-filter already-removed packages: pacman
+    //    -Rns on a non-installed pkg exits non-zero, which would trigger
+    //    abort and block retry after a mid-uninstall crash.
+    if !flags.skip_pacman && !record.pacman_diff.added_explicit.is_empty() {
+        let still_installed: Vec<String> = record
+            .pacman_diff
+            .added_explicit
+            .iter()
+            .filter(|p| pacman::is_installed(p).unwrap_or(true))
+            .cloned()
+            .collect();
+        if !still_installed.is_empty() {
+            pacman::remove_added(&still_installed, flags.no_confirm).context("sudo pacman -Rns")?;
+        }
+    }
+
+    // 2. Preserve user edits + remove symlink. The rcsave step runs
+    //    BEFORE symlink removal so a rcsave failure doesn't leave the
+    //    user without their symlink AND without their edits.
+    let clone_dir = dirs.clone_dir(&name);
+    let rcsave_root = symlink_shape::rcsave_root(dirs, &name);
+    let rcsave_paths = if let Some(sym) = record.symlink_path.as_ref() {
+        symlink_shape::remove_symlink_with_preservation(&clone_dir, sym, &rcsave_root)?
+    } else {
+        // Legacy records without symlink_path shouldn't exist, but don't
+        // crash if one does.
+        vec![]
+    };
+
+    // 3. Delete clone dir.
+    let _ = fs::remove_dir_all(&clone_dir);
+
+    // 4. Retire record.
+    retire_to_previous(dirs, &name)?;
+    clear_current(dirs)?;
+
+    Ok(UninstallOutcome {
+        name,
+        rcsave_paths,
+        crash_record: false,
+        preserved_snapshot_dir: None,
+    })
 }
 
 /// Uninstall WITHOUT acquiring the lock. Caller must already hold it.
 fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
-
-    let name = read_current(dirs)?
-        .ok_or_else(|| anyhow!("no rice installed"))?;
+    let name = read_current(dirs)?.ok_or_else(|| anyhow!("no rice installed"))?;
     let record = load_record(&dirs.record_json(&name))?;
 
     if record.partial && !flags.force {
@@ -313,8 +500,18 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
         ));
     }
 
+    // Shape dispatch: symlink records take the minimal fast-path
+    // (rcsave user edits, rm symlink, rm clone). Dotfiles records go
+    // through the full fs-diff reversal below.
+    if record.shape == Shape::Symlink {
+        return uninstall_symlink_locked(dirs, name, record, flags);
+    }
+
     if flags.dry_run {
-        println!("would reverse {} operations", diff_op_count(&record.fs_diff));
+        println!(
+            "would reverse {} operations",
+            diff_op_count(&record.fs_diff)
+        );
         return Ok(UninstallOutcome {
             name,
             rcsave_paths: vec![],
@@ -344,9 +541,7 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
     let mut rcsave_paths: Vec<PathBuf> = Vec::new();
     if let Err(e) = reverse_fs_diff(dirs, &name, &record, flags, &mut rcsave_paths) {
         if !rcsave_paths.is_empty() {
-            eprintln!(
-                "uninstall reversed partially before failure; preserved user content at:"
-            );
+            eprintln!("uninstall reversed partially before failure; preserved user content at:");
             for p in &rcsave_paths {
                 eprintln!("  {}", p.display());
             }
@@ -380,15 +575,9 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
 /// Atomic switch: uninstall the current rice and install <to> under a
 /// single lock acquisition so another rice-cooker process can't slip an
 /// install/apply between the two halves.
-pub fn switch(
-    cat: &Catalog,
-    dirs: &Dirs,
-    to: &str,
-    flags: Flags,
-) -> Result<SwitchOutcome> {
+pub fn switch(cat: &Catalog, dirs: &Dirs, to: &str, flags: Flags) -> Result<SwitchOutcome> {
     dirs.ensure()?;
-    let _lock = ApplyLock::try_acquire(&dirs.lock_file())
-        .map_err(|e| anyhow!("lock: {e}"))?;
+    let _lock = ApplyLock::try_acquire(&dirs.lock_file()).map_err(|e| anyhow!("lock: {e}"))?;
     let uninstall_out = uninstall_locked(dirs, flags)?;
     let install_out = install_locked(cat, dirs, to, flags)?;
     Ok(SwitchOutcome {
@@ -462,9 +651,11 @@ fn reverse_fs_diff(
             continue;
         }
         if runtime_regen.contains(&a.path) {
-            fs::remove_file(&a.path)
-                .with_context(|| format!("removing {}", a.path.display()))?;
-            log_verbose(flags, &format!("added→removed (runtime_regen) {}", a.path.display()));
+            fs::remove_file(&a.path).with_context(|| format!("removing {}", a.path.display()))?;
+            log_verbose(
+                flags,
+                &format!("added→removed (runtime_regen) {}", a.path.display()),
+            );
             continue;
         }
         if partial_ownership.contains(&a.path) {
@@ -486,8 +677,7 @@ fn reverse_fs_diff(
             }
         };
         if current_hash == a.hash {
-            fs::remove_file(&a.path)
-                .with_context(|| format!("removing {}", a.path.display()))?;
+            fs::remove_file(&a.path).with_context(|| format!("removing {}", a.path.display()))?;
         } else {
             let dest = rcsave_path(&a.path);
             fs::rename(&a.path, &dest)
@@ -600,8 +790,7 @@ fn reverse_fs_diff(
         }
         let actual = fs::read_link(&s.path).ok();
         if actual.as_deref() == Some(s.target.as_path()) {
-            fs::remove_file(&s.path)
-                .with_context(|| format!("unlinking {}", s.path.display()))?;
+            fs::remove_file(&s.path).with_context(|| format!("unlinking {}", s.path.display()))?;
         } else {
             eprintln!(
                 "symlink {} now points at {:?}, leaving in place",
@@ -634,11 +823,9 @@ fn rcsave_path(original: &Path) -> PathBuf {
 fn copy_file(src: &Path, dest: &Path, mode: u32) -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
     if let Some(parent) = dest.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("creating {}", parent.display()))?;
+        fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
     }
-    fs::copy(src, dest)
-        .with_context(|| format!("copy {} -> {}", src.display(), dest.display()))?;
+    fs::copy(src, dest).with_context(|| format!("copy {} -> {}", src.display(), dest.display()))?;
     let mut perms = fs::metadata(dest)
         .with_context(|| format!("stat {} to set mode", dest.display()))?
         .permissions();
@@ -667,6 +854,9 @@ fn write_partial_crashed_record(
         schema_version: SCHEMA_VERSION,
         name: name.to_string(),
         commit: entry.commit.clone(),
+        shape: entry.shape,
+        symlink_path: None,
+        symlink_target: None,
         catalog_entry_hash: hash_catalog_entry(entry),
         installed_at: InstallRecord::now_rfc3339(),
         install_cmd: entry.install_cmd.clone(),
@@ -829,7 +1019,7 @@ pub fn capture_pre_content(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::catalog::{RiceEntry, ShellType};
+    use crate::catalog::{RiceEntry, Shape, ShellType};
 
     fn mk_entry() -> RiceEntry {
         RiceEntry {
@@ -837,7 +1027,10 @@ mod tests {
             description: "".into(),
             repo: "https://example/x".into(),
             commit: "0123456789abcdef0123456789abcdef01234567".into(),
+            shape: Shape::Dotfiles,
             install_cmd: "true".into(),
+            symlink_src: String::new(),
+            symlink_dst: String::new(),
             interactive: false,
             shell_type: ShellType::None,
             runtime_regenerated: vec![],
