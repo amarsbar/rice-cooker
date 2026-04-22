@@ -36,6 +36,7 @@ aur_deps = [
   "python-materialyoucolor",  # needed by caelestia-cli
   "app2unit",                 # needed by caelestia-cli + caelestia-shell-git
   "ttf-rubik-vf",             # needed by caelestia-shell-git
+  "libcava",                  # needed by caelestia-shell-git
   "caelestia-cli",            # needed by caelestia-shell-git
   "caelestia-shell-git",      # provides Caelestia.Config QML module
 ]
@@ -44,6 +45,7 @@ aur_deps = [
 python-materialyoucolor = "7a148d4abba3db45fc042faa0dfb37d329f6d615"
 app2unit = "cbb5bc30403d28bbae4cf10257318c3d32ae31cb"
 ttf-rubik-vf = "df5b264003f0d39ba75f42970074ff2465ed527c"
+libcava = "22658159dbbde1a7d1103eafd864828ed9b93314"
 caelestia-cli = "39dac9a14fad199f32fade1f9f17c3599de33454"
 caelestia-shell-git = "69dd9e17c2ae3e40341266d22e16518bd4da3c98"
 

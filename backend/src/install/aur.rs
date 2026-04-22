@@ -21,7 +21,21 @@ use anyhow::{Context, Result, anyhow};
 /// retrying after a crashed prior attempt).
 pub fn clone_pkgbuild(pkg: &str, commit: &str, dest: &Path) -> Result<()> {
     if dest.exists() {
-        fs::remove_dir_all(dest).with_context(|| format!("removing stale {}", dest.display()))?;
+        // makepkg leaves a `pkg/` staging dir with 0111 perms — no read,
+        // execute only — which breaks `fs::remove_dir_all` (readdir needs
+        // read). Shell out to `rm -rf` which handles this by chmodding.
+        let status = Command::new("rm")
+            .arg("-rf")
+            .arg(dest)
+            .status()
+            .with_context(|| format!("rm -rf {}", dest.display()))?;
+        if !status.success() {
+            return Err(anyhow!(
+                "rm -rf {} exited {:?}",
+                dest.display(),
+                status.code()
+            ));
+        }
     }
     if let Some(parent) = dest.parent() {
         fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
@@ -62,10 +76,17 @@ pub fn clone_pkgbuild(pkg: &str, commit: &str, dest: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Return the list of makedepends for a cloned PKGBUILD. Prefers an
-/// existing `.SRCINFO`; falls back to running `makepkg --printsrcinfo`
-/// inside the clone. Both fail → error, catalog maintainer's problem.
-pub fn makedepends(pkgbuild_dir: &Path) -> Result<Vec<String>> {
+/// Return the build-time dep set for a cloned PKGBUILD: `depends +
+/// makedepends + checkdepends`. Prefers an existing `.SRCINFO`; falls
+/// back to `makepkg --printsrcinfo`.
+///
+/// Why `depends` too: many Python packages list runtime deps (like
+/// `pybind11`) that setuptools actually imports at build time to
+/// generate wheels. `makepkg --nodeps` skips checking both lists, so
+/// we need to pre-install both to avoid ModuleNotFoundError in build().
+/// Declared AUR deps (listed as `depends`) are intentionally NOT
+/// included here — the caller resolves those separately via `aur_deps`.
+pub fn build_time_deps(pkgbuild_dir: &Path, declared_aur: &[String]) -> Result<Vec<String>> {
     let srcinfo = pkgbuild_dir.join(".SRCINFO");
     let body = if srcinfo.exists() {
         fs::read_to_string(&srcinfo).with_context(|| format!("reading {}", srcinfo.display()))?
@@ -85,25 +106,44 @@ pub fn makedepends(pkgbuild_dir: &Path) -> Result<Vec<String>> {
         }
         String::from_utf8(out.stdout).context("makepkg --printsrcinfo output not UTF-8")?
     };
-    Ok(parse_makedepends(&body))
+    let raw = parse_dep_keys(&body, &["depends", "makedepends", "checkdepends"]);
+    // Strip any deps the catalog already provides via aur_deps — those
+    // are built + installed in order, not pulled from the Arch repos.
+    // Also strip the version constraint suffix ("foo>=1.0" → "foo").
+    let declared: std::collections::HashSet<&str> =
+        declared_aur.iter().map(String::as_str).collect();
+    Ok(raw
+        .into_iter()
+        .map(|d| strip_version_constraint(&d).to_string())
+        .filter(|d| !declared.contains(d.as_str()))
+        .collect())
 }
 
-fn parse_makedepends(srcinfo: &str) -> Vec<String> {
+fn parse_dep_keys(srcinfo: &str, keys: &[&str]) -> Vec<String> {
     // `.SRCINFO` lines look like:
     //     key = value
-    // indented with a leading tab. makedepends may appear multiple times.
+    // indented with a leading tab. Each key may appear multiple times.
     srcinfo
         .lines()
         .filter_map(|line| {
             let l = line.trim();
             let (k, v) = l.split_once('=')?;
-            if k.trim() == "makedepends" {
+            let k = k.trim();
+            if keys.iter().any(|want| *want == k) {
                 Some(v.trim().to_string())
             } else {
                 None
             }
         })
         .collect()
+}
+
+fn strip_version_constraint(dep: &str) -> &str {
+    // "foo>=1.0" / "foo=1.0" / "foo<2" / "foo: description" → "foo".
+    dep.split(|c: char| matches!(c, '=' | '<' | '>' | ':'))
+        .next()
+        .unwrap_or(dep)
+        .trim()
 }
 
 /// Run `makepkg --noconfirm --clean --nodeps` in `pkgbuild_dir` and
@@ -154,37 +194,56 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_makedepends_finds_multiple() {
+    fn parses_depends_makedepends_checkdepends() {
         let srcinfo = r#"
 pkgbase = foo
 	pkgname = foo
 	pkgver = 1.0
+	depends = glibc
+	depends = pybind11
 	makedepends = cmake
 	makedepends = ninja
-	makedepends = git
-	depends = glibc
+	checkdepends = python-pytest
+	optdepends = foo: something
 "#;
-        let deps = parse_makedepends(srcinfo);
-        assert_eq!(deps, vec!["cmake", "ninja", "git"]);
+        let deps = parse_dep_keys(srcinfo, &["depends", "makedepends", "checkdepends"]);
+        assert_eq!(deps, vec!["glibc", "pybind11", "cmake", "ninja", "python-pytest"]);
     }
 
     #[test]
-    fn parse_makedepends_ignores_other_keys() {
+    fn parse_dep_keys_skips_other_keys() {
         let srcinfo = r#"
 	pkgver = 1.0
-	depends = a
-	depends = b
-	optdepends = c
+	optdepends = foo
+	provides = bar
 "#;
-        let deps = parse_makedepends(srcinfo);
-        assert!(
-            deps.is_empty(),
-            "should ignore depends/optdepends: {deps:?}"
-        );
+        let deps = parse_dep_keys(srcinfo, &["depends", "makedepends"]);
+        assert!(deps.is_empty(), "expected empty: {deps:?}");
     }
 
     #[test]
-    fn parse_makedepends_on_empty_srcinfo_is_empty() {
-        assert!(parse_makedepends("").is_empty());
+    fn strips_version_constraints() {
+        assert_eq!(strip_version_constraint("foo"), "foo");
+        assert_eq!(strip_version_constraint("foo>=1.0"), "foo");
+        assert_eq!(strip_version_constraint("foo=1.0"), "foo");
+        assert_eq!(strip_version_constraint("foo<2"), "foo");
+        assert_eq!(strip_version_constraint("foo: description"), "foo");
+    }
+
+    #[test]
+    fn build_time_deps_strips_declared_aur_members() {
+        // Simulate parse_dep_keys output + strip_version. caelestia-cli
+        // is declared as an aur_dep and must not bleed into the pacman-
+        // install set (it's built + installed separately).
+        let declared = vec!["caelestia-cli".to_string()];
+        let raw: Vec<String> = ["caelestia-cli", "glibc", "python"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let filtered: Vec<_> = raw
+            .into_iter()
+            .filter(|d| !declared.iter().any(|x| x == d))
+            .collect();
+        assert_eq!(filtered, vec!["glibc", "python"]);
     }
 }

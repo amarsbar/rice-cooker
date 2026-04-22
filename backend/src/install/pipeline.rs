@@ -58,9 +58,13 @@ fn install_deps(entry: &RiceEntry, aur_cache_dir: &Path, flags: Flags) -> Result
         return Ok(());
     }
 
-    // Clone PKGBUILDs and gather makedepends.
+    // Clone PKGBUILDs and gather build-time deps (depends + makedepends
+    // + checkdepends). We include `depends` too because many Python AUR
+    // packages list runtime deps that setuptools imports at build time
+    // (e.g. pybind11 for python-materialyoucolor). `makepkg --nodeps`
+    // skips the check so we pre-install everything.
     let mut aur_clones: Vec<PathBuf> = Vec::new();
-    let mut all_makedeps: Vec<String> = Vec::new();
+    let mut all_deps: Vec<String> = Vec::new();
     for pkg in &entry.aur_deps {
         let commit = entry
             .aur_commits
@@ -69,14 +73,14 @@ fn install_deps(entry: &RiceEntry, aur_cache_dir: &Path, flags: Flags) -> Result
         let dest = aur_cache_dir.join(pkg);
         log_verbose(flags, &format!("aur clone {pkg}@{commit}"));
         aur::clone_pkgbuild(pkg, commit, &dest)?;
-        let md = aur::makedepends(&dest)?;
-        all_makedeps.extend(md);
+        let md = aur::build_time_deps(&dest, &entry.aur_deps)?;
+        all_deps.extend(md);
         aur_clones.push(dest);
     }
 
     // Filter to packages that aren't already installed.
     let mut wanted: Vec<String> = entry.pacman_deps.clone();
-    wanted.extend(all_makedeps);
+    wanted.extend(all_deps);
     wanted.sort();
     wanted.dedup();
     let missing = helper::missing_pacman(&wanted);
@@ -89,18 +93,32 @@ fn install_deps(entry: &RiceEntry, aur_cache_dir: &Path, flags: Flags) -> Result
         helper::install_repo_packages(&missing)?;
     }
 
-    // Build each AUR pkg (as user).
-    let mut built: Vec<PathBuf> = Vec::new();
+    // Build + install each AUR pkg in order. Install immediately after
+    // build (not batched at the end) because later packages may depend
+    // on earlier ones being INSTALLED at build time, not just built —
+    // e.g. caelestia-shell-git's cmake runs `pkg_check_modules(cava)`
+    // which resolves via libcava's installed .pc file. Buffering to the
+    // end would leave libcava unavailable to the cmake run.
+    //
+    // Cost: one pkexec prompt per AUR pkg. Polkit's `auth_admin_keep`
+    // window (~5 min) collapses successive prompts when builds are fast,
+    // so in the happy case the user only sees one prompt. Long-running
+    // builds (e.g. AUR pkgs that compile Rust/C++) can push past the
+    // keep window and reprompt — acceptable per spec.
     for dir in &aur_clones {
         log_verbose(flags, &format!("makepkg in {}", dir.display()));
-        built.extend(aur::build(dir)?);
-    }
-    if !built.is_empty() {
+        let pkgs = aur::build(dir)?;
         log_verbose(
             flags,
-            &format!("install-built-packages: {} pkg(s)", built.len()),
+            &format!(
+                "install-built-packages: {}",
+                pkgs.iter()
+                    .map(|p| p.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
         );
-        helper::install_built_packages(&built)?;
+        helper::install_built_packages(&pkgs)?;
     }
     Ok(())
 }
