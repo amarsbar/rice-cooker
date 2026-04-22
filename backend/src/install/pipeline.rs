@@ -219,7 +219,7 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
             .context("cp -aT")?;
         if !status.success() {
             return Err(anyhow!(
-                "cp -rT {} {} exited {:?}",
+                "cp -aT {} {} exited {:?}",
                 clone.display(),
                 rcsave.display(),
                 status.code()
@@ -241,14 +241,18 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
             ));
         }
     }
-    // rm -rf is idempotent for missing paths; propagate only real failure.
-    if clone.exists()
-        && let Err(e) = remove_dir_all_forceful(&clone)
-    {
-        eprintln!(
-            "rice-cooker: could not remove clone dir {}: {e} (manual cleanup required)",
-            clone.display()
-        );
+    // Clone must actually be gone before we retire the record: if we
+    // retire first and clone-removal fails, the next uninstall reads
+    // `current.json` as empty and bails "no rice installed", orphaning
+    // the clone dir with no pointer back. So: fail-stop here, leave
+    // the record in place, user retries after clearing the blocker.
+    if clone.exists() {
+        remove_dir_all_forceful(&clone).with_context(|| {
+            format!(
+                "removing clone {} (record left in place — re-run uninstall after clearing the blocker)",
+                clone.display()
+            )
+        })?;
     }
     retire_to_previous(dirs, &name)?;
     clear_current(dirs)?;

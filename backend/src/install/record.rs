@@ -3,9 +3,10 @@
 //! pointer to the active rice.
 
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
@@ -41,17 +42,8 @@ impl InstallRecord {
 }
 
 pub fn save_record(path: &Path, r: &InstallRecord) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
-    }
     let body = serde_json::to_string_pretty(r).context("serializing install record")?;
-    let mut tmp = path.as_os_str().to_os_string();
-    tmp.push(".tmp");
-    let tmp = PathBuf::from(tmp);
-    fs::write(&tmp, body.as_bytes()).with_context(|| format!("writing {}", tmp.display()))?;
-    fs::rename(&tmp, path)
-        .with_context(|| format!("renaming {} -> {}", tmp.display(), path.display()))?;
-    Ok(())
+    atomic_write_fsync(path, body.as_bytes())
 }
 
 pub fn load_record(path: &Path) -> Result<InstallRecord> {
@@ -71,13 +63,43 @@ pub fn load_record(path: &Path) -> Result<InstallRecord> {
 
 pub fn write_current(dirs: &Dirs, name: &str) -> Result<()> {
     let body = serde_json::json!({ "name": name }).to_string();
-    let mut tmp = dirs.current_json().as_os_str().to_os_string();
+    atomic_write_fsync(&dirs.current_json(), body.as_bytes())
+}
+
+/// Write `body` to `path` atomically and durably: write-to-tmp, fsync
+/// the tmp file, rename over `path`, then fsync the parent directory so
+/// the rename itself survives power loss. Without the file fsync, a
+/// crash between rename and kernel writeback can leave a zero-byte
+/// record file at `path`; without the directory fsync, the rename
+/// itself may be lost and the file content only visible under the
+/// `.tmp` name. Either case leaves the uninstall flow unable to find
+/// the record for packages it just installed.
+fn atomic_write_fsync(path: &Path, body: &[u8]) -> Result<()> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| anyhow!("{}: no parent directory", path.display()))?;
+    fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
+
+    let mut tmp = path.as_os_str().to_os_string();
     tmp.push(".tmp");
     let tmp = PathBuf::from(tmp);
-    fs::create_dir_all(dirs.installs_dir())
-        .with_context(|| format!("creating {}", dirs.installs_dir().display()))?;
-    fs::write(&tmp, body).with_context(|| format!("writing {}", tmp.display()))?;
-    fs::rename(&tmp, dirs.current_json()).context("renaming current.json")?;
+    {
+        let mut f = fs::OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(&tmp)
+            .with_context(|| format!("opening {}", tmp.display()))?;
+        f.write_all(body)
+            .with_context(|| format!("writing {}", tmp.display()))?;
+        f.sync_all()
+            .with_context(|| format!("fsync {}", tmp.display()))?;
+    }
+    fs::rename(&tmp, path)
+        .with_context(|| format!("renaming {} -> {}", tmp.display(), path.display()))?;
+    fs::File::open(parent)
+        .and_then(|f| f.sync_all())
+        .with_context(|| format!("fsync dir {}", parent.display()))?;
     Ok(())
 }
 
