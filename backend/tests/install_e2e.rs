@@ -93,6 +93,80 @@ fn uninstall_symlink_shape_removes_link_and_preserves_user_edits() {
 }
 
 #[test]
+fn cleanup_refuses_when_no_in_progress_marker() {
+    let h = Harness::new();
+    h.with_catalog("");
+    let out = h.bin().arg("cleanup").output().unwrap();
+    assert!(!out.status.success(), "cleanup without marker must fail");
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        err.contains("nothing to clean up"),
+        "expected nothing-to-clean-up error, got: {err}"
+    );
+}
+
+#[test]
+fn cleanup_after_symlink_crash_removes_dangling_link_and_clears_marker() {
+    let h = Harness::new();
+    h.with_rice_file("shell.qml", SHELL_QML);
+    let cat = symlink_catalog_for("dms", ".", "~/.config/quickshell/dms");
+    h.with_catalog(&cat);
+
+    // Simulate a crashed install: write the in-progress marker + dangling
+    // symlink ourselves (no record, no current.json).
+    fs::create_dir_all(h.in_progress_json().parent().unwrap()).unwrap();
+    fs::write(
+        h.in_progress_json(),
+        r#"{"name":"dms","shape":"symlink","started_at":"2026-01-01T00:00:00Z"}"#,
+    )
+    .unwrap();
+    // Create the clone dir so cleanup has something to wipe.
+    let clone = h.clone_dir("dms");
+    fs::create_dir_all(&clone).unwrap();
+    // Create the dangling symlink.
+    let dst = h.home_path(".config/quickshell/dms");
+    fs::create_dir_all(dst.parent().unwrap()).unwrap();
+    std::os::unix::fs::symlink(&clone, &dst).unwrap();
+
+    let out = h.bin().arg("cleanup").output().unwrap();
+    assert!(
+        out.status.success(),
+        "cleanup failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    assert!(!dst.exists(), "symlink cleared");
+    assert!(!h.in_progress_json().exists(), "marker cleared");
+    assert!(!h.clone_dir("dms").exists(), "clone cleared");
+}
+
+#[test]
+fn install_refuses_when_in_progress_marker_exists() {
+    let h = Harness::new();
+    h.with_rice_file("shell.qml", SHELL_QML);
+    let cat = symlink_catalog_for("dms", ".", "~/.config/quickshell/dms");
+    h.with_catalog(&cat);
+
+    fs::create_dir_all(h.in_progress_json().parent().unwrap()).unwrap();
+    fs::write(
+        h.in_progress_json(),
+        r#"{"name":"dms","shape":"symlink","started_at":"2026-01-01T00:00:00Z"}"#,
+    )
+    .unwrap();
+
+    let out = h.bin().args(["install", "dms"]).output().unwrap();
+    assert!(
+        !out.status.success(),
+        "install must refuse with marker present"
+    );
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        err.contains("previous install was interrupted"),
+        "expected interrupted-install error, got: {err}"
+    );
+}
+
+#[test]
 fn symlink_shape_rejects_install_cmd_in_catalog() {
     let h = Harness::new();
     h.with_rice_file("shell.qml", SHELL_QML);

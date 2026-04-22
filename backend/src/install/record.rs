@@ -166,6 +166,55 @@ pub fn clear_current(dirs: &Dirs) -> Result<()> {
     }
 }
 
+/// In-progress marker schema: written at install start, deleted on
+/// successful record write. Its presence at startup means a prior install
+/// crashed mid-way; the user must run `rice-cooker cleanup` first.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InProgress {
+    pub name: String,
+    pub shape: crate::catalog::Shape,
+    pub started_at: String,
+}
+
+pub fn write_in_progress(dirs: &Dirs, name: &str, shape: crate::catalog::Shape) -> Result<()> {
+    let marker = InProgress {
+        name: name.to_string(),
+        shape,
+        started_at: InstallRecord::now_rfc3339(),
+    };
+    let body = serde_json::to_string_pretty(&marker).context("serializing in-progress marker")?;
+    let path = dirs.in_progress_json();
+    fs::create_dir_all(dirs.installs_dir())
+        .with_context(|| format!("creating {}", dirs.installs_dir().display()))?;
+    let mut tmp = path.as_os_str().to_os_string();
+    tmp.push(".tmp");
+    let tmp = PathBuf::from(tmp);
+    fs::write(&tmp, body).with_context(|| format!("writing {}", tmp.display()))?;
+    fs::rename(&tmp, &path)
+        .with_context(|| format!("renaming {} -> {}", tmp.display(), path.display()))?;
+    Ok(())
+}
+
+pub fn read_in_progress(dirs: &Dirs) -> Result<Option<InProgress>> {
+    match fs::read_to_string(dirs.in_progress_json()) {
+        Ok(s) => {
+            let m: InProgress = serde_json::from_str(&s).context("parsing .in-progress.json")?;
+            Ok(Some(m))
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e).context("reading .in-progress.json"),
+    }
+}
+
+pub fn clear_in_progress(dirs: &Dirs) -> Result<()> {
+    match fs::remove_file(dirs.in_progress_json()) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e).context("removing .in-progress.json"),
+    }
+}
+
 /// Move `<name>.json` to `previous.json`, overwriting any existing one.
 /// Called from uninstall to retire the record.
 pub fn retire_to_previous(dirs: &Dirs, name: &str) -> Result<()> {

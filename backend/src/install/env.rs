@@ -49,6 +49,17 @@ impl Dirs {
     pub fn snapshot_dir(&self, name: &str) -> PathBuf {
         self.snapshots_dir().join(name)
     }
+    /// Marker file written at install start, deleted on successful record
+    /// write. Its presence means an install was interrupted mid-way; the
+    /// user must run `rice-cooker cleanup` before retrying.
+    pub fn in_progress_json(&self) -> PathBuf {
+        self.installs_dir().join(".in-progress.json")
+    }
+    /// Rcsave dir for symlink-shape user-edit preservation. Timestamped
+    /// so concurrent/retry invocations don't collide.
+    pub fn rcsave_dir(&self, name: &str, ts: &str) -> PathBuf {
+        self.cache.join("rcsave").join(format!("{name}-{ts}"))
+    }
 
     /// Create every directory that install/uninstall/switch relies on being
     /// present. Idempotent.

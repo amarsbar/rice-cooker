@@ -16,4 +16,4 @@ pub mod symlink;
 pub mod systemd;
 
 pub use env::{Dirs, resolve_dirs};
-pub use pipeline::{Flags, install, list, status, switch, uninstall};
+pub use pipeline::{CleanupOutcome, Flags, cleanup, install, list, status, switch, uninstall};
