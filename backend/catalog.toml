@@ -1,9 +1,10 @@
 # rice-cooker catalog — one file, keyed by rice name.
 # Filename stem of each [table] is the CLI id: `rice-cooker install <stem>`.
 #
-# `commit` MUST be a full hex SHA. Placeholder values containing the
-# literal "PLACEHOLDER" string are accepted by the parser (so `list` and
-# `status` work for uncurated entries) but install refuses them.
+# `commit` is a hex SHA (min 7 chars, all hex); full 40-char SHAs
+# strongly preferred. Placeholder values are rejected on install:
+# a commit that contains the literal "PLACEHOLDER" string, or has
+# 30+ leading zero characters, is treated as a placeholder.
 #
 # Install = clone rice at `commit` → paru installs `pacman_deps ∪ aur_deps`
 # via pkexec → `ln -sfnT <clone>/<symlink_src> <symlink_dst>`. That's it.

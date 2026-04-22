@@ -9,14 +9,15 @@
 #   4. check process alive + hyprctl layer-shell surfaces exist
 #   5. kill quickshell
 #   6. rice-cooker uninstall
-#   7. verify symlink + clone + record all gone
+#   7. verify symlink + clone + record.json + current.json all gone
 # Passes summarize at the end.
 
 set -u
 
-ROOT=/home/user/Documents/Code/rice-cooker
-BIN=$ROOT/backend/target/release/rice-cooker-backend
-CAT=$ROOT/backend/catalog.toml
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+BIN=$ROOT/target/release/rice-cooker-backend
+CAT=$ROOT/catalog.toml
 RENDER_WAIT=5
 
 # Rices to test, in order. Skip caelestia (tested) + dotfiles-hyprland (known bad).
@@ -25,7 +26,9 @@ RICES=(
     linux-retroism Zaphkiel eqsh whisker dhrruvsharma-shell Moonveil
 )
 
-# Stop whatever quickshell is running so we can take over.
+# Stop the user's personal `qs -c clock` shell so this script can
+# take the display. Restored at the bottom. Any other quickshell
+# instances are left alone.
 pkill -xf 'qs -c clock' 2>/dev/null || true
 sleep 1
 
@@ -78,19 +81,25 @@ for name in "${RICES[@]}"; do
     alive=no
     if kill -0 "$shell_pid" 2>/dev/null; then alive=yes; fi
     # Count caelestia-style layer-shell surfaces for this rice's quickshell.
-    layers=$(hyprctl layers -j 2>/dev/null \
-        | python3 -c "
-import json, sys
-root = json.load(sys.stdin)
-pid = $shell_pid
+    # `layers=${layers:-0}` defends against hyprctl/python failures that
+    # would otherwise produce an empty string and break `-lt 1` below.
+    layers=$(SHELL_PID=$shell_pid hyprctl layers -j 2>/dev/null \
+        | python3 -c '
+import json, os, sys
+try:
+    root = json.load(sys.stdin)
+except Exception:
+    print(0); sys.exit(0)
+pid = int(os.environ.get("SHELL_PID", "0"))
 count = 0
 for mon in root.values():
-    for level_arr in mon.get('levels', {}).values():
+    for level_arr in mon.get("levels", {}).values():
         for l in level_arr:
-            if l.get('pid') == pid:
+            if l.get("pid") == pid:
                 count += 1
 print(count)
-")
+' 2>/dev/null)
+    layers=${layers:-0}
     err_snippet=$(grep -iE 'ERROR|Failed' /tmp/rc-shell.log | head -2 | tr '\n' '; ')
 
     # Kill the shell before uninstall so uninstall can clean the clone.
