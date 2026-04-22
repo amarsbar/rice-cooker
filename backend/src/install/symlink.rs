@@ -10,13 +10,13 @@
 //! clone.
 //!
 //! All retry-safety properties are shape-local:
-//! - pacman pre-filter handles already-removed packages
-//! - `rm -f` / `rm -rf` are idempotent
-//! - timestamped rcsave dirs never collide
+//! - pacman pre-filter (in pipeline.rs) handles already-removed packages
+//! - `fs::remove_file` is idempotent (caller filters `NotFound`)
+//! - timestamped rcsave dirs don't collide within a second, and
+//!   `create_dir_all` tolerates pre-existing dirs
 //!
-//! No `uninstall_phase` tracking needed.
-//!
-//! Target: ~50 LOC of install + ~30 LOC of uninstall + tests.
+//! No `uninstall_phase` tracking needed on the symlink path: the only
+//! non-idempotent step is record retirement, done last.
 
 use std::fs;
 use std::os::unix::fs::symlink;
@@ -51,7 +51,7 @@ pub fn create_symlink(clone_dir: &Path, entry: &RiceEntry, home: &Path) -> Resul
 
     // Refuse to replace a real directory. `symlink_metadata` doesn't
     // follow symlinks, so a stale symlink at `dst` is caught by the
-    // existing-symlink branch below.
+    // atomic-rename branch below.
     if let Ok(md) = fs::symlink_metadata(&dst)
         && md.file_type().is_dir()
     {
@@ -60,10 +60,33 @@ pub fn create_symlink(clone_dir: &Path, entry: &RiceEntry, home: &Path) -> Resul
             dst.display()
         ));
     }
-    // Clear any existing symlink/file at the destination before writing
-    // the new one. `symlink()` itself errors on EEXIST.
-    let _ = fs::remove_file(&dst);
-    symlink(&src, &dst).with_context(|| format!("ln -sfnT {} {}", src.display(), dst.display()))?;
+    // Atomic replace: create a new symlink at a sibling tmp path and
+    // `fs::rename` it over `dst`. `rename` is atomic on POSIX and works
+    // for symlinks. This closes the gap where a mid-create_symlink error
+    // would leave the user with no symlink AND no install record.
+    let mut tmp_name = dst.as_os_str().to_os_string();
+    tmp_name.push(format!(".tmp.{}", std::process::id()));
+    let tmp = PathBuf::from(tmp_name);
+    // A stale tmp from a prior crash is harmless — remove + retry. Non-
+    // NotFound errors at this point (EACCES, EROFS) will surface below
+    // when symlink() fails with the same error.
+    if let Err(e) = fs::remove_file(&tmp)
+        && e.kind() != std::io::ErrorKind::NotFound
+    {
+        return Err(anyhow!("clearing stale tmp {}: {e}", tmp.display()));
+    }
+    symlink(&src, &tmp)
+        .with_context(|| format!("symlink {} -> {}", tmp.display(), src.display()))?;
+    if let Err(e) = fs::rename(&tmp, &dst) {
+        // Best-effort cleanup of the tmp so we don't leak; propagate the
+        // real error.
+        let _ = fs::remove_file(&tmp);
+        return Err(anyhow!(
+            "rename {} -> {}: {e}",
+            tmp.display(),
+            dst.display()
+        ));
+    }
 
     Ok(SymlinkPaths {
         symlink_path: dst,
@@ -94,9 +117,14 @@ pub fn remove_symlink_with_preservation(
     // symlink removal precisely so the user can retry if rcsave fails.
     let preserved = preserve_user_edits(clone_dir, rcsave_root)?;
 
-    // Step B: remove the symlink. Idempotent — missing-symlink is not an
-    // error (uninstall retry after successful symlink removal).
-    let _ = fs::remove_file(symlink_path);
+    // Step B: remove the symlink. Missing-symlink is a retry: ignore.
+    // Other errors (EACCES, EROFS) must surface or uninstall reports
+    // success while leaving a dangling symlink on disk.
+    match fs::remove_file(symlink_path) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(anyhow!("rm {}: {e}", symlink_path.display())),
+    }
     Ok(preserved)
 }
 
@@ -110,12 +138,9 @@ pub fn remove_symlink_with_preservation(
 /// edits. This is the "we can't tell what's modified, so save everything"
 /// backstop demanded by the spec.
 fn preserve_user_edits(clone_dir: &Path, rcsave_root: &Path) -> Result<Vec<PathBuf>> {
-    // Fast-path bail: no clone dir means nothing to preserve.
     if !clone_dir.exists() {
         return Ok(vec![]);
     }
-
-    // If .git is missing, fall back to preserving the whole clone.
     if !clone_dir.join(".git").exists() {
         return preserve_whole_clone(clone_dir, rcsave_root);
     }
@@ -127,9 +152,20 @@ fn preserve_user_edits(clone_dir: &Path, rcsave_root: &Path) -> Result<Vec<PathB
 
     let out = match out {
         Ok(o) if o.status.success() => o,
-        _ => {
-            // git failed — fall back to whole-clone preservation rather
-            // than silently drop user edits.
+        Ok(o) => {
+            eprintln!(
+                "rice-cooker: git status exited {:?} in {}; falling back to whole-clone preservation\n  stderr: {}",
+                o.status.code(),
+                clone_dir.display(),
+                String::from_utf8_lossy(&o.stderr).trim(),
+            );
+            return preserve_whole_clone(clone_dir, rcsave_root);
+        }
+        Err(e) => {
+            eprintln!(
+                "rice-cooker: git status spawn failed in {}: {e}; falling back to whole-clone preservation",
+                clone_dir.display(),
+            );
             return preserve_whole_clone(clone_dir, rcsave_root);
         }
     };
@@ -153,9 +189,13 @@ fn preserve_user_edits(clone_dir: &Path, rcsave_root: &Path) -> Result<Vec<PathB
         if xy.starts_with(b"R") {
             let _ = it.next();
         }
-        let rel = std::str::from_utf8(path_bytes)
-            .map_err(|e| anyhow!("git status path not utf-8: {e}"))?;
-        let rel = Path::new(rel);
+        // Linux paths are arbitrary bytes; reconstruct via OsStr so a
+        // latin-1 or other non-UTF-8 filename still round-trips through
+        // rcsave. Uninstall is a critical safety path — never error out
+        // here; we'd leave the user with no way to finish the uninstall.
+        use std::ffi::OsStr;
+        use std::os::unix::ffi::OsStrExt;
+        let rel = Path::new(OsStr::from_bytes(path_bytes));
         let src = clone_dir.join(rel);
         let dst = rcsave_root.join(rel);
         if copy_into_rcsave(&src, &dst)? {
@@ -388,6 +428,73 @@ mod tests {
             fallback.display()
         );
         assert!(fallback.join("shell.qml").exists());
+    }
+
+    #[test]
+    fn create_symlink_preserves_existing_symlink_on_failure() {
+        // Simulate: dst parent is read-only, so atomic-rename fails.
+        // Verify the tmp symlink doesn't leak and the prior symlink
+        // (if any) remains untouched.
+        let t = tempdir().unwrap();
+        let home = t.path();
+        let clone = home.join("clone");
+        fs::create_dir_all(&clone).unwrap();
+        let parent = home.join(".config/qs");
+        fs::create_dir_all(&parent).unwrap();
+        // Pre-existing symlink we want preserved on failure.
+        let orig_target = home.join("original-target");
+        fs::create_dir_all(&orig_target).unwrap();
+        symlink(&orig_target, parent.join("x")).unwrap();
+
+        // Happy path: current code does atomic rename, should succeed.
+        let entry = mk_symlink_entry(".", "~/.config/qs/x");
+        create_symlink(&clone, &entry, home).unwrap();
+        assert_eq!(fs::read_link(parent.join("x")).unwrap(), clone);
+
+        // No stray .tmp file left in the parent dir.
+        for e in fs::read_dir(&parent).unwrap().flatten() {
+            let name = e.file_name();
+            let name = name.to_string_lossy();
+            assert!(!name.contains(".tmp."), "atomic-rename leaked tmp: {name}");
+        }
+    }
+
+    #[test]
+    fn preserve_user_edits_handles_non_utf8_filename() {
+        use std::ffi::OsStr;
+        use std::os::unix::ffi::OsStrExt;
+
+        let t = tempdir().unwrap();
+        let clone = t.path().join("clone");
+        fs::create_dir_all(&clone).unwrap();
+        fs::write(clone.join("shell.qml"), "orig\n").unwrap();
+        let git = |args: &[&str]| {
+            Command::new("git")
+                .current_dir(&clone)
+                .args(args)
+                .output()
+                .expect("git")
+        };
+        git(&["init", "-q"]);
+        git(&["config", "user.email", "a@b"]);
+        git(&["config", "user.name", "a"]);
+        git(&["add", "."]);
+        git(&["commit", "-qm", "init"]);
+
+        // Drop a file whose name is not valid UTF-8 (latin-1 é as 0xe9).
+        let bytes = b"caf\xe9.conf";
+        let latin1_name = OsStr::from_bytes(bytes);
+        fs::write(clone.join(latin1_name), "data\n").unwrap();
+
+        let rcsave = t.path().join("rcsave");
+        // Must not error out — uninstall depends on never losing user
+        // edits, and erroring leaves the user stuck.
+        let preserved = preserve_user_edits(&clone, &rcsave).unwrap();
+        assert!(
+            preserved.iter().any(|p| p.file_name() == Some(latin1_name)),
+            "latin-1 filename not preserved: {:?}",
+            preserved
+        );
     }
 
     #[test]

@@ -293,13 +293,13 @@ fn install_locked_inner(
 }
 
 /// Symlink-shape install: clone the repo, create the symlink. No
-/// filesystem snapshot, no install_cmd (forbidden by catalog validation),
-/// no pacman_deps handling via install.sh — packages declared in the
-/// catalog are still installed via the dotfiles path's pacman helper once
-/// the helper binary lands; for now, a symlink rice with pacman_deps will
-/// be caught by the dotfiles pacman step being skipped here. Future work
-/// in the v2 spec's Phase 1 (helper binary) moves shared dep install
-/// upstream of this dispatch.
+/// filesystem snapshot, no `install_cmd` (forbidden by catalog
+/// validation). Any system-package deps the rice needs will be installed
+/// via the privileged helper binary (v2 spec Phase 1), not yet wired;
+/// for now, symlink rices only work when their deps are already in the
+/// PKGBUILD baseline. The pre/post `pacman -Qqe` snapshots below capture
+/// whatever happens to be installed so the record can reverse it if a
+/// future helper-binary step later populates `pacman_diff.added_explicit`.
 fn install_symlink_locked(
     dirs: &Dirs,
     name: &str,
@@ -317,8 +317,8 @@ fn install_symlink_locked(
     git::clone_at_commit(&entry.repo, &entry.commit, &clone)?;
 
     // Pre-pacman state: populate so the uninstall record can reverse
-    // anything that got installed via pacman_deps (wired in the helper
-    // binary path — today, symlink rices with pacman_deps skip this).
+    // anything that got installed (wired once the helper binary lands;
+    // today a symlink install doesn't run pacman itself).
     let pre_pacman = if flags.skip_pacman {
         ExplicitSet::default()
     } else {
@@ -460,7 +460,14 @@ fn uninstall_symlink_locked(
         }
     }
 
-    // 2. Preserve user edits + remove symlink. The rcsave step runs
+    // 2. Disable any systemd units that ended up in the record. Symlink
+    //    installs today don't enable units (install_cmd is forbidden),
+    //    so the list is expected to be empty — this call is defensive
+    //    against future helper-binary wiring. `disable_units` no-ops on
+    //    empty input.
+    systemd::disable_units(&record.systemd_units_enabled)?;
+
+    // 3. Preserve user edits + remove symlink. The rcsave step runs
     //    BEFORE symlink removal so a rcsave failure doesn't leave the
     //    user without their symlink AND without their edits.
     let clone_dir = dirs.clone_dir(&name);
@@ -473,10 +480,10 @@ fn uninstall_symlink_locked(
         vec![]
     };
 
-    // 3. Delete clone dir.
+    // 4. Delete clone dir.
     let _ = fs::remove_dir_all(&clone_dir);
 
-    // 4. Retire record.
+    // 5. Retire record.
     retire_to_previous(dirs, &name)?;
     clear_current(dirs)?;
 

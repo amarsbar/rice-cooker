@@ -200,6 +200,24 @@ fn validate_entry(name: &str, entry: &RiceEntry) -> Result<()> {
                     "{name}: install_cmd is forbidden for shape = \"symlink\" (use shape = \"dotfiles\" if the rice needs more than a symlink)"
                 ));
             }
+            // Dotfiles-only fields must not appear on Symlink entries.
+            // Silently ignoring them would hide catalog mistakes where
+            // the maintainer meant shape = "dotfiles" but typoed.
+            if !entry.partial_ownership.is_empty() {
+                return Err(anyhow!(
+                    "{name}: partial_ownership is only valid for shape = \"dotfiles\""
+                ));
+            }
+            if !entry.runtime_regenerated.is_empty() {
+                return Err(anyhow!(
+                    "{name}: runtime_regenerated is only valid for shape = \"dotfiles\""
+                ));
+            }
+            if !entry.extra_watched_roots.is_empty() {
+                return Err(anyhow!(
+                    "{name}: extra_watched_roots is only valid for shape = \"dotfiles\""
+                ));
+            }
             if entry.symlink_src.is_empty() {
                 return Err(anyhow!(
                     "{name}: symlink_src is required for shape = \"symlink\""
@@ -357,6 +375,33 @@ mod tests {
             assert!(
                 Catalog::from_str(&t).is_err(),
                 "accepted unsafe symlink_dst {bad:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn symlink_shape_rejects_dotfiles_only_fields() {
+        for (field, value) in [
+            ("partial_ownership", "[\"~/.zshrc\"]"),
+            ("runtime_regenerated", "[\"~/.config/gtk-3.0/colors.css\"]"),
+            ("extra_watched_roots", "[\"~/.local/share/matugen\"]"),
+        ] {
+            let t = format!(
+                r#"
+                [x]
+                display_name = "X"
+                repo = "https://x"
+                commit = "0123456789abcdef0123456789abcdef01234567"
+                shape = "symlink"
+                symlink_src = "."
+                symlink_dst = "~/.config/quickshell/x"
+                {field} = {value}
+                "#
+            );
+            let err = Catalog::from_str(&t).unwrap_err().to_string();
+            assert!(
+                err.contains(field),
+                "expected {field:?} in error, got: {err}"
             );
         }
     }
