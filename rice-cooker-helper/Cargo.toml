@@ -1,0 +1,16 @@
+[package]
+name = "rice-cooker-helper"
+version = "0.1.0"
+edition = "2024"
+description = "Privileged helper for rice-cooker. Invoked via pkexec."
+
+[[bin]]
+name = "rice-cooker-helper"
+path = "src/main.rs"
+
+[dependencies]
+# No heavy deps — this binary runs as root and every line matters for audit.
+# clap is used for subcommand dispatch; everything else is std.
+
+[dev-dependencies]
+tempfile = "3.12"

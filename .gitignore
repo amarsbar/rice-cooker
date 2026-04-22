@@ -8,4 +8,6 @@ dist
 .env
 .env.local
 backend/target
+rice-cooker-helper/target
+rice-cooker-helper/Cargo.lock
 .claude/
