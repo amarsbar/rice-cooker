@@ -158,8 +158,18 @@ fn install_locked(cat: &Catalog, dirs: &Dirs, name: &str, flags: Flags) -> Resul
     write_current(dirs, name)?;
 
     // Now create the symlink. If it fails, the record is already on
-    // disk so uninstall can roll back the packages.
-    symlink_shape::create_symlink(&clone, entry, &dirs.home)?;
+    // disk so uninstall can roll back the packages — but the user
+    // hitting this mid-install has no idea they need to uninstall;
+    // `install <name>` would just keep erroring with "already
+    // installed". Wrap the error with a remediation hint.
+    if let Err(e) = symlink_shape::create_symlink(&clone, entry, &dirs.home) {
+        return Err(anyhow!(
+            "{e:#}\n\
+             install left {} package(s) registered to this rice but no symlink. \
+             Run `rice-cooker uninstall` to roll back, then retry install.",
+            added_explicit.len()
+        ));
+    }
 
     Ok(InstallOutcome {
         name: name.to_string(),
@@ -241,23 +251,31 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
     // Remove symlink — but only if it's still OUR symlink. User could
     // have replaced it with a regular file/dir since install; we don't
     // want to clobber that. NotFound is idempotent-OK; type mismatch or
-    // target mismatch is skipped with a warning; real IO errors bubble.
+    // target mismatch is skipped with a warning that includes both
+    // paths for diagnostics; real IO errors bubble up.
+    //
+    // If we skip (retargeted/replaced), the record is still retired +
+    // current.json cleared below, so the rice is "uninstalled" from the
+    // tool's view even though the user-owned file at symlink_path stays.
     match fs::symlink_metadata(&record.symlink_path) {
-        Ok(md) if md.file_type().is_symlink() => {
-            let target_ok = fs::read_link(&record.symlink_path)
-                .map(|t| t == record.symlink_target)
-                .unwrap_or(false);
-            if target_ok {
+        Ok(md) if md.file_type().is_symlink() => match fs::read_link(&record.symlink_path) {
+            Ok(t) if t == record.symlink_target => {
                 fs::remove_file(&record.symlink_path).with_context(|| {
                     format!("removing symlink {}", record.symlink_path.display())
                 })?;
-            } else {
+            }
+            Ok(t) => {
                 eprintln!(
-                    "rice-cooker: skipping {}: symlink target no longer matches record (user-retargeted?)",
-                    record.symlink_path.display()
+                    "rice-cooker: skipping {}: symlink target is {:?}, record says {:?} (user-retargeted?)",
+                    record.symlink_path.display(),
+                    t,
+                    record.symlink_target
                 );
             }
-        }
+            Err(e) => {
+                return Err(anyhow!("read_link {}: {e}", record.symlink_path.display()));
+            }
+        },
         Ok(_) => {
             eprintln!(
                 "rice-cooker: skipping {}: not a symlink anymore (user-replaced?)",
@@ -330,15 +348,26 @@ pub fn switch(cat: &Catalog, dirs: &Dirs, to: &str, flags: Flags) -> Result<Swit
     if flags.dry_run {
         let from = read_current(dirs)?.unwrap_or_default();
         let entry = cat.get(to).ok_or_else(|| anyhow!("{to}: not in catalog"))?;
-        if !from.is_empty()
-            && let Ok(rec) = load_record(&dirs.record_json(&from))
-        {
-            println!("would remove symlink {}", rec.symlink_path.display());
-            if !rec.pacman_diff.added_explicit.is_empty() {
-                println!(
-                    "would remove packages: {}",
-                    rec.pacman_diff.added_explicit.join(" ")
-                );
+        if !from.is_empty() {
+            match load_record(&dirs.record_json(&from)) {
+                Ok(rec) => {
+                    println!("would remove symlink {}", rec.symlink_path.display());
+                    if !rec.pacman_diff.added_explicit.is_empty() {
+                        println!(
+                            "would remove packages: {}",
+                            rec.pacman_diff.added_explicit.join(" ")
+                        );
+                    }
+                }
+                Err(e) => {
+                    // Surface the read failure so dry-run doesn't silently
+                    // diverge from what wet `switch` would report. Wet
+                    // `uninstall_locked` would hit the same error and bail.
+                    eprintln!(
+                        "rice-cooker: warn: cannot read current install record for {from}: {e}; \
+                         dry-run omitting remove plan (wet switch would fail)"
+                    );
+                }
             }
         }
         let dst = expand_home(&entry.symlink_dst, &dirs.home);

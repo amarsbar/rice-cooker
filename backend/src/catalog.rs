@@ -159,8 +159,9 @@ fn validate_entry(name: &str, entry: &RiceEntry) -> Result<()> {
     }
     // symlink_src is joined onto clone_dir at install time. Reject
     // absolute paths (which Path::join would treat as a full replacement,
-    // escaping clone_dir entirely) and any `..` component (which could
-    // traverse out of clone_dir via resolved parent links).
+    // escaping clone_dir entirely) and any `..` component (Path::join
+    // preserves `..` literally; the OS backs out of clone_dir when it
+    // later dereferences the joined path).
     let src = std::path::Path::new(&entry.symlink_src);
     if src.is_absolute() {
         return Err(anyhow!(

@@ -58,12 +58,14 @@ for entry in "${ENTRIES[@]}"; do
     printf '\n--- %s (%s) ---\n' "$name" "$repo"
     # apply expects --entry; shell.qml + resolve_entry's walk fallback
     # handles the layout variance across the catalog.
-    # Capture exit code explicitly: set -e would bail the whole script
-    # on a single failing apply, and `|| true` would mask the failure
-    # and still run grim against a black screen (or the previous rice).
-    apply_rc=0
+    # Disable errexit/pipefail around the pipeline: with `set -euo
+    # pipefail`, a non-zero apply would make the pipeline exit before
+    # `apply_rc=${PIPESTATUS[0]}` runs, so the script would die
+    # instead of continuing to the next rice.
+    set +e
     "$BIN" apply --name "$name" --repo "$repo" --entry "shell.qml" 2>&1 | tail -4
     apply_rc=${PIPESTATUS[0]}
+    set -e
     if [[ $apply_rc -ne 0 ]]; then
         echo "apply failed for $name (exit $apply_rc); skipping screenshot"
         continue
