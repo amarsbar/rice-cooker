@@ -49,6 +49,12 @@ impl Dirs {
     pub fn snapshot_dir(&self, name: &str) -> PathBuf {
         self.snapshots_dir().join(name)
     }
+    /// Per-rice AUR PKGBUILD clones. Each `aur_deps` entry clones into
+    /// `aur_dir(rice_name)/<pkg>`. Ephemeral: deleted on successful
+    /// install + on uninstall + on cleanup.
+    pub fn aur_dir(&self, name: &str) -> PathBuf {
+        self.cache.join("aur").join(name)
+    }
     /// Marker file written at install start, deleted on successful record
     /// write. Its presence means an install was interrupted mid-way; the
     /// user must run `rice-cooker cleanup` before retrying.

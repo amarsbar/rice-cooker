@@ -75,6 +75,23 @@ pub struct RiceEntry {
     /// only.
     #[serde(default)]
     pub extra_watched_roots: Vec<String>,
+    /// Repo packages installed before `install_cmd` runs (or before the
+    /// symlink is created). Processed via the privileged helper binary
+    /// (`pacman -S --needed --noconfirm <pkgs>`). Names must match
+    /// `^[a-zA-Z0-9@._+-]+$`; the helper will reject anything else.
+    #[serde(default)]
+    pub pacman_deps: Vec<String>,
+    /// AUR packages installed before `install_cmd` (or the symlink).
+    /// Each entry must have a matching key in `aur_commits` pinning the
+    /// PKGBUILD repo to a specific commit. Transitive AUR deps must be
+    /// declared explicitly in dependency order — Rice Cooker does NOT
+    /// walk the AUR dep graph.
+    #[serde(default)]
+    pub aur_deps: Vec<String>,
+    /// Per-AUR-package commit pins. Every `aur_deps` entry must have a
+    /// matching key here.
+    #[serde(default)]
+    pub aur_commits: std::collections::BTreeMap<String, String>,
     /// Purely informational: rendered in `list` / `status` so users know
     /// which effects Rice Cooker cannot reverse.
     #[serde(default)]
@@ -266,6 +283,14 @@ fn validate_entry(name: &str, entry: &RiceEntry) -> Result<()> {
                     "{name}: symlink_src/symlink_dst are only valid for shape = \"symlink\""
                 ));
             }
+        }
+    }
+    // Every aur_deps entry must have a matching aur_commits pin.
+    for pkg in &entry.aur_deps {
+        if !entry.aur_commits.contains_key(pkg) {
+            return Err(anyhow!(
+                "{name}: aur_deps contains {pkg:?} but aur_commits has no pin for it"
+            ));
         }
     }
     // Extra watched roots must look like absolute paths or start with ~
