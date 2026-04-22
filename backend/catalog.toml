@@ -47,8 +47,9 @@ display_name = "illogical-impulse (end-4 dots-hyprland)"
 description = "End-4's Quickshell"
 repo = "https://github.com/end-4/dots-hyprland"
 commit = "a2c164109061554ee11e6ee6806b29e7e8e89417"
-symlink_src = ".config/quickshell/ii"
+symlink_src = "dots/.config/quickshell/ii"
 symlink_dst = "~/.config/quickshell/end-4"
+pacman_deps = ["qt6-positioning"]
 documented_system_effects = [
   "upstream installer modifies waybar/hypr/gtk configs (we do not run it)",
 ]
@@ -62,6 +63,7 @@ repo = "https://github.com/Axenide/Ambxst"
 commit = "844cb9d3fc465ff13b504c99469fb6c4d695e399"
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/Ambxst"
+pacman_deps = ["syntax-highlighting"]
 [Ambxst.entry]
 path = "shell.qml"
 
@@ -72,6 +74,7 @@ repo = "https://github.com/snowarch/iNiR"
 commit = "a69d17fe6c919cdcedd4802b4ee56535b02449be"
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/iNiR"
+pacman_deps = ["kirigami", "syntax-highlighting"]
 [iNiR.entry]
 path = "shell.qml"
 
@@ -80,7 +83,7 @@ display_name = "Nucleus"
 description = "Nucleus HQ's Quickshell"
 repo = "https://github.com/nucleus-hq/nucleus-shell"
 commit = "2db58fc9d8c4ffc8c6b3b063692febf6c0686201"
-symlink_src = "."
+symlink_src = "quickshell/nucleus-shell"
 symlink_dst = "~/.config/quickshell/nucleus"
 [nucleus.entry]
 path = "shell.qml"
@@ -90,8 +93,9 @@ display_name = "NibrasShell"
 description = "Ahmed Saadi's Quickshell"
 repo = "https://github.com/AhmedSaadi0/NibrasShell"
 commit = "9760442e925981f74d2129d1f74ec93b2e5293d7"
-symlink_src = "."
+symlink_src = "config/quickshell"
 symlink_dst = "~/.config/quickshell/NibrasShell"
+pacman_deps = ["kirigami"]
 [NibrasShell.entry]
 path = "shell.qml"
 
@@ -100,17 +104,17 @@ display_name = "linux-retroism"
 description = "Diinki's Quickshell"
 repo = "https://github.com/diinki/linux-retroism"
 commit = "255eb6a7b5a0d26413eea8dc5f47e8d67bb4b1ff"
-symlink_src = "."
+symlink_src = "configs/quickshell"
 symlink_dst = "~/.config/quickshell/linux-retroism"
 [linux-retroism.entry]
 path = "shell.qml"
 
 [Zaphkiel]
 display_name = "Zaphkiel"
-description = "Rexcrazy's Quickshell"
+description = "Rexcrazy's Quickshell (KuruKuruBar)"
 repo = "https://github.com/Rexcrazy804/Zaphkiel"
 commit = "6029924d393940d1f34a8e93dc7b89e24d797ff9"
-symlink_src = "."
+symlink_src = "dots/quickshell/kurukurubar"
 symlink_dst = "~/.config/quickshell/Zaphkiel"
 [Zaphkiel.entry]
 path = "shell.qml"
@@ -120,7 +124,7 @@ display_name = "eqsh"
 description = "eq-desktop's Quickshell"
 repo = "https://github.com/eq-desktop/eqsh"
 commit = "2eea698ec832a1b3dacb8cd5d566a5416cb11dff"
-symlink_src = "."
+symlink_src = "eqsh"
 symlink_dst = "~/.config/quickshell/eqsh"
 [eqsh.entry]
 path = "shell.qml"
@@ -150,17 +154,17 @@ display_name = "dhrruvsharma-shell"
 description = "dhrruvsharma's shell"
 repo = "https://github.com/dhrruvsharma/shell"
 commit = "7a69584217a009ee9eea8e180ecb2471569a3187"
-symlink_src = "."
+symlink_src = "quickshell"
 symlink_dst = "~/.config/quickshell/dhrruvsharma-shell"
 [dhrruvsharma-shell.entry]
 path = "shell.qml"
 
 [Moonveil]
 display_name = "Moonveil"
-description = "notcandy001's Quickshell"
+description = "notcandy001's Quickshell (CrescentShell)"
 repo = "https://github.com/notcandy001/Moonveil"
 commit = "e421611fbd9406f8cea3447849064e030f068cce"
-symlink_src = ".config/quickshell"
+symlink_src = "dots/.config/quickshell/CrescentShell"
 symlink_dst = "~/.config/quickshell/Moonveil"
 [Moonveil.entry]
 path = "shell.qml"
