@@ -68,11 +68,22 @@ pub fn create_symlink(clone_dir: &Path, entry: &RiceEntry, home: &Path) -> Resul
     let mut tmp_name = file_name.to_os_string();
     tmp_name.push(".rctmp");
     let tmp = parent.join(tmp_name);
-    // Clean up any stray tmp from a previous failed run.
-    let _ = fs::remove_file(&tmp);
+    // Clean up any stray tmp from a previous failed run. Swallow
+    // NotFound (expected — tmp usually doesn't exist) but surface
+    // unexpected errors so a root-owned `.rctmp` or similar doesn't
+    // get silently masked by the subsequent symlink-EEXIST failure.
+    match fs::remove_file(&tmp) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => {
+            return Err(anyhow!("clearing stale temp {}: {e}", tmp.display()));
+        }
+    }
     symlink(&src, &tmp)
         .with_context(|| format!("symlink {} -> {}", tmp.display(), src.display()))?;
     if let Err(e) = fs::rename(&tmp, &dst) {
+        // Best-effort cleanup of the temp symlink on rename failure;
+        // swallow anything here — the real error is the rename failure.
         let _ = fs::remove_file(&tmp);
         return Err(anyhow!(
             "renaming {} -> {}: {e}",

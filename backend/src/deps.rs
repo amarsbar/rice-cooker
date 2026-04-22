@@ -198,11 +198,17 @@ fn pkexec_error(status: ExitStatus, label: &str) -> anyhow::Error {
 }
 
 /// Defense-in-depth check before passing names to paru/yay/pacman.
-/// Rejects anything that could be interpreted as a flag (`-`-prefix)
-/// or a path (contains `/`, `..`, or `\`). The catalog validator
-/// already controls what reaches `pacman_deps`/`aur_deps`, but this
-/// means a future caller that bypasses the catalog still can't
-/// feed arbitrary argv into pkexec-privileged pacman.
+/// Rejects:
+/// - empty strings
+/// - names beginning with `-` (could be argv flag)
+/// - names containing path characters (`/`, `\`, or `..`)
+/// - names with characters outside `[A-Za-z0-9._+@-]` (covers real
+///   Arch package names; anything else is suspicious)
+///
+/// The catalog validator already controls what reaches
+/// `pacman_deps`/`aur_deps`; this means a future caller that
+/// bypasses the catalog still can't feed arbitrary argv into
+/// pkexec-privileged pacman.
 fn validate_pkg_names(pkgs: &[String]) -> Result<()> {
     for p in pkgs {
         if p.is_empty() {

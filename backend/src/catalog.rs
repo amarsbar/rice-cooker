@@ -176,9 +176,10 @@ fn validate_entry(name: &str, entry: &RiceEntry) -> Result<()> {
         }
     }
     // Use Path::components for the `..` check (mirrors the symlink_src
-    // check). A raw `dst.contains("..")` would miss `..` tucked inside
-    // a literal component (e.g. `..foo`) is fine, but path like
-    // `a/..` gets caught here.
+    // check). `dst.contains("..")` would both over-match (rejecting
+    // benign names like `..foo`) and confuse real traversal with
+    // substring noise; `Component::ParentDir` matches only a pure `..`
+    // component, which is exactly what escapes `$HOME`.
     let dst_path = std::path::Path::new(dst);
     if dst_path
         .components()
