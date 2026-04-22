@@ -109,7 +109,7 @@ pub fn install_packages(pkgs: &[String]) -> Result<()> {
         .status()
         .with_context(|| format!("spawning {}", helper.bin()))?;
     if !status.success() {
-        return Err(anyhow!("{} -S exited {:?}", helper.bin(), status.code()));
+        return Err(pkexec_error(status.code(), helper.bin()));
     }
     Ok(())
 }
@@ -131,9 +131,25 @@ pub fn remove_packages(pkgs: &[String]) -> Result<()> {
         .status()
         .context("spawning pkexec pacman")?;
     if !status.success() {
-        return Err(anyhow!("pkexec pacman -Rns exited {:?}", status.code()));
+        return Err(pkexec_error(status.code(), "pkexec pacman -Rns"));
     }
     Ok(())
+}
+
+/// pkexec exit codes: 126 = polkit denied auth (user hit Cancel), 127
+/// = pkexec couldn't reach an agent or target binary isn't in the
+/// policy. Anything else is forwarded from the underlying command
+/// (pacman/paru). Distinguishing these lets the user know whether to
+/// re-auth, check their polkit setup, or look at the command output.
+fn pkexec_error(code: Option<i32>, label: &str) -> anyhow::Error {
+    match code {
+        Some(126) => anyhow!("authorization cancelled — re-run and approve the polkit prompt"),
+        Some(127) => anyhow!(
+            "pkexec could not authorize (no polkit agent reachable or target binary not in policy)"
+        ),
+        Some(n) => anyhow!("{label} failed (exit {n}) — see output above"),
+        None => anyhow!("{label} killed by signal"),
+    }
 }
 
 /// `pacman -Q <pkg>` — true if installed. Falls back to false on any
