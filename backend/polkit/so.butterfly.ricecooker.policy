@@ -5,7 +5,6 @@
 <policyconfig>
   <vendor>Butterfly Interaction</vendor>
   <vendor_url>https://butterfly.so</vendor_url>
-
   <action id="so.butterfly.ricecooker.manage-packages">
     <description>Install or remove system packages for a rice</description>
     <message>Rice Cooker needs permission to manage packages on your system</message>
@@ -14,6 +13,6 @@
       <allow_inactive>auth_admin</allow_inactive>
       <allow_active>auth_admin_keep</allow_active>
     </defaults>
-    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/rice-cooker-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/pacman</annotate>
   </action>
 </policyconfig>

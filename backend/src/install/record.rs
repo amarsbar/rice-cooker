@@ -1,6 +1,6 @@
 //! Install record: the JSON file at
-//! `~/.local/share/rice-cooker/installs/<name>.json` plus the `current.json`
-//! "what's installed now?" pointer.
+//! `~/.local/share/rice-cooker/installs/<name>.json` + the `current.json`
+//! pointer to the active rice.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -10,107 +10,26 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
 
-use crate::catalog::Shape;
-
-use super::diff::FsDiff;
 use super::env::Dirs;
 
 pub const SCHEMA_VERSION: u32 = 1;
-
-fn default_shape() -> Shape {
-    Shape::Dotfiles
-}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct InstallRecord {
     pub schema_version: u32,
     pub name: String,
-    /// Pinned catalog commit.
     pub commit: String,
-    /// Install shape this record was written with. Defaults to `Dotfiles`
-    /// for backwards compatibility with pre-shape records.
-    #[serde(default = "default_shape")]
-    pub shape: Shape,
-    /// `Symlink` shape only: the `ln -sfnT` destination we created. Empty
-    /// for dotfiles. Uninstall removes this symlink.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub symlink_path: Option<PathBuf>,
-    /// `Symlink` shape only: what the symlink points at. Informational.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub symlink_target: Option<PathBuf>,
-    /// BLAKE3 of the catalog entry's TOML, so `status` can tell if the
-    /// catalog changed since this rice was installed.
-    pub catalog_entry_hash: String,
-    /// RFC3339 timestamp.
     pub installed_at: String,
-    pub install_cmd: String,
-    pub exit_code: i32,
-    /// True if install.sh exited non-zero; we still wrote this record so
-    /// uninstall has the state to reverse.
-    pub partial: bool,
-    pub fs_diff: FsDiff,
+    pub symlink_path: PathBuf,
+    pub symlink_target: PathBuf,
     pub pacman_diff: PacmanDiff,
-    /// Catalog's `partial_ownership` and `runtime_regenerated` paths, HOME-
-    /// expanded at record time. Uninstall reads these to apply per-path
-    /// reversal rules without re-reading the catalog (catalog may have
-    /// changed by then).
-    #[serde(default)]
-    pub partial_ownership_paths: Vec<PathBuf>,
-    #[serde(default)]
-    pub runtime_regenerated_paths: Vec<PathBuf>,
-    /// Systemd user units enabled during this install (detected via
-    /// `~/.config/systemd/user/**/*.target.wants/*.service` symlinks in the
-    /// fs_diff).
-    #[serde(default)]
-    pub systemd_units_enabled: Vec<String>,
-    /// Paths whose pre-install content couldn't be trusted for restore
-    /// (TOCTOU race during pre-content capture, permission denied, etc).
-    /// Uninstall SKIPS restore for these paths and leaves a message so the
-    /// user knows. Empty in the common case.
-    #[serde(default)]
-    pub unrestorable_paths: Vec<PathBuf>,
-    /// True when this record was written by `write_partial_crashed_record`
-    /// — i.e. install_cmd ran but the pipeline crashed before we could
-    /// take the post-snapshot, so `fs_diff` is empty-by-omission rather
-    /// than empty-because-install-did-nothing. Uninstall consults this to
-    /// surface a loud "files may remain in HOME" warning and preserve
-    /// snapshot_dir for manual recovery. Defaults to false for backwards
-    /// compatibility with records written before this field existed.
-    #[serde(default)]
-    pub crash_recovery: bool,
-    /// Mid-uninstall phase tracker. Populated by the dotfiles uninstall
-    /// path after each phase completes. On retry, skip past completed
-    /// phases (all phases are individually idempotent, but skipping
-    /// avoids unnecessary work and wrong-state surprises). `None`
-    /// when the record has never been through uninstall.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub uninstall_phase: Option<UninstallPhase>,
-    /// Path to the log file that captured install.sh stdout+stderr.
-    pub log_path: PathBuf,
-}
-
-/// Phases of dotfiles uninstall, stamped into the record at each
-/// completion so retry-after-crash can skip finished work.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum UninstallPhase {
-    /// `pacman -Rns` complete; continue with systemd disable.
-    Pacman,
-    /// `systemctl --user disable` complete; continue with fs-diff reversal.
-    Systemd,
-    /// `fs_diff` reversed; continue with cache-dir cleanup.
-    FsDiff,
-    /// Cache dirs cleaned; continue with record retirement (last step).
-    Cleanup,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PacmanDiff {
     #[serde(default)]
     pub added_explicit: Vec<String>,
-    #[serde(default)]
-    pub removed_explicit: Vec<String>,
 }
 
 impl InstallRecord {
@@ -150,9 +69,6 @@ pub fn load_record(path: &Path) -> Result<InstallRecord> {
     Ok(r)
 }
 
-/// Atomically mark a rice as the currently-installed one. Writes
-/// `current.json` with the record's name inside — uninstall / status read
-/// this to find the active rice without scanning the installs dir.
 pub fn write_current(dirs: &Dirs, name: &str) -> Result<()> {
     let body = serde_json::json!({ "name": name }).to_string();
     let mut tmp = dirs.current_json().as_os_str().to_os_string();
@@ -188,75 +104,9 @@ pub fn clear_current(dirs: &Dirs) -> Result<()> {
     }
 }
 
-/// In-progress marker schema: written at install start, deleted on
-/// successful record write. Its presence at startup means a prior install
-/// crashed mid-way; the user must run `rice-cooker cleanup` first.
-///
-/// For symlink shape, we persist `symlink_dst` here (not just the rice
-/// name) so cleanup can remove the dangling symlink even if the user
-/// edited catalog.toml between the crashed install and cleanup.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct InProgress {
-    pub name: String,
-    pub shape: crate::catalog::Shape,
-    pub started_at: String,
-    /// Populated for `Shape::Symlink` installs; absent for Dotfiles.
-    /// Records the absolute dst path so cleanup is robust to catalog drift.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub symlink_dst: Option<PathBuf>,
-}
-
-pub fn write_in_progress(
-    dirs: &Dirs,
-    name: &str,
-    shape: crate::catalog::Shape,
-    symlink_dst: Option<PathBuf>,
-) -> Result<()> {
-    let marker = InProgress {
-        name: name.to_string(),
-        shape,
-        started_at: InstallRecord::now_rfc3339(),
-        symlink_dst,
-    };
-    let body = serde_json::to_string_pretty(&marker).context("serializing in-progress marker")?;
-    let path = dirs.in_progress_json();
-    fs::create_dir_all(dirs.installs_dir())
-        .with_context(|| format!("creating {}", dirs.installs_dir().display()))?;
-    let mut tmp = path.as_os_str().to_os_string();
-    tmp.push(".tmp");
-    let tmp = PathBuf::from(tmp);
-    fs::write(&tmp, body).with_context(|| format!("writing {}", tmp.display()))?;
-    fs::rename(&tmp, &path)
-        .with_context(|| format!("renaming {} -> {}", tmp.display(), path.display()))?;
-    Ok(())
-}
-
-pub fn read_in_progress(dirs: &Dirs) -> Result<Option<InProgress>> {
-    match fs::read_to_string(dirs.in_progress_json()) {
-        Ok(s) => {
-            let m: InProgress = serde_json::from_str(&s).context("parsing .in-progress.json")?;
-            Ok(Some(m))
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(e).context("reading .in-progress.json"),
-    }
-}
-
-pub fn clear_in_progress(dirs: &Dirs) -> Result<()> {
-    match fs::remove_file(dirs.in_progress_json()) {
-        Ok(()) => Ok(()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(e).context("removing .in-progress.json"),
-    }
-}
-
-/// Move `<name>.json` to `previous.json`, overwriting any existing one.
-/// Called from uninstall to retire the record.
 pub fn retire_to_previous(dirs: &Dirs, name: &str) -> Result<()> {
     let from = dirs.record_json(name);
     let to = dirs.previous_json();
-    // If the record is missing entirely, nothing to retire.
     if !from.exists() {
         return Ok(());
     }
@@ -281,86 +131,24 @@ mod tests {
         (t, d)
     }
 
-    #[test]
-    fn in_progress_roundtrips_through_json() {
-        let (_t, d) = tmp_dirs();
-        assert!(read_in_progress(&d).unwrap().is_none());
-        write_in_progress(
-            &d,
-            "dms",
-            Shape::Symlink,
-            Some(PathBuf::from("/h/.config/qs/dms")),
-        )
-        .unwrap();
-        let back = read_in_progress(&d).unwrap().unwrap();
-        assert_eq!(back.name, "dms");
-        assert_eq!(back.shape, Shape::Symlink);
-        assert_eq!(
-            back.symlink_dst.as_deref(),
-            Some(Path::new("/h/.config/qs/dms"))
-        );
-        clear_in_progress(&d).unwrap();
-        assert!(read_in_progress(&d).unwrap().is_none());
-        // Idempotent.
-        clear_in_progress(&d).unwrap();
-    }
-
-    #[test]
-    fn in_progress_dotfiles_omits_symlink_dst() {
-        let (_t, d) = tmp_dirs();
-        write_in_progress(&d, "caelestia", Shape::Dotfiles, None).unwrap();
-        let body = fs::read_to_string(d.in_progress_json()).unwrap();
-        assert!(
-            !body.contains("symlink_dst"),
-            "dotfiles marker should skip symlink_dst"
-        );
-    }
-
-    #[test]
-    fn uninstall_phase_serializes_snake_case() {
-        let phases = [
-            (UninstallPhase::Pacman, "pacman"),
-            (UninstallPhase::Systemd, "systemd"),
-            (UninstallPhase::FsDiff, "fs_diff"),
-            (UninstallPhase::Cleanup, "cleanup"),
-        ];
-        for (p, s) in phases {
-            let got = serde_json::to_string(&p).unwrap();
-            assert_eq!(got, format!("\"{s}\""));
-            let back: UninstallPhase = serde_json::from_str(&got).unwrap();
-            assert_eq!(back, p);
-        }
-    }
-
-    fn sample_record() -> InstallRecord {
+    fn sample() -> InstallRecord {
         InstallRecord {
             schema_version: SCHEMA_VERSION,
-            name: "caelestia".into(),
-            commit: "a3f4b2c9e1d7".into(),
-            shape: Shape::Dotfiles,
-            symlink_path: None,
-            symlink_target: None,
-            catalog_entry_hash: "HASH".into(),
+            name: "dms".into(),
+            commit: "abc123".into(),
             installed_at: InstallRecord::now_rfc3339(),
-            install_cmd: "./install.fish".into(),
-            exit_code: 0,
-            partial: false,
-            fs_diff: FsDiff::default(),
-            pacman_diff: PacmanDiff::default(),
-            partial_ownership_paths: vec![],
-            runtime_regenerated_paths: vec![],
-            systemd_units_enabled: vec![],
-            unrestorable_paths: vec![],
-            crash_recovery: false,
-            uninstall_phase: None,
-            log_path: PathBuf::from("/tmp/log"),
+            symlink_path: PathBuf::from("/home/x/.config/quickshell/dms"),
+            symlink_target: PathBuf::from("/home/x/.cache/rice-cooker/rices/dms"),
+            pacman_diff: PacmanDiff {
+                added_explicit: vec!["caelestia-shell-git".into()],
+            },
         }
     }
 
     #[test]
     fn record_round_trips_through_json() {
         let (_t, d) = tmp_dirs();
-        let r = sample_record();
+        let r = sample();
         let path = d.record_json(&r.name);
         save_record(&path, &r).unwrap();
         let back = load_record(&path).unwrap();
@@ -371,22 +159,20 @@ mod tests {
     fn current_json_roundtrip() {
         let (_t, d) = tmp_dirs();
         assert_eq!(read_current(&d).unwrap(), None);
-        write_current(&d, "caelestia").unwrap();
-        assert_eq!(read_current(&d).unwrap().as_deref(), Some("caelestia"));
+        write_current(&d, "dms").unwrap();
+        assert_eq!(read_current(&d).unwrap().as_deref(), Some("dms"));
         clear_current(&d).unwrap();
         assert_eq!(read_current(&d).unwrap(), None);
-        // Idempotent.
         clear_current(&d).unwrap();
     }
 
     #[test]
     fn retire_moves_to_previous() {
         let (_t, d) = tmp_dirs();
-        let r = sample_record();
+        let r = sample();
         save_record(&d.record_json(&r.name), &r).unwrap();
-        assert!(d.record_json("caelestia").exists());
-        retire_to_previous(&d, "caelestia").unwrap();
-        assert!(!d.record_json("caelestia").exists());
+        retire_to_previous(&d, "dms").unwrap();
+        assert!(!d.record_json("dms").exists());
         assert!(d.previous_json().exists());
     }
 
@@ -397,7 +183,7 @@ mod tests {
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(
             &path,
-            r#"{"schema_version":99,"name":"x","commit":"a","catalog_entry_hash":"","installed_at":"","install_cmd":"","exit_code":0,"partial":false,"fs_diff":{},"pacman_diff":{},"log_path":"/"}"#,
+            r#"{"schema_version":99,"name":"x","commit":"a","installed_at":"","symlink_path":"/","symlink_target":"/","pacman_diff":{}}"#,
         )
         .unwrap();
         assert!(load_record(&path).is_err());
