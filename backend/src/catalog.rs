@@ -19,6 +19,7 @@ pub struct Catalog {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RiceEntry {
     pub display_name: String,
     #[serde(default)]
@@ -40,11 +41,11 @@ pub struct RiceEntry {
     /// from aur_deps' own depends lists. Usually empty.
     #[serde(default)]
     pub pacman_deps: Vec<String>,
-    /// Reserved for v1.1 interactive-installer support. Set to true ⇒
-    /// install refuses in v1.
+    /// Reserved for future interactive-installer support. Set to true ⇒
+    /// install refuses (see `docs/issues/interactive-installs.md`).
     #[serde(default)]
     pub interactive: bool,
-    /// Entry point used by `try` / `apply`.
+    /// Entry point used by `apply`.
     #[serde(default)]
     pub entry: EntryPoint,
     /// Purely informational — shown in `list` / `status` for effects
@@ -55,6 +56,7 @@ pub struct RiceEntry {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EntryPoint {
     #[serde(default)]
     pub path: String,
