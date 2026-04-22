@@ -241,18 +241,37 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
             ));
         }
     }
-    // Clone must actually be gone before we retire the record: if we
-    // retire first and clone-removal fails, the next uninstall reads
-    // `current.json` as empty and bails "no rice installed", orphaning
-    // the clone dir with no pointer back. So: fail-stop here, leave
-    // the record in place, user retries after clearing the blocker.
-    if clone.exists() {
-        remove_dir_all_forceful(&clone).with_context(|| {
-            format!(
-                "removing clone {} (record left in place — re-run uninstall after clearing the blocker)",
+    // Clone must actually be gone before we retire the record. The
+    // ordering below is retire_to_previous (renames record.json ->
+    // previous.json) then clear_current. If we retired first and
+    // clone-rm then failed, a retry would find current.json still
+    // pointing at the rice but load_record would error on the now-
+    // renamed record file — the user would be stuck with no tool
+    // path forward. Fail-stop here keeps record + current.json intact
+    // so retry walks the whole uninstall path again (safely: packages
+    // already removed means deps::installed() returns empty; symlink
+    // NotFound is idempotent-OK; rcsave gets a fresh ts+pid dir).
+    //
+    // `--force` skips the fail-stop: the clone is left on disk (with
+    // an eprintln advising manual rm), the record is retired, and
+    // the user regains tool control. Use for unremovable paths
+    // (root-owned files from a rice's own hook, fs corruption).
+    if clone.exists()
+        && let Err(e) = remove_dir_all_forceful(&clone)
+    {
+        if flags.force {
+            eprintln!(
+                "rice-cooker: warn: --force: could not remove clone {}: {e}. Manual rm required.",
                 clone.display()
-            )
-        })?;
+            );
+        } else {
+            return Err(anyhow!(
+                "removing clone {}: {e}\n\
+                 Packages + symlink are already removed. Clear the blocker and re-run \
+                 uninstall, or pass --force to orphan the clone and retire the record anyway.",
+                clone.display()
+            ));
+        }
     }
     retire_to_previous(dirs, &name)?;
     clear_current(dirs)?;
@@ -331,11 +350,22 @@ fn diff_explicit(pre: &[String], post: &[String]) -> Vec<String> {
     added
 }
 
-/// Shell out to `rm -rf` for fs::remove_dir_all-resistant cases
-/// (makepkg's pkg/ dir with 0111 perms, stray immutable files).
+/// Remove a directory tree. Tries `std::fs::remove_dir_all` first —
+/// which suffices for ordinary rice trees — and falls back to `rm
+/// -rf` on PermissionDenied / NotADirectory / other kinds so we can
+/// still clean makepkg's `pkg/` dir (0111 perms), stray immutable
+/// files, and whatever other surprises a rice's hooks leave behind.
+/// `rm -rf --` protects against clone paths that could begin with
+/// `-` (our clone dirs can't, but belt-and-suspenders).
 fn remove_dir_all_forceful(path: &std::path::Path) -> Result<()> {
+    match std::fs::remove_dir_all(path) {
+        Ok(()) => return Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(_) => {}
+    }
     let status = Command::new("rm")
         .arg("-rf")
+        .arg("--")
         .arg(path)
         .status()
         .with_context(|| format!("rm -rf {}", path.display()))?;
@@ -352,7 +382,7 @@ fn remove_dir_all_forceful(path: &std::path::Path) -> Result<()> {
 fn now_ts_compact() -> String {
     OffsetDateTime::now_utc()
         .format(&Rfc3339)
-        .unwrap_or_else(|_| "unknown".into())
+        .expect("RFC3339 formatting of OffsetDateTime::now_utc cannot fail")
         .replace(':', "")
 }
 

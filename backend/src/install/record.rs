@@ -37,7 +37,7 @@ impl InstallRecord {
     pub fn now_rfc3339() -> String {
         OffsetDateTime::now_utc()
             .format(&Rfc3339)
-            .unwrap_or_else(|_| "0000-00-00T00:00:00Z".into())
+            .expect("RFC3339 formatting of OffsetDateTime::now_utc cannot fail")
     }
 }
 
@@ -68,12 +68,19 @@ pub fn write_current(dirs: &Dirs, name: &str) -> Result<()> {
 
 /// Write `body` to `path` atomically and durably: write-to-tmp, fsync
 /// the tmp file, rename over `path`, then fsync the parent directory so
-/// the rename itself survives power loss. Without the file fsync, a
-/// crash between rename and kernel writeback can leave a zero-byte
-/// record file at `path`; without the directory fsync, the rename
-/// itself may be lost and the file content only visible under the
-/// `.tmp` name. Either case leaves the uninstall flow unable to find
-/// the record for packages it just installed.
+/// the rename itself survives power loss.
+///
+/// Without the file fsync, a crash between rename and kernel writeback
+/// can leave a zero-byte record file at `path`; without the directory
+/// fsync, the rename may be lost and the content only visible under
+/// the `.tmp` name. Parent-dir fsync failure doesn't abort: by that
+/// point the file itself is durable at the new name, and returning
+/// Err here would desync `save_record` → `write_current` ordering
+/// (record on disk, current.json skipped, packages orphaned). We warn
+/// to stderr and continue.
+///
+/// On any earlier error, the `.tmp` file is best-effort unlinked so
+/// failures don't litter the installs dir.
 fn atomic_write_fsync(path: &Path, body: &[u8]) -> Result<()> {
     let parent = path
         .parent()
@@ -83,7 +90,8 @@ fn atomic_write_fsync(path: &Path, body: &[u8]) -> Result<()> {
     let mut tmp = path.as_os_str().to_os_string();
     tmp.push(".tmp");
     let tmp = PathBuf::from(tmp);
-    {
+
+    let write_then_rename = || -> Result<()> {
         let mut f = fs::OpenOptions::new()
             .create(true)
             .truncate(true)
@@ -94,12 +102,32 @@ fn atomic_write_fsync(path: &Path, body: &[u8]) -> Result<()> {
             .with_context(|| format!("writing {}", tmp.display()))?;
         f.sync_all()
             .with_context(|| format!("fsync {}", tmp.display()))?;
+        drop(f);
+        fs::rename(&tmp, path)
+            .with_context(|| format!("renaming {} -> {}", tmp.display(), path.display()))
+    };
+
+    if let Err(e) = write_then_rename() {
+        let _ = fs::remove_file(&tmp);
+        return Err(e);
     }
-    fs::rename(&tmp, path)
-        .with_context(|| format!("renaming {} -> {}", tmp.display(), path.display()))?;
-    fs::File::open(parent)
-        .and_then(|f| f.sync_all())
-        .with_context(|| format!("fsync dir {}", parent.display()))?;
+
+    match fs::File::open(parent) {
+        Ok(dir) => {
+            if let Err(e) = dir.sync_all() {
+                eprintln!(
+                    "rice-cooker: warn: fsync {}: {e} (file content is durable; rename may not survive power loss)",
+                    parent.display()
+                );
+            }
+        }
+        Err(e) => {
+            eprintln!(
+                "rice-cooker: warn: open {} for fsync: {e} (file content is durable; rename may not survive power loss)",
+                parent.display()
+            );
+        }
+    }
     Ok(())
 }
 

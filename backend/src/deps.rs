@@ -1,7 +1,10 @@
 //! Dep installation via paru/yay. One external process, one GUI polkit
 //! prompt via --sudo pkexec. No helper binary, no native AUR handling.
 
-use std::process::{Command, Stdio};
+use std::env;
+use std::os::unix::process::ExitStatusExt;
+use std::path::Path;
+use std::process::{Command, ExitStatus, Stdio};
 
 use anyhow::{Context, Result, anyhow};
 
@@ -13,17 +16,16 @@ pub enum Helper {
 }
 
 impl Helper {
+    /// Walk `$PATH` directly rather than shelling out to `which` —
+    /// avoids a fork per lookup AND avoids false "not found" reports
+    /// on minimal systems where `which` itself is missing.
     pub fn detect() -> Option<Self> {
-        for (name, which) in [("paru", Helper::Paru), ("yay", Helper::Yay)] {
-            if Command::new("which")
-                .arg(name)
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status()
-                .map(|s| s.success())
-                .unwrap_or(false)
-            {
-                return Some(which);
+        let path = env::var_os("PATH")?;
+        for (name, helper) in [("paru", Helper::Paru), ("yay", Helper::Yay)] {
+            for dir in env::split_paths(&path) {
+                if is_executable_file(&dir.join(name)) {
+                    return Some(helper);
+                }
             }
         }
         None
@@ -39,20 +41,32 @@ impl Helper {
 
 /// Best-effort polkit-agent preflight. pkexec without a running agent
 /// hangs / silently fails; detect and surface a clear error instead.
+///
+/// pgrep exits 0 on match, 1 on no-match; anything else is pgrep
+/// itself breaking (syntax error, /proc restricted, EPERM from
+/// sandboxing). Treat those as "environment unknown" with a distinct
+/// error so the user doesn't chase a missing polkit agent that's
+/// actually running.
 pub fn check_polkit_agent() -> Result<()> {
-    let out = Command::new("pgrep")
+    let status = Command::new("pgrep")
         .arg("-f")
         .arg("polkit.*agent|hyprpolkitagent|polkit-gnome|polkit-kde|lxpolkit|lxqt-policykit|mate-polkit")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
         .context("running pgrep")?;
-    if !out.success() {
-        return Err(anyhow!(
+    match status.code() {
+        Some(0) => Ok(()),
+        Some(1) => Err(anyhow!(
             "no polkit authentication agent running. Start one (e.g. `systemctl --user start hyprpolkitagent`) and retry."
-        ));
+        )),
+        Some(n) => Err(anyhow!(
+            "pgrep returned unexpected exit {n} while checking for a polkit agent; cannot verify authorization environment"
+        )),
+        None => Err(anyhow!(
+            "pgrep killed by signal while checking for a polkit agent"
+        )),
     }
-    Ok(())
 }
 
 /// Install packages via the AUR helper with pkexec as the sudo backend.
@@ -61,9 +75,16 @@ pub fn check_polkit_agent() -> Result<()> {
 ///
 /// `--needed` skips already-installed packages. `--noconfirm` suppresses
 /// paru/yay's own confirmation prompts (not polkit's, which are user-
-/// visible). `--skipreview` skips the PKGBUILD diff review paru/yay
-/// would otherwise show in an interactive terminal — necessary for GUI
-/// operation, standard tradeoff for curated-catalog package managers.
+/// visible).
+///
+/// Review-prompt suppression is helper-specific:
+/// * paru gets `--skipreview` (one flag skips all PKGBUILD diff menus).
+/// * yay has no `--skipreview`; it gets `--answerclean/diff/edit/upgrade N`
+///   which pre-answers each of yay's individual menus as "no", so the
+///   menu renders and auto-advances without user input.
+///
+/// Needed for GUI operation; standard tradeoff for a curated catalog
+/// where the pinned commit is reviewed upstream, not per install.
 pub fn install_packages(pkgs: &[String]) -> Result<()> {
     if pkgs.is_empty() {
         return Ok(());
@@ -109,7 +130,7 @@ pub fn install_packages(pkgs: &[String]) -> Result<()> {
         .status()
         .with_context(|| format!("spawning {}", helper.bin()))?;
     if !status.success() {
-        return Err(pkexec_error(status.code(), helper.bin()));
+        return Err(pkexec_error(status, helper.bin()));
     }
     Ok(())
 }
@@ -131,24 +152,51 @@ pub fn remove_packages(pkgs: &[String]) -> Result<()> {
         .status()
         .context("spawning pkexec pacman")?;
     if !status.success() {
-        return Err(pkexec_error(status.code(), "pkexec pacman -Rns"));
+        return Err(pkexec_error(status, "pkexec pacman -Rns"));
     }
     Ok(())
 }
 
-/// pkexec exit codes: 126 = polkit denied auth (user hit Cancel), 127
-/// = pkexec couldn't reach an agent or target binary isn't in the
-/// policy. Anything else is forwarded from the underlying command
-/// (pacman/paru). Distinguishing these lets the user know whether to
-/// re-auth, check their polkit setup, or look at the command output.
-fn pkexec_error(code: Option<i32>, label: &str) -> anyhow::Error {
-    match code {
-        Some(126) => anyhow!("authorization cancelled — re-run and approve the polkit prompt"),
+/// Map a failed pkexec-driven command's exit status to a human error.
+///
+/// Exit codes 126/127 are ambiguous: they CAN indicate polkit
+/// outcomes (126 = action denied / not in policy, 127 = no agent
+/// reachable) but they're also POSIX shell conventions for "found
+/// but not executable" / "not found" — which pacman hooks, broken
+/// post-install scripts, or missing `execve` targets will surface
+/// through paru unchanged. So we always include the label + exit
+/// code and frame the polkit interpretation as "typical", not
+/// definitive. Signal terminations include the signal number instead
+/// of silently collapsing to "killed".
+///
+/// `check_polkit_agent` preflights the common "no agent" case, so
+/// 127 in practice usually means a real pacman-hook breakage.
+fn pkexec_error(status: ExitStatus, label: &str) -> anyhow::Error {
+    if let Some(sig) = status.signal() {
+        return anyhow!("{label} killed by signal {sig}");
+    }
+    match status.code() {
+        Some(126) => anyhow!(
+            "{label} failed (exit 126): typically polkit denied or cancelled authorization — \
+             if you approved the prompt, scan the output above for the real error"
+        ),
         Some(127) => anyhow!(
-            "pkexec could not authorize (no polkit agent reachable or target binary not in policy)"
+            "{label} failed (exit 127): typically no polkit agent reachable — \
+             if one is running, this is usually a pacman hook invoking a missing binary \
+             (scan the output above)"
         ),
         Some(n) => anyhow!("{label} failed (exit {n}) — see output above"),
-        None => anyhow!("{label} killed by signal"),
+        None => anyhow!("{label} exited without a status code"),
+    }
+}
+
+/// True if `p` exists, is a regular file, and has at least one exec
+/// bit set. Used by `Helper::detect` to avoid relying on `which`.
+fn is_executable_file(p: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    match std::fs::metadata(p) {
+        Ok(md) => md.is_file() && (md.permissions().mode() & 0o111) != 0,
+        Err(_) => false,
     }
 }
 
