@@ -36,7 +36,13 @@ enum Cmd {
         #[arg(long)]
         force: bool,
     },
-    /// Uninstall current (if any) and install <name>.
+    /// Uninstall current (if any) then install <name>.
+    ///
+    /// NOT atomic. If uninstall succeeds but install then fails (bad
+    /// catalog entry, network flap, dep install failure), nothing is
+    /// left installed. The previous rice's clone is preserved under
+    /// ~/.cache/rice-cooker/rcsave/<prev>-<ts>-<pid>/ — restore from
+    /// there if needed, then re-run install for the rice you wanted.
     Switch {
         name: String,
         #[arg(long)]

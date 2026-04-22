@@ -462,20 +462,30 @@ fn diff_explicit(pre: &[String], post: &[String]) -> Vec<String> {
 /// `rm -rf --` protects against clone paths that could begin with
 /// `-` (our clone dirs can't, but belt-and-suspenders).
 fn remove_dir_all_forceful(path: &std::path::Path) -> Result<()> {
-    match std::fs::remove_dir_all(path) {
+    let fs_err = match std::fs::remove_dir_all(path) {
         Ok(()) => return Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(_) => {}
-    }
+        Err(e) => e,
+    };
+    // Fallback to `rm -rf`. Preserve the original std::fs error in the
+    // final message so a failed fallback shows both diagnostics — the
+    // Rust-side kind (PermissionDenied, DirectoryNotEmpty, etc.) tells
+    // us what the stdlib hit, the rm exit code tells us what `rm`
+    // saw on its second pass.
     let status = Command::new("rm")
         .arg("-rf")
         .arg("--")
         .arg(path)
         .status()
-        .with_context(|| format!("rm -rf {}", path.display()))?;
+        .map_err(|rm_err| {
+            anyhow!(
+                "spawning rm -rf {}: {rm_err} (after std::fs::remove_dir_all failed: {fs_err})",
+                path.display()
+            )
+        })?;
     if !status.success() {
         return Err(anyhow!(
-            "rm -rf {} exited {:?}",
+            "rm -rf {} exited {:?} (after std::fs::remove_dir_all failed: {fs_err})",
             path.display(),
             status.code()
         ));
