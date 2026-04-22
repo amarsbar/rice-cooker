@@ -191,19 +191,33 @@ pub fn clear_current(dirs: &Dirs) -> Result<()> {
 /// In-progress marker schema: written at install start, deleted on
 /// successful record write. Its presence at startup means a prior install
 /// crashed mid-way; the user must run `rice-cooker cleanup` first.
+///
+/// For symlink shape, we persist `symlink_dst` here (not just the rice
+/// name) so cleanup can remove the dangling symlink even if the user
+/// edited catalog.toml between the crashed install and cleanup.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct InProgress {
     pub name: String,
     pub shape: crate::catalog::Shape,
     pub started_at: String,
+    /// Populated for `Shape::Symlink` installs; absent for Dotfiles.
+    /// Records the absolute dst path so cleanup is robust to catalog drift.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symlink_dst: Option<PathBuf>,
 }
 
-pub fn write_in_progress(dirs: &Dirs, name: &str, shape: crate::catalog::Shape) -> Result<()> {
+pub fn write_in_progress(
+    dirs: &Dirs,
+    name: &str,
+    shape: crate::catalog::Shape,
+    symlink_dst: Option<PathBuf>,
+) -> Result<()> {
     let marker = InProgress {
         name: name.to_string(),
         shape,
         started_at: InstallRecord::now_rfc3339(),
+        symlink_dst,
     };
     let body = serde_json::to_string_pretty(&marker).context("serializing in-progress marker")?;
     let path = dirs.in_progress_json();
@@ -265,6 +279,57 @@ mod tests {
         };
         d.ensure().unwrap();
         (t, d)
+    }
+
+    #[test]
+    fn in_progress_roundtrips_through_json() {
+        let (_t, d) = tmp_dirs();
+        assert!(read_in_progress(&d).unwrap().is_none());
+        write_in_progress(
+            &d,
+            "dms",
+            Shape::Symlink,
+            Some(PathBuf::from("/h/.config/qs/dms")),
+        )
+        .unwrap();
+        let back = read_in_progress(&d).unwrap().unwrap();
+        assert_eq!(back.name, "dms");
+        assert_eq!(back.shape, Shape::Symlink);
+        assert_eq!(
+            back.symlink_dst.as_deref(),
+            Some(Path::new("/h/.config/qs/dms"))
+        );
+        clear_in_progress(&d).unwrap();
+        assert!(read_in_progress(&d).unwrap().is_none());
+        // Idempotent.
+        clear_in_progress(&d).unwrap();
+    }
+
+    #[test]
+    fn in_progress_dotfiles_omits_symlink_dst() {
+        let (_t, d) = tmp_dirs();
+        write_in_progress(&d, "caelestia", Shape::Dotfiles, None).unwrap();
+        let body = fs::read_to_string(d.in_progress_json()).unwrap();
+        assert!(
+            !body.contains("symlink_dst"),
+            "dotfiles marker should skip symlink_dst"
+        );
+    }
+
+    #[test]
+    fn uninstall_phase_serializes_snake_case() {
+        let phases = [
+            (UninstallPhase::Pacman, "pacman"),
+            (UninstallPhase::Systemd, "systemd"),
+            (UninstallPhase::FsDiff, "fs_diff"),
+            (UninstallPhase::Cleanup, "cleanup"),
+        ];
+        for (p, s) in phases {
+            let got = serde_json::to_string(&p).unwrap();
+            assert_eq!(got, format!("\"{s}\""));
+            let back: UninstallPhase = serde_json::from_str(&got).unwrap();
+            assert_eq!(back, p);
+        }
     }
 
     fn sample_record() -> InstallRecord {
