@@ -14,8 +14,9 @@ use super::diff::{self, FsDiff};
 use super::env::{Dirs, expand_home};
 use super::pacman::{self, ExplicitSet};
 use super::record::{
-    InstallRecord, PacmanDiff, SCHEMA_VERSION, clear_current, load_record, read_current,
-    retire_to_previous, save_record, write_current,
+    InstallRecord, PacmanDiff, SCHEMA_VERSION, clear_current, clear_in_progress, load_record,
+    read_current, read_in_progress, retire_to_previous, save_record, write_current,
+    write_in_progress,
 };
 use super::run;
 use super::snapshot::{self, Manifest, WalkOpts, path_key};
@@ -93,12 +94,28 @@ fn install_locked_inner(
             "{cur} is already installed — run uninstall or switch first"
         ));
     }
+    // In-progress marker from a crashed prior install → refuse. The user
+    // must run `rice-cooker cleanup` to restore pre-install state before
+    // retrying. `--dry-run` is allowed so users can still inspect what
+    // would happen without committing.
+    if !flags.dry_run && read_in_progress(dirs)?.is_some() {
+        return Err(anyhow!(
+            "a previous install was interrupted — run `rice-cooker cleanup` to reset, then retry"
+        ));
+    }
 
     // Shape dispatch: symlink-shape rices take a fast path (clone +
     // `ln -sfnT`, no filesystem snapshot). Dotfiles rices continue
     // through the existing pre/post-snapshot pipeline.
     if entry.shape == Shape::Symlink {
         return install_symlink_locked(dirs, name, entry, flags, cmd_ran);
+    }
+
+    // Write the in-progress marker BEFORE any mutating work. Deleted at
+    // the end in save_record, or left in place on crash so cleanup can
+    // see the interrupted state.
+    if !flags.dry_run {
+        write_in_progress(dirs, name, entry.shape)?;
     }
 
     // Clone / re-clone.
@@ -282,6 +299,11 @@ fn install_locked_inner(
         );
         return Err(e);
     }
+    // Clear the in-progress marker last — presence of the marker + no
+    // record means a crash between install_cmd and record save. A
+    // non-fatal clear failure still leaves the record valid; the marker
+    // just has to be reconciled by the next cleanup run.
+    let _ = clear_in_progress(dirs);
 
     Ok(InstallOutcome {
         name: name.to_string(),
@@ -307,6 +329,12 @@ fn install_symlink_locked(
     flags: Flags,
     cmd_ran: &std::sync::atomic::AtomicBool,
 ) -> Result<InstallOutcome> {
+    // In-progress marker written before any mutation. Cleanup reads this
+    // to know what to reverse if the install is interrupted.
+    if !flags.dry_run {
+        write_in_progress(dirs, name, Shape::Symlink)?;
+    }
+
     // Clone / re-clone.
     let clone = dirs.clone_dir(name);
     if clone.exists() {
@@ -404,6 +432,9 @@ fn install_symlink_locked(
         );
         return Err(e);
     }
+    // Clear the in-progress marker on success. Non-fatal if it lingers —
+    // cleanup would only run once the user explicitly invokes it.
+    let _ = clear_in_progress(dirs);
     Ok(InstallOutcome {
         name: name.to_string(),
         partial: false,
@@ -1021,6 +1052,212 @@ pub fn capture_pre_content(
         }
     }
     Ok(unrestorable)
+}
+
+/// Outcome of a `rice-cooker cleanup` invocation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CleanupOutcome {
+    pub name: String,
+    pub shape: Shape,
+    /// Files restored from the pre-install content backup (dotfiles shape).
+    pub restored: usize,
+    /// Files deleted from the watched paths because they were added by
+    /// install.sh before the crash (dotfiles shape).
+    pub deleted_added: usize,
+    /// Whether the dangling symlink was removed (symlink shape).
+    pub removed_symlink: bool,
+}
+
+/// Reset state after a crashed install. Precondition: `.in-progress.json`
+/// exists. Restores pre-install filesystem state (dotfiles) or removes
+/// the dangling symlink (symlink), then deletes install artifacts.
+///
+/// See SPEC.md `cleanup` section for full step-by-step. Refuses if:
+/// - the global lock is held
+/// - `.in-progress.json` is absent (use `uninstall --force` for a failed
+///   completed install)
+pub fn cleanup(cat: &Catalog, dirs: &Dirs) -> Result<CleanupOutcome> {
+    dirs.ensure()?;
+    let _lock = ApplyLock::try_acquire(&dirs.lock_file()).map_err(|e| anyhow!("lock: {e}"))?;
+    cleanup_locked(cat, dirs)
+}
+
+fn cleanup_locked(cat: &Catalog, dirs: &Dirs) -> Result<CleanupOutcome> {
+    let marker = read_in_progress(dirs)?.ok_or_else(|| {
+        anyhow!("nothing to clean up; for a failed completed install, use `uninstall --force`")
+    })?;
+    let name = marker.name.clone();
+    let shape = marker.shape;
+
+    let mut restored = 0usize;
+    let mut deleted_added = 0usize;
+    let mut removed_symlink = false;
+
+    match shape {
+        Shape::Dotfiles => {
+            // Restore pre-install filesystem state from the content backup.
+            let snap_dir = dirs.snapshot_dir(&name);
+            let manifest_path = snap_dir.join("manifest.json");
+            if manifest_path.exists() {
+                let manifest = snapshot::load_manifest(&manifest_path)?;
+                let content_dir = snap_dir.join("content");
+                let (r, d) = cleanup_dotfiles_restore(&manifest, &content_dir, &dirs.home)?;
+                restored = r;
+                deleted_added = d;
+            }
+        }
+        Shape::Symlink => {
+            // Remove dangling symlink (install may have succeeded
+            // create_symlink but crashed before record write).
+            if let Some(entry) = cat.get(&name) {
+                let dst = expand_home(&entry.symlink_dst, &dirs.home);
+                if fs::symlink_metadata(&dst).is_ok() {
+                    match fs::remove_file(&dst) {
+                        Ok(()) => removed_symlink = true,
+                        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                        Err(e) => {
+                            return Err(anyhow!("rm {}: {e}", dst.display()));
+                        }
+                    }
+                }
+            }
+            // If the catalog no longer has this entry (rice removed mid-
+            // crash), we can't know symlink_dst. Best-effort: continue
+            // cleanup of clone + marker so the user isn't stuck.
+        }
+    }
+
+    // Common cleanup: snapshot dir, clone dir, AUR clones, marker.
+    let _ = fs::remove_dir_all(dirs.snapshot_dir(&name));
+    let _ = fs::remove_dir_all(dirs.clone_dir(&name));
+    // AUR clones are ephemeral per-install; wipe them if we know what to
+    // wipe. The catalog is consulted rather than the marker (which only
+    // carries name/shape) so this is best-effort.
+    // Deferred: a dedicated `aur_deps` field on the marker would make
+    // this robust to catalog changes between install-start and cleanup.
+    clear_in_progress(dirs)?;
+
+    Ok(CleanupOutcome {
+        name,
+        shape,
+        restored,
+        deleted_added,
+        removed_symlink,
+    })
+}
+
+/// Dotfiles-cleanup restoration: walk each tracked dir, delete entries
+/// install.sh added that aren't in the manifest, then restore each
+/// manifest entry from content backup. Order matters — delete-additions
+/// before restore-manifest so we don't immediately re-delete what we
+/// just restored.
+fn cleanup_dotfiles_restore(
+    manifest: &Manifest,
+    content_dir: &Path,
+    home: &Path,
+) -> Result<(usize, usize)> {
+    use std::collections::HashSet;
+    let known: HashSet<&PathBuf> = manifest.entries.keys().collect();
+    let mut deleted_added = 0usize;
+    let mut restored = 0usize;
+
+    // (a) Walk each watched root; delete anything not in the manifest.
+    for root in &manifest.roots {
+        if !root.exists() {
+            continue;
+        }
+        let mut stack: Vec<PathBuf> = vec![root.clone()];
+        while let Some(dir) = stack.pop() {
+            let entries = match fs::read_dir(&dir) {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+            for de in entries.flatten() {
+                let path = de.path();
+                let ft = match de.file_type() {
+                    Ok(t) => t,
+                    Err(_) => continue,
+                };
+                if known.contains(&path) {
+                    // Keep — will be handled by the restore pass.
+                    if ft.is_dir() {
+                        stack.push(path);
+                    }
+                    continue;
+                }
+                // Install-sh-added entry. Delete it.
+                let res = if ft.is_dir() {
+                    fs::remove_dir_all(&path)
+                } else {
+                    fs::remove_file(&path)
+                };
+                if res.is_ok() {
+                    deleted_added += 1;
+                }
+            }
+        }
+    }
+
+    // (b) Restore each manifest entry from content backup.
+    // Sort by depth so dirs are created before files inside them.
+    let mut ordered: Vec<(&PathBuf, &snapshot::Entry)> = manifest.entries.iter().collect();
+    ordered.sort_by_key(|(p, _)| p.components().count());
+    let _ = home; // home not needed — manifest paths are absolute.
+
+    for (path, entry) in ordered {
+        // Handle type mismatches: if the current path is the wrong type,
+        // remove it before restoring. Symlink/file can `rm -f`; a dir
+        // where a file belongs needs `rm -rf`.
+        if let Ok(md) = fs::symlink_metadata(path) {
+            let cur_is_dir = md.file_type().is_dir();
+            let want_is_dir = matches!(entry, snapshot::Entry::Dir { .. });
+            if cur_is_dir != want_is_dir {
+                let _ = if cur_is_dir {
+                    fs::remove_dir_all(path)
+                } else {
+                    fs::remove_file(path)
+                };
+            }
+        }
+        match entry {
+            snapshot::Entry::File { mode, .. } => {
+                let src = content_dir.join(path_key(path));
+                if !src.exists() {
+                    // Backup missing (e.g., unrestorable at install) —
+                    // skip silently.
+                    continue;
+                }
+                if let Some(parent) = path.parent() {
+                    let _ = fs::create_dir_all(parent);
+                }
+                if fs::copy(&src, path).is_ok() {
+                    set_mode(path, *mode);
+                    restored += 1;
+                }
+            }
+            snapshot::Entry::Symlink { target, .. } => {
+                let _ = fs::remove_file(path);
+                if let Some(parent) = path.parent() {
+                    let _ = fs::create_dir_all(parent);
+                }
+                if std::os::unix::fs::symlink(target, path).is_ok() {
+                    restored += 1;
+                }
+            }
+            snapshot::Entry::Dir { mode } => {
+                if fs::create_dir_all(path).is_ok() {
+                    set_mode(path, *mode);
+                    restored += 1;
+                }
+            }
+        }
+    }
+    Ok((restored, deleted_added))
+}
+
+fn set_mode(path: &Path, mode: u32) {
+    use std::os::unix::fs::PermissionsExt;
+    let _ = fs::set_permissions(path, fs::Permissions::from_mode(mode));
 }
 
 #[cfg(test)]

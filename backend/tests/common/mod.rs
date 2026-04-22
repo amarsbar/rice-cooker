@@ -144,6 +144,19 @@ impl Harness {
         self.data_dir.join("rice-cooker/installs/previous.json")
     }
 
+    pub fn in_progress_json(&self) -> PathBuf {
+        self.data_dir.join("rice-cooker/installs/.in-progress.json")
+    }
+
+    pub fn clone_dir(&self, name: &str) -> PathBuf {
+        self.cache_dir.join("rice-cooker/rices").join(name)
+    }
+
+    #[allow(dead_code)]
+    pub fn snapshot_dir(&self, name: &str) -> PathBuf {
+        self.cache_dir.join("rice-cooker/snapshots").join(name)
+    }
+
     pub fn home_path(&self, rel: &str) -> PathBuf {
         self.home.join(rel)
     }

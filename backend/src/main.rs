@@ -59,6 +59,11 @@ enum Cmd {
     List,
     /// Print details about the currently-installed rice.
     Status,
+    /// Reset state after a crashed install. Restores pre-install
+    /// filesystem state (dotfiles shape) or removes the dangling symlink
+    /// (symlink shape), then clears cache artifacts. Refuses if no
+    /// `.in-progress.json` marker exists.
+    Cleanup,
     /// v1 preview: clone + launch a rice in-session; `exit` restores.
     Apply {
         #[arg(long)]
@@ -208,6 +213,15 @@ fn run() -> Result<()> {
                 }
                 None => println!("nothing installed"),
             }
+        }
+        Cmd::Cleanup => {
+            let dirs = install::resolve_dirs()?;
+            let cat = Catalog::from_file(&catalog_path(cli.catalog.as_deref())?)?;
+            let out = install::cleanup(&cat, &dirs)?;
+            println!(
+                "cleanup: {} (shape: {:?}), restored {}, deleted {} add-ons, symlink-removed: {}",
+                out.name, out.shape, out.restored, out.deleted_added, out.removed_symlink
+            );
         }
         Cmd::Apply {
             name,
