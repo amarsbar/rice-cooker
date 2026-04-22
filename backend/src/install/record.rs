@@ -79,8 +79,30 @@ pub struct InstallRecord {
     /// compatibility with records written before this field existed.
     #[serde(default)]
     pub crash_recovery: bool,
+    /// Mid-uninstall phase tracker. Populated by the dotfiles uninstall
+    /// path after each phase completes. On retry, skip past completed
+    /// phases (all phases are individually idempotent, but skipping
+    /// avoids unnecessary work and wrong-state surprises). `None`
+    /// when the record has never been through uninstall.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uninstall_phase: Option<UninstallPhase>,
     /// Path to the log file that captured install.sh stdout+stderr.
     pub log_path: PathBuf,
+}
+
+/// Phases of dotfiles uninstall, stamped into the record at each
+/// completion so retry-after-crash can skip finished work.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UninstallPhase {
+    /// `pacman -Rns` complete; continue with systemd disable.
+    Pacman,
+    /// `systemctl --user disable` complete; continue with fs-diff reversal.
+    Systemd,
+    /// `fs_diff` reversed; continue with cache-dir cleanup.
+    FsDiff,
+    /// Cache dirs cleaned; continue with record retirement (last step).
+    Cleanup,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -265,6 +287,7 @@ mod tests {
             systemd_units_enabled: vec![],
             unrestorable_paths: vec![],
             crash_recovery: false,
+            uninstall_phase: None,
             log_path: PathBuf::from("/tmp/log"),
         }
     }

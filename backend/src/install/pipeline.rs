@@ -14,8 +14,8 @@ use super::diff::{self, FsDiff};
 use super::env::{Dirs, expand_home};
 use super::pacman::{self, ExplicitSet};
 use super::record::{
-    InstallRecord, PacmanDiff, SCHEMA_VERSION, clear_current, clear_in_progress, load_record,
-    read_current, read_in_progress, retire_to_previous, save_record, write_current,
+    InstallRecord, PacmanDiff, SCHEMA_VERSION, UninstallPhase, clear_current, clear_in_progress,
+    load_record, read_current, read_in_progress, retire_to_previous, save_record, write_current,
     write_in_progress,
 };
 use super::run;
@@ -268,6 +268,7 @@ fn install_locked_inner(
             v
         },
         crash_recovery: false,
+        uninstall_phase: None,
         log_path: log_path.clone(),
     };
     // Past this point, install_cmd has deployed files to HOME. If the
@@ -410,6 +411,7 @@ fn install_symlink_locked(
         systemd_units_enabled: vec![],
         unrestorable_paths: vec![],
         crash_recovery: false,
+        uninstall_phase: None,
         log_path: log_path.clone(),
     };
     if let Err(e) = save_record(&dirs.record_json(name), &record) {
@@ -558,14 +560,53 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
         });
     }
 
-    // 1. Reverse pacman.
-    if !flags.skip_pacman && !record.pacman_diff.added_explicit.is_empty() {
-        pacman::remove_added(&record.pacman_diff.added_explicit, flags.no_confirm)
-            .context("sudo pacman -Rns")?;
+    // Phase-aware retry: if the record was stamped with a completed
+    // phase by a prior uninstall that crashed mid-way, skip past it.
+    // All phases are individually idempotent (pacman pre-filter,
+    // systemctl-disable on already-disabled, fs-diff current-state
+    // check) so skipping avoids unnecessary work and surprising side
+    // effects.
+    let skip_pacman_phase = matches!(
+        record.uninstall_phase,
+        Some(
+            UninstallPhase::Pacman
+                | UninstallPhase::Systemd
+                | UninstallPhase::FsDiff
+                | UninstallPhase::Cleanup
+        )
+    );
+    let skip_systemd_phase = matches!(
+        record.uninstall_phase,
+        Some(UninstallPhase::Systemd | UninstallPhase::FsDiff | UninstallPhase::Cleanup)
+    );
+    let skip_fs_diff_phase = matches!(
+        record.uninstall_phase,
+        Some(UninstallPhase::FsDiff | UninstallPhase::Cleanup)
+    );
+    let skip_cleanup_phase = matches!(record.uninstall_phase, Some(UninstallPhase::Cleanup));
+
+    // 1. Reverse pacman. Pre-filter already-removed packages: `pacman
+    //    -Rns` on a non-installed pkg exits non-zero, which would abort
+    //    uninstall and block retry after a mid-uninstall crash.
+    if !skip_pacman_phase && !flags.skip_pacman && !record.pacman_diff.added_explicit.is_empty() {
+        let still_installed: Vec<String> = record
+            .pacman_diff
+            .added_explicit
+            .iter()
+            .filter(|p| pacman::is_installed(p).unwrap_or(true))
+            .cloned()
+            .collect();
+        if !still_installed.is_empty() {
+            pacman::remove_added(&still_installed, flags.no_confirm).context("sudo pacman -Rns")?;
+        }
     }
+    stamp_uninstall_phase(dirs, &name, &record, UninstallPhase::Pacman);
 
     // 2. Disable systemd units.
-    systemd::disable_units(&record.systemd_units_enabled)?;
+    if !skip_systemd_phase {
+        systemd::disable_units(&record.systemd_units_enabled)?;
+    }
+    stamp_uninstall_phase(dirs, &name, &record, UninstallPhase::Systemd);
 
     // Crash-record detection: use the explicit field written by
     // `write_partial_crashed_record`. Previous heuristic (partial + empty
@@ -577,7 +618,9 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
     // 3. Reverse fs diff. `rcsave_paths` is passed mutably so a mid-
     //    reversal Err still surfaces the partial list.
     let mut rcsave_paths: Vec<PathBuf> = Vec::new();
-    if let Err(e) = reverse_fs_diff(dirs, &name, &record, flags, &mut rcsave_paths) {
+    if !skip_fs_diff_phase
+        && let Err(e) = reverse_fs_diff(dirs, &name, &record, flags, &mut rcsave_paths)
+    {
         if !rcsave_paths.is_empty() {
             eprintln!("uninstall reversed partially before failure; preserved user content at:");
             for p in &rcsave_paths {
@@ -586,15 +629,22 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
         }
         return Err(e);
     }
+    stamp_uninstall_phase(dirs, &name, &record, UninstallPhase::FsDiff);
 
     // 4. Clean up cache dirs. On crash-records, preserve snapshot_dir so
     //    the user can manually recover — it may hold the only copy of
     //    pre-install content for files the rice modified before crashing.
-    let _ = fs::remove_dir_all(dirs.clone_dir(&name));
-    let preserved_snapshot_dir = if crash_record && dirs.snapshot_dir(&name).exists() {
-        Some(dirs.snapshot_dir(&name))
+    let preserved_snapshot_dir = if !skip_cleanup_phase {
+        let _ = fs::remove_dir_all(dirs.clone_dir(&name));
+        let psd = if crash_record && dirs.snapshot_dir(&name).exists() {
+            Some(dirs.snapshot_dir(&name))
+        } else {
+            let _ = fs::remove_dir_all(dirs.snapshot_dir(&name));
+            None
+        };
+        stamp_uninstall_phase(dirs, &name, &record, UninstallPhase::Cleanup);
+        psd
     } else {
-        let _ = fs::remove_dir_all(dirs.snapshot_dir(&name));
         None
     };
 
@@ -919,6 +969,7 @@ fn write_partial_crashed_record(
         systemd_units_enabled: vec![],
         unrestorable_paths: vec![],
         crash_recovery: true,
+        uninstall_phase: None,
         log_path: log_path.to_path_buf(),
     };
     if let Err(e) = save_record(&dirs.record_json(name), &record) {
@@ -1258,6 +1309,15 @@ fn cleanup_dotfiles_restore(
 fn set_mode(path: &Path, mode: u32) {
     use std::os::unix::fs::PermissionsExt;
     let _ = fs::set_permissions(path, fs::Permissions::from_mode(mode));
+}
+
+/// Stamp the record with the uninstall phase that just completed, so
+/// retry after crash can skip past it. Non-fatal if the save fails —
+/// next retry simply re-does the phase, which is idempotent.
+fn stamp_uninstall_phase(dirs: &Dirs, name: &str, record: &InstallRecord, phase: UninstallPhase) {
+    let mut r = record.clone();
+    r.uninstall_phase = Some(phase);
+    let _ = save_record(&dirs.record_json(name), &r);
 }
 
 #[cfg(test)]
