@@ -15,7 +15,9 @@ CATALOG="$PWD/catalog.toml"
 [[ -x "$BIN" ]] || { echo "build the release binary first: cargo build --release" >&2; exit 1; }
 
 mapfile -t ENTRIES < <(awk '
-    /^\[[A-Za-z0-9_.-]+\]$/ {
+    # Top-level [name] only — nested [name.entry] tables would
+    # otherwise emit spurious ENTRIES with empty repo.
+    /^\[[A-Za-z0-9_-]+\]$/ {
         if (name != "") print name "|" repo
         name = substr($0, 2, length($0)-2)
         repo = ""

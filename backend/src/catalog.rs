@@ -175,9 +175,17 @@ fn validate_entry(name: &str, entry: &RiceEntry) -> Result<()> {
             ));
         }
     }
-    if dst.contains("..") {
+    // Use Path::components for the `..` check (mirrors the symlink_src
+    // check). A raw `dst.contains("..")` would miss `..` tucked inside
+    // a literal component (e.g. `..foo`) is fine, but path like
+    // `a/..` gets caught here.
+    let dst_path = std::path::Path::new(dst);
+    if dst_path
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
         return Err(anyhow!(
-            "{name}: symlink_dst must not contain .. segments: {dst:?}"
+            "{name}: symlink_dst must not contain .. components: {dst:?}"
         ));
     }
     Ok(())

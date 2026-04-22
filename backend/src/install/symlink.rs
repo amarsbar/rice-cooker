@@ -48,15 +48,38 @@ pub fn create_symlink(clone_dir: &Path, entry: &RiceEntry, home: &Path) -> Resul
                     dst.display()
                 ));
             }
-            // Stale symlink — safe to replace.
-            fs::remove_file(&dst)
-                .map_err(|e| anyhow!("clearing stale symlink {}: {e}", dst.display()))?;
+            // Stale symlink — will be replaced atomically by the rename below.
         }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
         Err(e) => return Err(anyhow!("reading {}: {e}", dst.display())),
     }
-    symlink(&src, &dst)
-        .with_context(|| format!("symlink {} -> {}", dst.display(), src.display()))?;
+
+    // Create the new symlink at a sibling temp path, then atomically
+    // rename over dst. Skipping this and doing remove+symlink leaves a
+    // window where dst doesn't exist — any reader in that window gets
+    // ENOENT, and a racing process could mkdir the path and make the
+    // symlink call fail with EEXIST. rename handles both.
+    let parent = dst
+        .parent()
+        .ok_or_else(|| anyhow!("{}: no parent dir", dst.display()))?;
+    let file_name = dst
+        .file_name()
+        .ok_or_else(|| anyhow!("{}: no file name", dst.display()))?;
+    let mut tmp_name = file_name.to_os_string();
+    tmp_name.push(".rctmp");
+    let tmp = parent.join(tmp_name);
+    // Clean up any stray tmp from a previous failed run.
+    let _ = fs::remove_file(&tmp);
+    symlink(&src, &tmp)
+        .with_context(|| format!("symlink {} -> {}", tmp.display(), src.display()))?;
+    if let Err(e) = fs::rename(&tmp, &dst) {
+        let _ = fs::remove_file(&tmp);
+        return Err(anyhow!(
+            "renaming {} -> {}: {e}",
+            tmp.display(),
+            dst.display()
+        ));
+    }
 
     Ok(SymlinkPaths {
         symlink_path: dst,

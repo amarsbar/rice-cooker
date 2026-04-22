@@ -94,6 +94,7 @@ pub fn install_packages(pkgs: &[String]) -> Result<()> {
     if pkgs.is_empty() {
         return Ok(());
     }
+    validate_pkg_names(pkgs)?;
     check_polkit_agent()?;
     let helper = Helper::detect()
         .ok_or_else(|| anyhow!("neither paru nor yay found in PATH — install one first"))?;
@@ -147,6 +148,7 @@ pub fn remove_packages(pkgs: &[String]) -> Result<()> {
     if pkgs.is_empty() {
         return Ok(());
     }
+    validate_pkg_names(pkgs)?;
     check_polkit_agent()?;
     let status = Command::new("pkexec")
         .args(["pacman", "-Rns", "--noconfirm"])
@@ -193,6 +195,35 @@ fn pkexec_error(status: ExitStatus, label: &str) -> anyhow::Error {
         Some(n) => anyhow!("{label} failed (exit {n}) — see output above"),
         None => anyhow!("{label} exited without a status code"),
     }
+}
+
+/// Defense-in-depth check before passing names to paru/yay/pacman.
+/// Rejects anything that could be interpreted as a flag (`-`-prefix)
+/// or a path (contains `/`, `..`, or `\`). The catalog validator
+/// already controls what reaches `pacman_deps`/`aur_deps`, but this
+/// means a future caller that bypasses the catalog still can't
+/// feed arbitrary argv into pkexec-privileged pacman.
+fn validate_pkg_names(pkgs: &[String]) -> Result<()> {
+    for p in pkgs {
+        if p.is_empty() {
+            return Err(anyhow!("empty package name rejected"));
+        }
+        if p.starts_with('-') {
+            return Err(anyhow!("refusing package name starting with '-': {p}"));
+        }
+        if p.contains('/') || p.contains('\\') || p.contains("..") {
+            return Err(anyhow!("refusing package name with path characters: {p}"));
+        }
+        if !p
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '+' | '-' | '@'))
+        {
+            return Err(anyhow!(
+                "refusing package name with unexpected characters: {p}"
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// True if `p` exists, is a regular file, and has at least one exec

@@ -168,8 +168,11 @@ pub fn verify(rice_dir: &Path, entry_rel: &Path, log_file: &Path) -> Result<Veri
     let pat = quickshell_cmdline_pattern(entry_rel);
     let entry_abs = rice_dir.join(entry_rel);
     let deadline = std::time::Instant::now() + Duration::from_millis(VERIFY_TIMEOUT_MS);
-    let mut hypr_ever_said_no = false; // hyprctl answered Some(false) at least once
-    let mut hypr_ever_said_yes_or_missing = false; // Some(true) or None ever
+    // Some(true) returns Ok immediately, so a deadline firing means
+    // we saw only Some(false) and/or None during the whole window.
+    // Track Some(false) explicitly; None is treated as a transient
+    // "hyprctl didn't answer" that doesn't rescue a negative run.
+    let mut hypr_ever_said_no = false;
 
     // Poll loop. First signal wins; on timeout we decide based on what
     // hyprctl was saying over the whole window.
@@ -215,23 +218,21 @@ pub fn verify(rice_dir: &Path, entry_rel: &Path, log_file: &Path) -> Result<Veri
         // Compositor check. Some(true) = definitively rendering;
         // Some(false) = hyprctl answered "no layers for this PID" —
         // keep polling (layers may appear later); None = hyprctl
-        // unavailable, won't be useful on retries either.
+        // unavailable / no answer this poll (treated as transient).
         match hyprland_owns_layers(&pids) {
             Some(true) => return Ok(VerifyResult::Ok),
             Some(false) => hypr_ever_said_no = true,
-            None => hypr_ever_said_yes_or_missing = true,
+            None => {}
         }
 
         if std::time::Instant::now() >= deadline {
-            // Time's up. Decide based on what hyprctl was saying:
-            // - If it consistently said "no layers" across the whole
-            //   window, we have high confidence the shell is not
-            //   rendering → Dead with a synthetic explanation.
-            // - If it was never reachable (None throughout), we have no
-            //   surface-level signal at all; fall back to "alive +
-            //   log-clean = Ok", matching the pre-hyprctl behavior on
-            //   non-Hyprland compositors.
-            if hypr_ever_said_no && !hypr_ever_said_yes_or_missing {
+            // Time's up. If hyprctl ever said "no layers" and we never
+            // saw Some(true) (otherwise we'd have returned early),
+            // the shell is up but not rendering → Dead. A run with
+            // only None responses (hyprctl unavailable / non-Hyprland
+            // compositor) leaves hypr_ever_said_no false and falls
+            // back to alive + log-clean = Ok.
+            if hypr_ever_said_no {
                 let base_tail = tail_lines_or_placeholder(&log_contents, &entry_abs);
                 let msg = format!(
                     "{base_tail}\n<rice-cooker: shell alive + log-clean but created 0 layer-shell surfaces in {}ms — the rice likely needs a runtime dep (wallpaper path, dbus service, specific env) that isn't present>",

@@ -34,7 +34,11 @@ mkdir -p "$SHOTS"
 # Extract `[rice_name]` headers and their repo = / entry = / commit =
 # from catalog.toml. Uses awk so the script doesn't need a toml parser.
 mapfile -t ENTRIES < <(awk '
-    /^\[[A-Za-z0-9_.-]+\]$/ {
+    # Match only top-level [name] tables, not nested [name.entry] etc.
+    # The dot-excluding character class is what keeps caelestia vs
+    # caelestia.entry straight — previously the nested header emitted
+    # an extra ENTRIES line with empty repo, which failed apply noisily.
+    /^\[[A-Za-z0-9_-]+\]$/ {
         if (name != "") print name "|" repo
         name = substr($0, 2, length($0)-2)
         repo = ""

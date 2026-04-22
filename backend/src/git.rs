@@ -91,6 +91,17 @@ pub fn clone_at_commit(repo_url: &str, commit: &str, dest: &Path) -> anyhow::Res
     if commit.starts_with('-') {
         anyhow::bail!("refusing commit starting with '-': {commit}");
     }
+    // Defense-in-depth: reject commit args that aren't a hex SHA
+    // (≥7 chars) or the PLACEHOLDER sentinel. The catalog validator
+    // already enforces this, but a future caller that bypasses the
+    // catalog still can't pass arbitrary strings into git checkout.
+    let is_hex_sha = commit.len() >= 7 && commit.chars().all(|c| c.is_ascii_hexdigit());
+    let is_placeholder = commit.contains("PLACEHOLDER");
+    if !is_hex_sha && !is_placeholder {
+        anyhow::bail!(
+            "refusing commit that is neither a hex SHA (≥7 chars) nor PLACEHOLDER: {commit}"
+        );
+    }
     // Full clone (not shallow), since we need a specific historical SHA.
     // --no-checkout so we land without a working tree and can check out
     // the pinned commit explicitly.
