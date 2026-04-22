@@ -73,19 +73,33 @@ pub fn install_packages(pkgs: &[String]) -> Result<()> {
         .ok_or_else(|| anyhow!("neither paru nor yay found in PATH — install one first"))?;
 
     let mut cmd = Command::new(helper.bin());
-    // Flag shape is helper-specific.
+    // Flag shape is helper-specific. Paru has --skipreview (skips all
+    // review menus). Yay has separate menu-suppression flags plus
+    // --answer* to pre-answer each menu as "no" — we set both for
+    // belt-and-suspenders non-interactivity.
     match helper {
         Helper::Paru => {
-            cmd.args(["--sudobin", "pkexec"]);
+            cmd.args(["--sudobin", "pkexec", "--skipreview"]);
         }
         Helper::Yay => {
-            // yay's flag is --sudo, not --sudobin. Yay's default is no
-            // sudoloop (unlike paru which loops by default), so no
-            // --nosudoloop flag needed.
-            cmd.args(["--sudo", "pkexec"]);
+            // yay has no --skipreview; menu flags have no `no` variants.
+            // Pre-answer each menu as "N" so the menu renders and
+            // auto-advances without user input.
+            cmd.args([
+                "--sudo",
+                "pkexec",
+                "--answerclean",
+                "N",
+                "--answerdiff",
+                "N",
+                "--answeredit",
+                "N",
+                "--answerupgrade",
+                "N",
+            ]);
         }
     }
-    cmd.args(["-S", "--needed", "--noconfirm", "--skipreview"]);
+    cmd.args(["-S", "--needed", "--noconfirm"]);
     cmd.args(pkgs);
     cmd.stdin(Stdio::null())
         .stdout(Stdio::inherit())
