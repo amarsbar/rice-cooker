@@ -17,21 +17,35 @@
 
 [caelestia]
 display_name = "Caelestia"
-description = "Segsy Quickshell rice with install.fish"
+description = "Caelestia Quickshell — ships via the caelestia-shell-git AUR package"
+# caelestia-dots/caelestia IS the shell repo. It has shell.qml at root
+# and all modules live under the same tree. The AUR package
+# caelestia-shell-git builds + installs the Caelestia.Config QML module
+# (which the shell's import "Caelestia.Config" requires) system-wide.
+# Install: pull the AUR package → symlink the clone into
+# ~/.config/quickshell/caelestia so `qs -c caelestia` loads it.
 repo = "https://github.com/caelestia-dots/caelestia"
-commit = "0000000000000000000000000000000000000001"
-shape = "dotfiles"
-install_cmd = "./install.fish --noconfirm --aur-helper=paru"
-partial_ownership = ["~/.zshrc", "~/.bashrc", "~/.config/mimeapps.list"]
-runtime_regenerated = [
-  "~/.config/gtk-3.0/settings.ini",
-  "~/.config/gtk-3.0/colors.css",
-  "~/.config/gtk-4.0/settings.ini",
-  "~/.config/qt5ct/qt5ct.conf",
+commit = "0283b44960791ab12cde19c9797d70976a0b96a4"
+shape = "symlink"
+symlink_src = "."
+symlink_dst = "~/.config/quickshell/caelestia"
+# Declared in dependency order. Rice Cooker does not walk the AUR dep
+# graph, so transitive AUR deps must be listed before the packages that
+# need them.
+aur_deps = [
+  "python-materialyoucolor",  # needed by caelestia-cli
+  "app2unit",                 # needed by caelestia-cli + caelestia-shell-git
+  "ttf-rubik-vf",             # needed by caelestia-shell-git
+  "caelestia-cli",            # needed by caelestia-shell-git
+  "caelestia-shell-git",      # provides Caelestia.Config QML module
 ]
-documented_system_effects = [
-  "installs caelestia-meta from AUR (via install.fish → paru)",
-]
+
+[caelestia.aur_commits]
+python-materialyoucolor = "7a148d4abba3db45fc042faa0dfb37d329f6d615"
+app2unit = "cbb5bc30403d28bbae4cf10257318c3d32ae31cb"
+ttf-rubik-vf = "df5b264003f0d39ba75f42970074ff2465ed527c"
+caelestia-cli = "39dac9a14fad199f32fade1f9f17c3599de33454"
+caelestia-shell-git = "69dd9e17c2ae3e40341266d22e16518bd4da3c98"
 
 [noctalia]
 display_name = "Noctalia"

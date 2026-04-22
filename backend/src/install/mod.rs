@@ -5,8 +5,10 @@
 //! it on uninstall. See `docs/install-design.md` (or the spec commit) for
 //! the motivating design discussion.
 
+pub mod aur;
 pub mod diff;
 pub mod env;
+pub mod helper;
 pub mod pacman;
 pub mod pipeline;
 pub mod record;

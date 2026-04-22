@@ -315,6 +315,9 @@ mod tests {
             runtime_regenerated: vec![],
             partial_ownership: vec![],
             extra_watched_roots: vec![],
+            pacman_deps: vec![],
+            aur_deps: vec![],
+            aur_commits: std::collections::BTreeMap::new(),
             documented_system_effects: vec![],
         }
     }

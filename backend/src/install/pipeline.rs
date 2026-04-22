@@ -10,8 +10,10 @@ use crate::catalog::{Catalog, RiceEntry, Shape};
 use crate::git;
 use crate::lock::ApplyLock;
 
+use super::aur;
 use super::diff::{self, FsDiff};
 use super::env::{Dirs, expand_home};
+use super::helper;
 use super::pacman::{self, ExplicitSet};
 use super::record::{
     InstallRecord, PacmanDiff, SCHEMA_VERSION, UninstallPhase, clear_current, clear_in_progress,
@@ -34,6 +36,73 @@ pub struct Flags {
     /// pacman work (tests that don't have a real pacman on PATH, or the
     /// user passes `--skip-pacman`).
     pub skip_pacman: bool,
+}
+
+/// Pre-`install_cmd` dep install: processes `pacman_deps` + `aur_deps`
+/// via the privileged helper. Called from both shape paths.
+///
+/// Flow:
+/// 1. Clone each AUR PKGBUILD at its pinned commit, collect makedepends.
+/// 2. Filter `(pacman_deps ∪ makedepends)` to just the missing packages.
+/// 3. If any missing: polkit-agent preflight → helper install-repo-packages
+///    (1st pkexec prompt).
+/// 4. For each AUR pkg: makepkg (as user, with --nodeps since makedeps
+///    are now installed). Collect `.pkg.tar.zst` paths.
+/// 5. If any built: helper install-built-packages (2nd pkexec; same keep
+///    window → usually no reprompt).
+fn install_deps(entry: &RiceEntry, aur_cache_dir: &Path, flags: Flags) -> Result<()> {
+    if entry.pacman_deps.is_empty() && entry.aur_deps.is_empty() {
+        return Ok(());
+    }
+    if flags.skip_pacman {
+        return Ok(());
+    }
+
+    // Clone PKGBUILDs and gather makedepends.
+    let mut aur_clones: Vec<PathBuf> = Vec::new();
+    let mut all_makedeps: Vec<String> = Vec::new();
+    for pkg in &entry.aur_deps {
+        let commit = entry
+            .aur_commits
+            .get(pkg)
+            .ok_or_else(|| anyhow!("{pkg}: aur_commits missing pin"))?;
+        let dest = aur_cache_dir.join(pkg);
+        log_verbose(flags, &format!("aur clone {pkg}@{commit}"));
+        aur::clone_pkgbuild(pkg, commit, &dest)?;
+        let md = aur::makedepends(&dest)?;
+        all_makedeps.extend(md);
+        aur_clones.push(dest);
+    }
+
+    // Filter to packages that aren't already installed.
+    let mut wanted: Vec<String> = entry.pacman_deps.clone();
+    wanted.extend(all_makedeps);
+    wanted.sort();
+    wanted.dedup();
+    let missing = helper::missing_pacman(&wanted);
+
+    if !missing.is_empty() {
+        log_verbose(
+            flags,
+            &format!("install-repo-packages: {}", missing.join(" ")),
+        );
+        helper::install_repo_packages(&missing)?;
+    }
+
+    // Build each AUR pkg (as user).
+    let mut built: Vec<PathBuf> = Vec::new();
+    for dir in &aur_clones {
+        log_verbose(flags, &format!("makepkg in {}", dir.display()));
+        built.extend(aur::build(dir)?);
+    }
+    if !built.is_empty() {
+        log_verbose(
+            flags,
+            &format!("install-built-packages: {} pkg(s)", built.len()),
+        );
+        helper::install_built_packages(&built)?;
+    }
+    Ok(())
 }
 
 /// Install <name> from the catalog. Acquires the lock.
@@ -180,6 +249,10 @@ fn install_locked_inner(
             log_path: PathBuf::new(),
         });
     }
+
+    // Install deps (pacman + AUR) before install.sh runs. Failures here
+    // abort before install.sh touches anything in $HOME.
+    install_deps(entry, &dirs.aur_dir(name), flags)?;
 
     // Run install.sh.
     let log_path = run::log_path(&dirs.logs_dir(), name);
@@ -360,6 +433,12 @@ fn install_symlink_locked(
         let dst = expand_home(&entry.symlink_dst, &dirs.home);
         let src = clone.join(&entry.symlink_src);
         println!("would symlink: {} -> {}", dst.display(), src.display());
+        if !entry.pacman_deps.is_empty() || !entry.aur_deps.is_empty() {
+            println!(
+                "would install deps: pacman={:?} aur={:?}",
+                entry.pacman_deps, entry.aur_deps
+            );
+        }
         return Ok(InstallOutcome {
             name: name.to_string(),
             partial: false,
@@ -368,6 +447,10 @@ fn install_symlink_locked(
             log_path: PathBuf::new(),
         });
     }
+
+    // Install deps (pacman + AUR) before the symlink goes in. Package
+    // failures abort before any user-visible state changes.
+    install_deps(entry, &dirs.aur_dir(name), flags)?;
 
     // Create the symlink — this is the entire "install" for this shape.
     // After this point, there's user-visible state on disk; do NOT let
@@ -1360,6 +1443,9 @@ mod tests {
             runtime_regenerated: vec![],
             partial_ownership: vec![],
             extra_watched_roots: vec![],
+            pacman_deps: vec![],
+            aur_deps: vec![],
+            aur_commits: std::collections::BTreeMap::new(),
             documented_system_effects: vec![],
         }
     }
