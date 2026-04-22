@@ -94,7 +94,7 @@ fn install_locked(cat: &Catalog, dirs: &Dirs, name: &str, flags: Flags) -> Resul
         let src = dirs.clone_dir(name).join(&entry.symlink_src);
         println!("would symlink: {} -> {}", dst.display(), src.display());
         let missing_deps =
-            deps::missing(&[entry.pacman_deps.clone(), entry.aur_deps.clone()].concat());
+            deps::missing(&[entry.pacman_deps.clone(), entry.aur_deps.clone()].concat())?;
         if !missing_deps.is_empty() {
             println!("would install deps: {}", missing_deps.join(" "));
         } else {
@@ -126,7 +126,7 @@ fn install_locked(cat: &Catalog, dirs: &Dirs, name: &str, flags: Flags) -> Resul
 
     // Install deps. Skip paru entirely if nothing's missing.
     let all_deps: Vec<String> = [entry.pacman_deps.clone(), entry.aur_deps.clone()].concat();
-    let missing_deps = deps::missing(&all_deps);
+    let missing_deps = deps::missing(&all_deps)?;
     if !missing_deps.is_empty() {
         log_verbose(flags, &format!("install deps: {}", missing_deps.join(" ")));
         deps::install_packages(&missing_deps)?;
@@ -185,9 +185,11 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
     }
 
     // Remove packages. Pre-filter already-removed so pacman doesn't
-    // abort with "target not found" on retry.
+    // abort with "target not found" on retry. A pacman-query failure
+    // here propagates — silently skipping removal would strand the
+    // rice's packages on disk with no tool-visible owner.
     if !record.pacman_diff.added_explicit.is_empty() {
-        let still_installed = deps::installed(&record.pacman_diff.added_explicit);
+        let still_installed = deps::installed(&record.pacman_diff.added_explicit)?;
         if !still_installed.is_empty() {
             log_verbose(
                 flags,
@@ -274,7 +276,19 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
         }
     }
     retire_to_previous(dirs, &name)?;
-    clear_current(dirs)?;
+    // clear_current is the last bookkeeping step — record is already
+    // retired to previous.json, packages+clone are gone. A stray
+    // current.json pointing at the retired name is a reportable glitch
+    // (next read_current returns Some(name), load_record errors), but
+    // it's not worth re-failing the whole uninstall after success on
+    // every other step. In force mode we've already accepted degraded
+    // state, so warn either way and let the user move on.
+    if let Err(e) = clear_current(dirs) {
+        eprintln!(
+            "rice-cooker: warn: could not clear current.json: {e}. \
+             Remove it manually if `rice-cooker status` still reports {name} as installed."
+        );
+    }
 
     Ok(UninstallOutcome { name, rcsave_dir })
 }

@@ -55,6 +55,11 @@ pub fn check_polkit_agent() -> Result<()> {
         .stderr(Stdio::null())
         .status()
         .context("running pgrep")?;
+    if let Some(sig) = status.signal() {
+        return Err(anyhow!(
+            "pgrep killed by signal {sig} while checking for a polkit agent"
+        ));
+    }
     match status.code() {
         Some(0) => Ok(()),
         Some(1) => Err(anyhow!(
@@ -64,7 +69,7 @@ pub fn check_polkit_agent() -> Result<()> {
             "pgrep returned unexpected exit {n} while checking for a polkit agent; cannot verify authorization environment"
         )),
         None => Err(anyhow!(
-            "pgrep killed by signal while checking for a polkit agent"
+            "pgrep exited without a status code while checking for a polkit agent"
         )),
     }
 }
@@ -200,30 +205,59 @@ fn is_executable_file(p: &Path) -> bool {
     }
 }
 
-/// `pacman -Q <pkg>` — true if installed. Falls back to false on any
-/// error (pacman missing, exec failure), so uninstall pre-filters
-/// already-removed packages rather than erroring.
-pub fn is_installed(pkg: &str) -> bool {
-    Command::new("pacman")
+/// `pacman -Q <pkg>` — Ok(true) if installed, Ok(false) if the pkg
+/// isn't present. Distinguishes "not installed" (pacman exit 1) from
+/// "pacman itself is broken" (any other exit / exec failure). The
+/// broken-pacman case propagates as Err so callers can fail-stop
+/// instead of silently collapsing to "nothing needs action" — which
+/// on uninstall would skip `pacman -Rns` entirely and leave the
+/// rice's packages on disk with no tool-visible owner.
+pub fn is_installed(pkg: &str) -> Result<bool> {
+    let status = Command::new("pacman")
         .args(["-Q", pkg])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
+        .context("running pacman -Q")?;
+    if let Some(sig) = status.signal() {
+        return Err(anyhow!("pacman -Q {pkg} killed by signal {sig}"));
+    }
+    match status.code() {
+        Some(0) => Ok(true),
+        Some(1) => Ok(false),
+        Some(n) => Err(anyhow!(
+            "pacman -Q {pkg} returned unexpected exit {n}; pacman may be broken (DB lock, corrupt state)"
+        )),
+        None => Err(anyhow!("pacman -Q {pkg} exited without a status code")),
+    }
 }
 
-/// Subset of `pkgs` that are NOT currently installed. Zero prompts when
-/// empty — install flow can skip paru/pkexec entirely.
-pub fn missing(pkgs: &[String]) -> Vec<String> {
-    pkgs.iter().filter(|p| !is_installed(p)).cloned().collect()
+/// Subset of `pkgs` that are NOT currently installed. Propagates
+/// pacman-query errors so an install against a broken pacman aborts
+/// instead of trying to re-install the full dep set.
+pub fn missing(pkgs: &[String]) -> Result<Vec<String>> {
+    let mut out = Vec::new();
+    for p in pkgs {
+        if !is_installed(p)? {
+            out.push(p.clone());
+        }
+    }
+    Ok(out)
 }
 
-/// Subset of `pkgs` that ARE currently installed. Used on uninstall to
-/// skip `pacman -Rns` for already-removed entries (which would exit
-/// non-zero and block retry).
-pub fn installed(pkgs: &[String]) -> Vec<String> {
-    pkgs.iter().filter(|p| is_installed(p)).cloned().collect()
+/// Subset of `pkgs` that ARE currently installed. Used on uninstall
+/// to skip `pacman -Rns` for already-removed entries (which would
+/// exit non-zero and block retry). Propagates pacman-query errors so
+/// uninstall against a broken pacman aborts rather than silently
+/// skipping package removal.
+pub fn installed(pkgs: &[String]) -> Result<Vec<String>> {
+    let mut out = Vec::new();
+    for p in pkgs {
+        if is_installed(p)? {
+            out.push(p.clone());
+        }
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -238,11 +272,11 @@ mod tests {
 
     #[test]
     fn missing_returns_empty_for_empty_input() {
-        assert!(missing(&[]).is_empty());
+        assert!(missing(&[]).unwrap().is_empty());
     }
 
     #[test]
     fn installed_returns_empty_for_empty_input() {
-        assert!(installed(&[]).is_empty());
+        assert!(installed(&[]).unwrap().is_empty());
     }
 }
