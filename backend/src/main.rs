@@ -13,21 +13,12 @@ use rice_cooker_backend::install::{self, Flags};
 #[derive(Parser)]
 #[command(name = "rice-cooker-backend", about = "Quickshell rice install engine")]
 struct Cli {
-    /// Skip interactive confirmation prompts that rice-cooker itself would
-    /// show. Does NOT pass --noconfirm to pacman or install.sh — those are
-    /// catalog-declared.
-    #[arg(long, global = true)]
-    no_confirm: bool,
-    /// Print each file operation as it happens.
+    /// Print each operation as it happens.
     #[arg(long, global = true)]
     verbose: bool,
     /// Alternate catalog file path (default: backend/catalog.toml).
     #[arg(long, global = true)]
     catalog: Option<PathBuf>,
-    /// Skip the pacman interaction (no -Qqe snapshot, no -Rns on uninstall).
-    /// Useful in sandboxed test environments without a working pacman.
-    #[arg(long, global = true)]
-    skip_pacman: bool,
     #[command(subcommand)]
     cmd: Cmd,
 }
@@ -37,6 +28,7 @@ enum Cmd {
     /// Install a rice from the catalog.
     Install {
         name: String,
+        /// Print planned actions without doing anything.
         #[arg(long)]
         dry_run: bool,
     },
@@ -59,11 +51,6 @@ enum Cmd {
     List,
     /// Print details about the currently-installed rice.
     Status,
-    /// Reset state after a crashed install. Restores pre-install
-    /// filesystem state (dotfiles shape) or removes the dangling symlink
-    /// (symlink shape), then clears cache artifacts. Refuses if no
-    /// `.in-progress.json` marker exists.
-    Cleanup,
     /// v1 preview: clone + launch a rice in-session; `exit` restores.
     Apply {
         #[arg(long)]
@@ -94,9 +81,7 @@ fn run() -> Result<()> {
     let flags = Flags {
         dry_run: false,
         force: false,
-        no_confirm: cli.no_confirm,
         verbose: cli.verbose,
-        skip_pacman: cli.skip_pacman,
     };
     match &cli.cmd {
         Cmd::Install { name, dry_run } => {
@@ -105,13 +90,10 @@ fn run() -> Result<()> {
             let mut f = flags;
             f.dry_run = *dry_run;
             let out = install::install(&cat, &dirs, name, f)?;
-            if out.partial {
-                eprintln!(
-                    "install partial: install_cmd exited non-zero; \
-                     uninstall with --force to reverse what happened."
-                );
+            if out.dry_run {
+                return Ok(());
             }
-            println!("installed: {} (log: {})", out.name, out.log_path.display());
+            println!("installed: {}", out.name);
             if !out.pacman_diff.added_explicit.is_empty() {
                 println!(
                     "pacman: added {} explicit: {:?}",
@@ -126,28 +108,9 @@ fn run() -> Result<()> {
             f.dry_run = *dry_run;
             f.force = *force;
             let out = install::uninstall(&dirs, f)?;
-            if out.crash_record {
-                eprintln!(
-                    "\n=== WARNING: uninstall of crash-record {} ===\n\
-                     The install of this rice crashed before rice-cooker could\n\
-                     observe what it deployed. Files may remain in $HOME that\n\
-                     rice-cooker did NOT reverse — review the install log and\n\
-                     clean up manually.\n",
-                    out.name
-                );
-                if let Some(snap) = &out.preserved_snapshot_dir {
-                    eprintln!(
-                        "Pre-install content backups preserved at (delete when done):\n  {}\n",
-                        snap.display()
-                    );
-                }
-            }
             println!("uninstalled: {}", out.name);
-            if !out.rcsave_paths.is_empty() {
-                println!("preserved user-modified content at:");
-                for p in out.rcsave_paths {
-                    println!("  {}", p.display());
-                }
+            if let Some(dir) = out.rcsave_dir {
+                println!("user files preserved at: {}", dir.display());
             }
         }
         Cmd::Switch {
@@ -162,11 +125,8 @@ fn run() -> Result<()> {
             f.force = *force;
             let out = install::switch(&cat, &dirs, name, f)?;
             println!("switched: {} -> {}", out.from, out.to);
-            if !out.rcsave_paths.is_empty() {
-                println!("preserved user-modified content at:");
-                for p in out.rcsave_paths {
-                    println!("  {}", p.display());
-                }
+            if let Some(dir) = out.rcsave_dir {
+                println!("user files preserved at: {}", dir.display());
             }
         }
         Cmd::List => {
@@ -193,35 +153,16 @@ fn run() -> Result<()> {
                     println!("installed_at: {}", r.installed_at);
                     println!("commit:       {}", r.commit);
                     println!(
-                        "files:        +{} ~{} -{} (symlinks: +{}, dirs: +{})",
-                        r.fs_diff.added.len(),
-                        r.fs_diff.modified.len(),
-                        r.fs_diff.deleted.len(),
-                        r.fs_diff.symlinks_added.len(),
-                        r.fs_diff.dirs_added.len()
+                        "symlink:      {} -> {}",
+                        r.symlink_path.display(),
+                        r.symlink_target.display()
                     );
                     if !r.pacman_diff.added_explicit.is_empty() {
                         println!("pacman:       +{:?}", r.pacman_diff.added_explicit);
                     }
-                    if !r.systemd_units_enabled.is_empty() {
-                        println!("systemd:      {:?}", r.systemd_units_enabled);
-                    }
-                    println!("log:          {}", r.log_path.display());
-                    if r.partial {
-                        println!("PARTIAL INSTALL — install_cmd exited {}", r.exit_code);
-                    }
                 }
                 None => println!("nothing installed"),
             }
-        }
-        Cmd::Cleanup => {
-            let dirs = install::resolve_dirs()?;
-            let cat = Catalog::from_file(&catalog_path(cli.catalog.as_deref())?)?;
-            let out = install::cleanup(&cat, &dirs)?;
-            println!(
-                "cleanup: {} (shape: {:?}), restored {}, deleted {} add-ons, symlink-removed: {}",
-                out.name, out.shape, out.restored, out.deleted_added, out.removed_symlink
-            );
         }
         Cmd::Apply {
             name,
@@ -261,7 +202,6 @@ fn catalog_path(flag: Option<&std::path::Path>) -> Result<PathBuf> {
     {
         return Ok(PathBuf::from(p));
     }
-    // Default: catalog.toml relative to cwd or next to the binary.
     let cwd = std::env::current_dir()?.join("catalog.toml");
     if cwd.exists() {
         return Ok(cwd);

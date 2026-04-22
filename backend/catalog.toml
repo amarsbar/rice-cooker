@@ -1,179 +1,166 @@
 # rice-cooker catalog — one file, keyed by rice name.
 # Filename stem of each [table] is the CLI id: `rice-cooker install <stem>`.
 #
-# `commit` MUST be a full hex SHA — no branch names, no "HEAD". Pinning is
-# what lets us reproduce the install and hash the rice's intended state.
-# When upgrading a rice, bump `commit` (and any fields that depend on it).
+# `commit` MUST be a full hex SHA. Placeholder values containing the
+# literal "PLACEHOLDER" string are accepted by the parser (so `list` and
+# `status` work for uncurated entries) but install refuses them.
 #
-# `shape` determines the deploy path:
-#   - "symlink": the repo IS the shell config. One `ln -sfnT <clone>/<src>
-#     <dst>`, no install script. Fast, no snapshot, trivial to uninstall.
-#   - "dotfiles": the rice ships an install script that copies a config
-#     tree into $HOME. Pre/post snapshot the watched roots so uninstall
-#     can reverse what it deployed.
+# Install = clone rice at `commit` → paru installs `pacman_deps ∪ aur_deps`
+# via pkexec → `ln -sfnT <clone>/<symlink_src> <symlink_dst>`. That's it.
 #
-# `commit` values below are placeholders pinned during v2 curation; bump
-# them when upgrading a rice.
+# paru resolves transitive AUR deps — aur_deps lists top-level names only,
+# no commit pins.
 
 [caelestia]
 display_name = "Caelestia"
-description = "Caelestia Quickshell — ships via the caelestia-shell-git AUR package"
-# caelestia-dots/caelestia IS the shell repo. It has shell.qml at root
-# and all modules live under the same tree. The AUR package
-# caelestia-shell-git builds + installs the Caelestia.Config QML module
-# (which the shell's import "Caelestia.Config" requires) system-wide.
-# Install: pull the AUR package → symlink the clone into
-# ~/.config/quickshell/caelestia so `qs -c caelestia` loads it.
+description = "Caelestia Quickshell. Ships as caelestia-shell-git AUR."
 repo = "https://github.com/caelestia-dots/caelestia"
 commit = "0283b44960791ab12cde19c9797d70976a0b96a4"
-shape = "symlink"
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/caelestia"
-# Declared in dependency order. Rice Cooker does not walk the AUR dep
-# graph, so transitive AUR deps must be listed before the packages that
-# need them.
-aur_deps = [
-  "python-materialyoucolor",  # needed by caelestia-cli
-  "app2unit",                 # needed by caelestia-cli + caelestia-shell-git
-  "ttf-rubik-vf",             # needed by caelestia-shell-git
-  "libcava",                  # needed by caelestia-shell-git
-  "caelestia-cli",            # needed by caelestia-shell-git
-  "caelestia-shell-git",      # provides Caelestia.Config QML module
-]
-
-[caelestia.aur_commits]
-python-materialyoucolor = "7a148d4abba3db45fc042faa0dfb37d329f6d615"
-app2unit = "cbb5bc30403d28bbae4cf10257318c3d32ae31cb"
-ttf-rubik-vf = "df5b264003f0d39ba75f42970074ff2465ed527c"
-libcava = "22658159dbbde1a7d1103eafd864828ed9b93314"
-caelestia-cli = "39dac9a14fad199f32fade1f9f17c3599de33454"
-caelestia-shell-git = "69dd9e17c2ae3e40341266d22e16518bd4da3c98"
+aur_deps = ["caelestia-shell-git"]
+[caelestia.entry]
+path = "shell.qml"
 
 [noctalia]
 display_name = "Noctalia"
 description = "Minimal dark Quickshell"
 repo = "https://github.com/noctalia-dev/noctalia-shell"
-commit = "0000000000000000000000000000000000000002"
-shape = "symlink"
+commit = "PLACEHOLDER..."
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/noctalia"
+[noctalia.entry]
+path = "shell.qml"
 
 [dms]
 display_name = "DankMaterialShell"
 description = "Material-design Quickshell"
 repo = "https://github.com/AvengeMedia/DankMaterialShell"
-commit = "0000000000000000000000000000000000000003"
-shape = "symlink"
+commit = "PLACEHOLDER..."
 symlink_src = "quickshell"
 symlink_dst = "~/.config/quickshell/dms"
+[dms.entry]
+path = "shell.qml"
 
 [end-4]
 display_name = "illogical-impulse (end-4 dots-hyprland)"
-description = "End-4's Quickshell-based dotfiles"
+description = "End-4's Quickshell"
 repo = "https://github.com/end-4/dots-hyprland"
-commit = "0000000000000000000000000000000000000004"
-shape = "symlink"
+commit = "PLACEHOLDER..."
 symlink_src = ".config/quickshell/ii"
 symlink_dst = "~/.config/quickshell/end-4"
 documented_system_effects = [
-  "upstream installer also modifies waybar/hypr/gtk configs (we do not run it)",
+  "upstream installer modifies waybar/hypr/gtk configs (we do not run it)",
 ]
+[end-4.entry]
+path = "shell.qml"
 
 [Ambxst]
 display_name = "Ambxst"
-description = "Axenide's Quickshell rice"
+description = "Axenide's Quickshell"
 repo = "https://github.com/Axenide/Ambxst"
-commit = "0000000000000000000000000000000000000005"
-shape = "symlink"
+commit = "PLACEHOLDER..."
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/Ambxst"
+[Ambxst.entry]
+path = "shell.qml"
 
 [iNiR]
 display_name = "iNiR"
-description = "Snowarch's Quickshell rice"
+description = "Snowarch's Quickshell"
 repo = "https://github.com/snowarch/iNiR"
-commit = "0000000000000000000000000000000000000006"
-shape = "symlink"
+commit = "PLACEHOLDER..."
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/iNiR"
+[iNiR.entry]
+path = "shell.qml"
 
 [nucleus]
 display_name = "Nucleus"
-description = "Nucleus HQ's Quickshell rice"
+description = "Nucleus HQ's Quickshell"
 repo = "https://github.com/nucleus-hq/nucleus-shell"
-commit = "0000000000000000000000000000000000000007"
-shape = "symlink"
+commit = "PLACEHOLDER..."
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/nucleus"
+[nucleus.entry]
+path = "shell.qml"
 
 [NibrasShell]
 display_name = "NibrasShell"
-description = "Ahmed Saadi's Quickshell rice"
+description = "Ahmed Saadi's Quickshell"
 repo = "https://github.com/AhmedSaadi0/NibrasShell"
-commit = "0000000000000000000000000000000000000008"
-shape = "symlink"
+commit = "PLACEHOLDER..."
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/NibrasShell"
+[NibrasShell.entry]
+path = "shell.qml"
 
 [linux-retroism]
 display_name = "linux-retroism"
-description = "Diinki's Quickshell rice"
+description = "Diinki's Quickshell"
 repo = "https://github.com/diinki/linux-retroism"
-commit = "0000000000000000000000000000000000000009"
-shape = "symlink"
+commit = "PLACEHOLDER..."
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/linux-retroism"
+[linux-retroism.entry]
+path = "shell.qml"
 
 [Zaphkiel]
 display_name = "Zaphkiel"
-description = "Rexcrazy's Quickshell rice"
+description = "Rexcrazy's Quickshell"
 repo = "https://github.com/Rexcrazy804/Zaphkiel"
-commit = "000000000000000000000000000000000000000a"
-shape = "symlink"
+commit = "PLACEHOLDER..."
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/Zaphkiel"
+[Zaphkiel.entry]
+path = "shell.qml"
 
 [eqsh]
 display_name = "eqsh"
-description = "eq-desktop's Quickshell rice"
+description = "eq-desktop's Quickshell"
 repo = "https://github.com/eq-desktop/eqsh"
-commit = "000000000000000000000000000000000000000b"
-shape = "symlink"
+commit = "PLACEHOLDER..."
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/eqsh"
+[eqsh.entry]
+path = "shell.qml"
 
 [dotfiles-hyprland]
 display_name = "dotfiles-hyprland"
-description = "cxOrz's dotfiles-hyprland Quickshell rice"
+description = "cxOrz's dotfiles-hyprland Quickshell"
 repo = "https://github.com/cxOrz/dotfiles-hyprland"
-commit = "000000000000000000000000000000000000000c"
-shape = "symlink"
+commit = "PLACEHOLDER..."
 symlink_src = ".config/quickshell"
 symlink_dst = "~/.config/quickshell/dotfiles-hyprland"
+[dotfiles-hyprland.entry]
+path = "shell.qml"
 
 [whisker]
 display_name = "whisker"
-description = "corecathx's Quickshell rice"
+description = "corecathx's Quickshell"
 repo = "https://github.com/corecathx/whisker"
-commit = "000000000000000000000000000000000000000d"
-shape = "symlink"
+commit = "PLACEHOLDER..."
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/whisker"
+[whisker.entry]
+path = "shell.qml"
 
 [dhrruvsharma-shell]
 display_name = "dhrruvsharma-shell"
 description = "dhrruvsharma's shell"
 repo = "https://github.com/dhrruvsharma/shell"
-commit = "000000000000000000000000000000000000000e"
-shape = "symlink"
+commit = "PLACEHOLDER..."
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/dhrruvsharma-shell"
+[dhrruvsharma-shell.entry]
+path = "shell.qml"
 
 [Moonveil]
 display_name = "Moonveil"
-description = "notcandy001's Quickshell rice"
+description = "notcandy001's Quickshell"
 repo = "https://github.com/notcandy001/Moonveil"
-commit = "000000000000000000000000000000000000000f"
-shape = "symlink"
+commit = "PLACEHOLDER..."
 symlink_src = ".config/quickshell"
 symlink_dst = "~/.config/quickshell/Moonveil"
+[Moonveil.entry]
+path = "shell.qml"
