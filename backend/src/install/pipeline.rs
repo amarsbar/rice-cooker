@@ -115,7 +115,7 @@ fn install_locked_inner(
     // the end in save_record, or left in place on crash so cleanup can
     // see the interrupted state.
     if !flags.dry_run {
-        write_in_progress(dirs, name, entry.shape)?;
+        write_in_progress(dirs, name, entry.shape, None)?;
     }
 
     // Clone / re-clone.
@@ -330,10 +330,12 @@ fn install_symlink_locked(
     flags: Flags,
     cmd_ran: &std::sync::atomic::AtomicBool,
 ) -> Result<InstallOutcome> {
-    // In-progress marker written before any mutation. Cleanup reads this
-    // to know what to reverse if the install is interrupted.
+    // In-progress marker written before any mutation. Persist
+    // symlink_dst so cleanup is robust to catalog drift between the
+    // crashed install and the cleanup invocation.
     if !flags.dry_run {
-        write_in_progress(dirs, name, Shape::Symlink)?;
+        let dst = expand_home(&entry.symlink_dst, &dirs.home);
+        write_in_progress(dirs, name, Shape::Symlink, Some(dst))?;
     }
 
     // Clone / re-clone.
@@ -1119,14 +1121,15 @@ pub struct CleanupOutcome {
     pub removed_symlink: bool,
 }
 
-/// Reset state after a crashed install. Precondition: `.in-progress.json`
-/// exists. Restores pre-install filesystem state (dotfiles) or removes
-/// the dangling symlink (symlink), then deletes install artifacts.
+/// Reset state after a crashed install. Runs iff `.in-progress.json`
+/// exists (absence is an error, not UB). Restores pre-install filesystem
+/// state (dotfiles) or removes the dangling symlink (symlink), then
+/// deletes install artifacts.
 ///
-/// See SPEC.md `cleanup` section for full step-by-step. Refuses if:
-/// - the global lock is held
-/// - `.in-progress.json` is absent (use `uninstall --force` for a failed
-///   completed install)
+/// Refuses if:
+/// - the global lock is held by another rice-cooker process
+/// - `.in-progress.json` is absent (directs caller to `uninstall --force`
+///   for a completed-but-failed install)
 pub fn cleanup(cat: &Catalog, dirs: &Dirs) -> Result<CleanupOutcome> {
     dirs.ensure()?;
     let _lock = ApplyLock::try_acquire(&dirs.lock_file()).map_err(|e| anyhow!("lock: {e}"))?;
@@ -1152,16 +1155,22 @@ fn cleanup_locked(cat: &Catalog, dirs: &Dirs) -> Result<CleanupOutcome> {
             if manifest_path.exists() {
                 let manifest = snapshot::load_manifest(&manifest_path)?;
                 let content_dir = snap_dir.join("content");
-                let (r, d) = cleanup_dotfiles_restore(&manifest, &content_dir, &dirs.home)?;
+                let (r, d) = cleanup_dotfiles_restore(&manifest, &content_dir)?;
                 restored = r;
                 deleted_added = d;
             }
         }
         Shape::Symlink => {
-            // Remove dangling symlink (install may have succeeded
-            // create_symlink but crashed before record write).
-            if let Some(entry) = cat.get(&name) {
-                let dst = expand_home(&entry.symlink_dst, &dirs.home);
+            // Prefer the marker's recorded dst (set at install start);
+            // fall back to the catalog entry if the marker predates this
+            // field. If both are absent (catalog edit + old marker),
+            // skip with a warning — cleanup of clone + marker still
+            // proceeds so the user isn't permanently stuck.
+            let dst = marker.symlink_dst.clone().or_else(|| {
+                cat.get(&name)
+                    .map(|e| expand_home(&e.symlink_dst, &dirs.home))
+            });
+            if let Some(dst) = dst {
                 if fs::symlink_metadata(&dst).is_ok() {
                     match fs::remove_file(&dst) {
                         Ok(()) => removed_symlink = true,
@@ -1171,21 +1180,37 @@ fn cleanup_locked(cat: &Catalog, dirs: &Dirs) -> Result<CleanupOutcome> {
                         }
                     }
                 }
+            } else {
+                eprintln!(
+                    "rice-cooker: cleanup of {name} has no recorded symlink_dst \
+                     (marker predates the field AND catalog entry missing); \
+                     skipping symlink removal — check ~/.config/quickshell/ manually"
+                );
             }
-            // If the catalog no longer has this entry (rice removed mid-
-            // crash), we can't know symlink_dst. Best-effort: continue
-            // cleanup of clone + marker so the user isn't stuck.
         }
     }
 
-    // Common cleanup: snapshot dir, clone dir, AUR clones, marker.
-    let _ = fs::remove_dir_all(dirs.snapshot_dir(&name));
-    let _ = fs::remove_dir_all(dirs.clone_dir(&name));
-    // AUR clones are ephemeral per-install; wipe them if we know what to
-    // wipe. The catalog is consulted rather than the marker (which only
-    // carries name/shape) so this is best-effort.
-    // Deferred: a dedicated `aur_deps` field on the marker would make
-    // this robust to catalog changes between install-start and cleanup.
+    // Common cleanup: snapshot dir, clone dir, marker. AUR clones are
+    // not wiped here — they're ephemeral anyway and the next install
+    // re-clones. Their removal is deferred to a future PR once the
+    // helper binary lands (the marker would need an `aur_deps` field to
+    // be robust to catalog drift).
+    if let Err(e) = fs::remove_dir_all(dirs.snapshot_dir(&name))
+        && e.kind() != std::io::ErrorKind::NotFound
+    {
+        eprintln!(
+            "rice-cooker: cleanup could not remove {}: {e} (residue left on disk)",
+            dirs.snapshot_dir(&name).display()
+        );
+    }
+    if let Err(e) = fs::remove_dir_all(dirs.clone_dir(&name))
+        && e.kind() != std::io::ErrorKind::NotFound
+    {
+        eprintln!(
+            "rice-cooker: cleanup could not remove {}: {e} (residue left on disk)",
+            dirs.clone_dir(&name).display()
+        );
+    }
     clear_in_progress(dirs)?;
 
     Ok(CleanupOutcome {
@@ -1202,11 +1227,7 @@ fn cleanup_locked(cat: &Catalog, dirs: &Dirs) -> Result<CleanupOutcome> {
 /// manifest entry from content backup. Order matters — delete-additions
 /// before restore-manifest so we don't immediately re-delete what we
 /// just restored.
-fn cleanup_dotfiles_restore(
-    manifest: &Manifest,
-    content_dir: &Path,
-    home: &Path,
-) -> Result<(usize, usize)> {
+fn cleanup_dotfiles_restore(manifest: &Manifest, content_dir: &Path) -> Result<(usize, usize)> {
     use std::collections::HashSet;
     let known: HashSet<&PathBuf> = manifest.entries.keys().collect();
     let mut deleted_added = 0usize;
@@ -1253,7 +1274,6 @@ fn cleanup_dotfiles_restore(
     // Sort by depth so dirs are created before files inside them.
     let mut ordered: Vec<(&PathBuf, &snapshot::Entry)> = manifest.entries.iter().collect();
     ordered.sort_by_key(|(p, _)| p.components().count());
-    let _ = home; // home not needed — manifest paths are absolute.
 
     for (path, entry) in ordered {
         // Handle type mismatches: if the current path is the wrong type,
