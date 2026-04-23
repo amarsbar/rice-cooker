@@ -88,9 +88,6 @@ impl Paths {
         Ok(self.installs_dir().join(format!("{name}.json")))
     }
 
-    pub fn active_file(&self) -> PathBuf {
-        self.cache_home.join("active")
-    }
     pub fn original_file(&self) -> PathBuf {
         self.cache_home.join("original")
     }
@@ -123,18 +120,6 @@ impl Paths {
     pub fn ensure_installs(&self) -> Result<()> {
         fs::create_dir_all(self.installs_dir())
             .with_context(|| format!("creating {}", self.installs_dir().display()))
-    }
-
-    pub fn active(&self) -> Result<Option<String>> {
-        read_line_file(&self.active_file())
-    }
-
-    pub fn set_active(&self, name: &str) -> Result<()> {
-        write_line_file(&self.active_file(), name)
-    }
-
-    pub fn clear_active(&self) -> Result<()> {
-        remove_if_exists(&self.active_file())
     }
 
     pub fn original(&self) -> Result<Option<OriginalShell>> {
@@ -226,24 +211,7 @@ fn remove_if_exists(p: &Path) -> Result<()> {
     }
 }
 
-fn read_line_file(path: &Path) -> Result<Option<String>> {
-    match fs::read_to_string(path) {
-        Ok(s) => {
-            let trimmed = s.trim_end_matches(['\n', '\r']).to_string();
-            if trimmed.is_empty() {
-                Ok(None)
-            } else {
-                Ok(Some(trimmed))
-            }
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(e).with_context(|| format!("reading {}", path.display())),
-    }
-}
-
-// No parent-dir fsync here (install/record.rs::atomic_write_fsync has one):
-// `active`/`original` are cache-tier session state, losing the rename on
-// power failure is acceptable — the next `apply` preflight re-captures.
+// No parent-dir fsync: `original` is cache; next try preflight re-captures.
 fn write_line_file(path: &Path, contents: &str) -> Result<()> {
     let mut tmp = path.as_os_str().to_os_string();
     tmp.push(".tmp");
@@ -324,17 +292,6 @@ mod tests {
     }
 
     #[test]
-    fn active_reads_none_when_missing_or_empty_and_writes_roundtrip() {
-        let (_t, p) = tmp_paths();
-        assert!(p.active().unwrap().is_none());
-        fs::write(p.active_file(), "").unwrap();
-        assert!(p.active().unwrap().is_none());
-        p.set_active("first").unwrap();
-        p.set_active("second").unwrap();
-        assert_eq!(p.active().unwrap().as_deref(), Some("second"));
-    }
-
-    #[test]
     fn original_none_recorded_flag_and_argv_roundtrip() {
         let (_t, p) = tmp_paths();
         assert!(!p.original_is_recorded());
@@ -361,13 +318,8 @@ mod tests {
     }
 
     #[test]
-    fn clear_active_and_original_are_idempotent() {
+    fn clear_original_is_idempotent() {
         let (_t, p) = tmp_paths();
-        p.set_active("x").unwrap();
-        p.clear_active().unwrap();
-        assert!(p.active().unwrap().is_none());
-        p.clear_active().unwrap();
-
         p.set_original(None).unwrap();
         assert!(p.original_is_recorded());
         p.clear_original().unwrap();

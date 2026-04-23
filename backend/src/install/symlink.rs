@@ -5,23 +5,17 @@
 
 use std::fs;
 use std::os::unix::fs::symlink;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{Context, Result, anyhow};
 
 use crate::catalog::RiceEntry;
 use crate::paths::expand_home;
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct SymlinkPaths {
-    pub symlink_path: PathBuf,
-    pub symlink_target: PathBuf,
-}
-
 /// Create `symlink_dst` pointing at `<clone>/<symlink_src>`. Creates
 /// parent dirs. Overwrites stale symlinks. Refuses to replace a real
-/// directory at the target (protects the user's existing config).
-pub fn create_symlink(clone_dir: &Path, entry: &RiceEntry, home: &Path) -> Result<SymlinkPaths> {
+/// directory or regular file at the target (protects user's config).
+pub fn create_symlink(clone_dir: &Path, entry: &RiceEntry, home: &Path) -> Result<()> {
     let src = clone_dir.join(&entry.symlink_src);
     let dst = expand_home(&entry.symlink_dst, home);
 
@@ -98,16 +92,12 @@ pub fn create_symlink(clone_dir: &Path, entry: &RiceEntry, home: &Path) -> Resul
         ));
     }
 
-    Ok(SymlinkPaths {
-        symlink_path: dst,
-        symlink_target: src,
-    })
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::catalog::EntryPoint;
     use tempfile::tempdir;
 
     fn mk_entry(src: &str, dst: &str) -> RiceEntry {
@@ -121,20 +111,18 @@ mod tests {
             aur_deps: vec![],
             pacman_deps: vec![],
             interactive: false,
-            entry: EntryPoint::default(),
             documented_system_effects: vec![],
         }
     }
 
     #[test]
-    fn writes_symlink_and_records_paths() {
+    fn writes_symlink_into_expanded_home() {
         let t = tempdir().unwrap();
         let home = t.path();
         let clone = home.join("clone");
         fs::create_dir_all(&clone).unwrap();
-        let paths = create_symlink(&clone, &mk_entry(".", "~/.config/qs/x"), home).unwrap();
-        assert_eq!(paths.symlink_path, home.join(".config/qs/x"));
-        assert_eq!(fs::read_link(&paths.symlink_path).unwrap(), clone);
+        create_symlink(&clone, &mk_entry(".", "~/.config/qs/x"), home).unwrap();
+        assert_eq!(fs::read_link(home.join(".config/qs/x")).unwrap(), clone);
     }
 
     #[test]

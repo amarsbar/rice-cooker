@@ -45,21 +45,11 @@ pub struct RiceEntry {
     /// install refuses (see `docs/issues/interactive-installs.md`).
     #[serde(default)]
     pub interactive: bool,
-    /// Entry point used by `apply`.
-    #[serde(default)]
-    pub entry: EntryPoint,
     /// Purely informational — shown in `list` / `status` for effects
     /// outside Rice Cooker's control (system services, root-owned
     /// configs, etc.).
     #[serde(default)]
     pub documented_system_effects: Vec<String>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct EntryPoint {
-    #[serde(default)]
-    pub path: String,
 }
 
 impl Catalog {
@@ -320,7 +310,7 @@ mod tests {
     }
 
     #[test]
-    fn round_trips_with_entry_and_deps() {
+    fn round_trips_with_deps() {
         let t = r#"
             [caelestia]
             display_name = "Caelestia"
@@ -329,12 +319,9 @@ mod tests {
             symlink_src = "."
             symlink_dst = "~/.config/quickshell/caelestia"
             aur_deps = ["caelestia-shell-git"]
-            [caelestia.entry]
-            path = "shell.qml"
         "#;
         let c = Catalog::from_str(t).unwrap();
         let e = c.get("caelestia").unwrap();
         assert_eq!(e.aur_deps, vec!["caelestia-shell-git"]);
-        assert_eq!(e.entry.path, "shell.qml");
     }
 }

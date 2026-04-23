@@ -4,7 +4,6 @@ use std::process::ExitCode;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-use rice_cooker_backend::apply::{self, ApplyParams};
 use rice_cooker_backend::catalog::Catalog;
 use rice_cooker_backend::events::EventWriter;
 use rice_cooker_backend::install::{self, Flags};
@@ -22,54 +21,24 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// Install a rice from the catalog.
-    Install { name: String },
-    /// Uninstall the currently-installed rice.
-    ///
-    /// Deletes the symlink, the clone directory at
-    /// `~/.cache/rice-cooker/rices/<name>/`, and the install record.
-    /// Any edits you made to files inside the clone are lost — copy
-    /// them out first.
+    /// Activate <name> (install + launch; evicts any currently-active rice).
+    Try { name: String },
+    /// Uninstall the active rice and replay the pre-rice shell. Clone stays
+    /// cached at `~/.cache/rice-cooker/rices/<name>/`.
     Uninstall {
         #[arg(long)]
         force: bool,
     },
-    /// Uninstall current (if any) then install <name>.
-    ///
-    /// The outgoing rice's clone at `~/.cache/rice-cooker/rices/<from>/`
-    /// is deleted along with its symlink and record — any edits you
-    /// made to files inside are lost, so copy them out first if you
-    /// need them.
-    ///
-    /// NOT atomic. If uninstall succeeds but install then fails (bad
-    /// catalog entry, network flap, dep install failure), nothing is
-    /// left installed. Re-run `install <name>` once the underlying
-    /// failure is addressed.
-    Switch {
-        name: String,
-        #[arg(long)]
-        force: bool,
-    },
-    /// List catalog entries; marks the installed one.
+    /// List catalog entries (JSON).
     List,
-    /// Print details about the currently-installed rice.
+    /// Print the active rice's install record (JSON).
     Status,
-    /// v1 preview: clone + launch a rice in-session; `exit` restores.
-    Apply {
-        #[arg(long)]
-        name: String,
-        #[arg(long)]
-        repo: String,
-        #[arg(long, default_value = "shell.qml")]
-        entry: String,
-    },
-    /// v1 preview: kill the active rice; restore pre-apply shell.
-    Exit,
 }
 
 fn main() -> ExitCode {
     match run() {
-        Ok(()) => ExitCode::SUCCESS,
+        Ok(true) => ExitCode::SUCCESS,
+        Ok(false) => ExitCode::from(1), // Fail event already on stdout
         Err(e) => {
             eprintln!("rice-cooker: {e:#}");
             ExitCode::from(1)
@@ -77,84 +46,37 @@ fn main() -> ExitCode {
     }
 }
 
-fn run() -> Result<()> {
+fn run() -> Result<bool> {
     let cli = Cli::parse();
     let paths = Paths::from_env()?;
-    let flags = Flags { force: false };
     match &cli.cmd {
-        Cmd::Install { name } => {
+        Cmd::Try { name } => {
             let cat = Catalog::from_file(&catalog_path(&paths, cli.catalog.as_deref())?)?;
-            let out = install::install(&cat, &paths, name, flags)?;
-            println!("installed: {}", out.name);
-            if !out.pacman_diff.added_explicit.is_empty() {
-                println!(
-                    "pacman: added {} explicit: {:?}",
-                    out.pacman_diff.added_explicit.len(),
-                    out.pacman_diff.added_explicit
-                );
-            }
+            let stdout = std::io::stdout();
+            let mut lock = stdout.lock();
+            let mut events = EventWriter::new(&mut lock);
+            install::run_try(&cat, &paths, name, &mut events)
         }
         Cmd::Uninstall { force } => {
-            let mut f = flags;
-            f.force = *force;
-            let out = install::uninstall(&paths, f)?;
-            println!("uninstalled: {}", out.name);
-        }
-        Cmd::Switch { name, force } => {
-            let cat = Catalog::from_file(&catalog_path(&paths, cli.catalog.as_deref())?)?;
-            let mut f = flags;
-            f.force = *force;
-            let out = install::switch(&cat, &paths, name, f)?;
-            println!("switched: {} -> {}", out.from, out.to);
+            let stdout = std::io::stdout();
+            let mut lock = stdout.lock();
+            let mut events = EventWriter::new(&mut lock);
+            install::run_uninstall(&paths, Flags { force: *force }, &mut events)
         }
         Cmd::List => {
             let cat = Catalog::from_file(&catalog_path(&paths, cli.catalog.as_deref())?)?;
-            for row in install::list(&cat, &paths)? {
-                let marker = if row.installed { "*" } else { " " };
-                print!("{marker} {:<24} {}", row.name, row.display_name);
-                if !row.description.is_empty() {
-                    print!(" — {}", row.description);
-                }
-                println!();
-                for eff in &row.documented_system_effects {
-                    println!("    ! {eff}");
-                }
-            }
+            let rows = install::list(&cat, &paths)?;
+            serde_json::to_writer_pretty(std::io::stdout(), &rows)?;
+            println!();
+            Ok(true)
         }
         Cmd::Status => {
             let row = install::status(&paths)?;
-            match row.installed {
-                Some(r) => {
-                    println!("name:         {}", r.name);
-                    println!("installed_at: {}", r.installed_at);
-                    println!("commit:       {}", r.commit);
-                    println!(
-                        "symlink:      {} -> {}",
-                        r.symlink_path.display(),
-                        r.symlink_target.display()
-                    );
-                    if !r.pacman_diff.added_explicit.is_empty() {
-                        println!("pacman:       +{:?}", r.pacman_diff.added_explicit);
-                    }
-                }
-                None => println!("nothing installed"),
-            }
-        }
-        Cmd::Apply { name, repo, entry } => {
-            let stdout = std::io::stdout();
-            let mut lock = stdout.lock();
-            let mut events = EventWriter::new(&mut lock);
-            let params = ApplyParams { name, repo, entry };
-            apply::run_apply(&paths, &params, &mut events)?;
-        }
-        Cmd::Exit => {
-            let stdout = std::io::stdout();
-            let mut lock = stdout.lock();
-            let mut events = EventWriter::new(&mut lock);
-            apply::run_exit(&paths, &mut events)?;
+            serde_json::to_writer_pretty(std::io::stdout(), &row)?;
+            println!();
+            Ok(true)
         }
     }
-    Ok(())
 }
 
 /// Resolve the catalog location in preference order:

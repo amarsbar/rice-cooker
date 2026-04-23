@@ -50,11 +50,16 @@ pub enum Event {
 #[serde(rename_all = "snake_case")]
 pub enum Step {
     Preflight,
+    Evict,
     Clone,
+    Deps,
+    Symlink,
+    Record,
     Notifiers,
     KillQuickshell,
     Launch,
     Verify,
+    Replay,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -74,9 +79,24 @@ mod tests {
             (
                 Event::Hello {
                     version: 1,
-                    subcommand: "apply".into(),
+                    subcommand: "try".into(),
                 },
-                r#"{"type":"hello","version":1,"subcommand":"apply"}"#,
+                r#"{"type":"hello","version":1,"subcommand":"try"}"#,
+            ),
+            // Pin every Step wire form.
+            (
+                Event::Step {
+                    step: Step::Preflight,
+                    state: StepState::Start,
+                },
+                r#"{"type":"step","step":"preflight","state":"start"}"#,
+            ),
+            (
+                Event::Step {
+                    step: Step::Evict,
+                    state: StepState::Done,
+                },
+                r#"{"type":"step","step":"evict","state":"done"}"#,
             ),
             (
                 Event::Step {
@@ -85,8 +105,63 @@ mod tests {
                 },
                 r#"{"type":"step","step":"clone","state":"start"}"#,
             ),
-            // Success omits None on serialize and reconstructs it on deserialize
-            // via #[serde(default)] — pins both halves of the contract.
+            (
+                Event::Step {
+                    step: Step::Deps,
+                    state: StepState::Done,
+                },
+                r#"{"type":"step","step":"deps","state":"done"}"#,
+            ),
+            (
+                Event::Step {
+                    step: Step::Symlink,
+                    state: StepState::Start,
+                },
+                r#"{"type":"step","step":"symlink","state":"start"}"#,
+            ),
+            (
+                Event::Step {
+                    step: Step::Record,
+                    state: StepState::Done,
+                },
+                r#"{"type":"step","step":"record","state":"done"}"#,
+            ),
+            (
+                Event::Step {
+                    step: Step::Notifiers,
+                    state: StepState::Start,
+                },
+                r#"{"type":"step","step":"notifiers","state":"start"}"#,
+            ),
+            (
+                Event::Step {
+                    step: Step::KillQuickshell,
+                    state: StepState::Done,
+                },
+                r#"{"type":"step","step":"kill_quickshell","state":"done"}"#,
+            ),
+            (
+                Event::Step {
+                    step: Step::Launch,
+                    state: StepState::Start,
+                },
+                r#"{"type":"step","step":"launch","state":"start"}"#,
+            ),
+            (
+                Event::Step {
+                    step: Step::Verify,
+                    state: StepState::Done,
+                },
+                r#"{"type":"step","step":"verify","state":"done"}"#,
+            ),
+            (
+                Event::Step {
+                    step: Step::Replay,
+                    state: StepState::Start,
+                },
+                r#"{"type":"step","step":"replay","state":"start"}"#,
+            ),
+            // Success omits None on serialize and reconstructs it via #[serde(default)].
             (
                 Event::Success {
                     active: Some("x".into()),
