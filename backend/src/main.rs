@@ -30,6 +30,11 @@ enum Cmd {
         dry_run: bool,
     },
     /// Uninstall the currently-installed rice.
+    ///
+    /// Deletes the symlink, the clone directory at
+    /// `~/.cache/rice-cooker/rices/<name>/`, and the install record.
+    /// Any edits you made to files inside the clone are lost — copy
+    /// them out first. `--dry-run` prints the plan without acting.
     Uninstall {
         #[arg(long)]
         dry_run: bool,
@@ -37,6 +42,11 @@ enum Cmd {
         force: bool,
     },
     /// Uninstall current (if any) then install <name>.
+    ///
+    /// The outgoing rice's clone at `~/.cache/rice-cooker/rices/<from>/`
+    /// is deleted along with its symlink and record — any edits you
+    /// made to files inside are lost, so copy them out first if you
+    /// need them.
     ///
     /// NOT atomic. If uninstall succeeds but install then fails (bad
     /// catalog entry, network flap, dep install failure), nothing is

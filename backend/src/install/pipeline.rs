@@ -184,6 +184,11 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
 
     if flags.dry_run {
         println!("would remove symlink {}", record.symlink_path.display());
+        let clone = dirs.clone_dir(&name);
+        println!(
+            "would remove clone {} (any edits to files inside will be lost — copy them out first)",
+            clone.display()
+        );
         println!(
             "would remove packages: {}",
             record.pacman_diff.added_explicit.join(" ")
