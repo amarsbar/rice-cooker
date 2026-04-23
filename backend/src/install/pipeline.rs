@@ -129,18 +129,14 @@ pub fn run_try<W: Write>(
     step(events, Step::Preflight, StepState::Done)?;
 
     if current.as_deref() == Some(name) {
+        // current.json can be stale (crash, manual kill) — only short-circuit
+        // if the process is actually running; otherwise fall through and launch.
         let alive = try_stage!(events, "liveness", process::rice_shell_alive(name));
         if alive {
-            let record_path = try_stage!(events, "liveness", paths.record_json(name));
-            let record = try_stage!(events, "liveness", "load_record", load_record(&record_path));
-            let same_commit = record.commit.starts_with(&entry.commit)
-                || entry.commit.starts_with(&record.commit);
-            if same_commit {
-                events.emit(&Event::Success {
-                    active: Some(name.to_string()),
-                })?;
-                return Ok(true);
-            }
+            events.emit(&Event::Success {
+                active: Some(name.to_string()),
+            })?;
+            return Ok(true);
         }
     }
 
