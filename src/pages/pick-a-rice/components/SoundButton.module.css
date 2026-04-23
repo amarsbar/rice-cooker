@@ -1,29 +1,27 @@
-/* Outer ellipse ring (168:6744) — 40 × 40 */
+/* Outer ring (350:6572) — 40 × 40 teal circle outline. */
 .ring {
   position: absolute;
+  left: 507px;
+  top: 287px;
   width: 40px;
   height: 40px;
+  pointer-events: none;
 }
 
-.ring > img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-}
-
-/* Inner teal circle (168:6745) — 37.377 × 37.377, teal bg, fully rounded */
+/* Inner teal circle (350:6573) — 37.377 × 37.377, offset 1.31px from ring
+   so the stroke sits cleanly around it. */
 .inner {
   position: absolute;
+  left: 508.31px;
+  top: 288.31px;
   width: 37.377px;
   height: 37.377px;
   background: var(--color-teal);
-  border-radius: 158.333px;
+  border-radius: 50%;
   overflow: hidden;
 }
 
-/* Sound icon (168:6746) — 20 × 20 centered inside .inner */
+/* Speaker icon — 20 × 20 centered inside the teal disc. */
 .icon {
   position: absolute;
   left: 50%;

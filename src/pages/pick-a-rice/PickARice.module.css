@@ -1,7 +1,7 @@
-/* Exact Figma frame size: 614.4066 × 597.4066 */
+/* Matches the Figma frame 350:6482 — 599.999 × 537.001 */
 .stage {
   position: relative;
-  width: 614.4066px;
-  height: 597.4066px;
+  width: 599.999px;
+  height: 537.001px;
   margin: 0 auto;
 }

@@ -1,18 +1,14 @@
-import { motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 import styles from './RiceCard.module.css';
-import { MORPH_TRANSITION, POSITIONS, useView } from '../view';
+import cardBg from '@/assets/figma/card-bg.png';
 
+/** Figma node 350:6484 — 500 × 440 black card with a 9px mint stroke and a
+ *  full-bleed background image (350:6485) clipped to the rounded rectangle. */
 export function RiceCard({ children }: { children: ReactNode }) {
-  const view = useView();
   return (
-    <motion.div
-      className={styles.card}
-      initial={false}
-      animate={POSITIONS[view].card}
-      transition={MORPH_TRANSITION}
-    >
+    <div className={styles.card}>
+      <img src={cardBg} alt="" className={styles.bg} />
       {children}
-    </motion.div>
+    </div>
   );
 }

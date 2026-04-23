@@ -2,29 +2,36 @@
   /* Colors from Figma */
   --color-card-bg: #000001;
   --color-mint: #dfecdb;
-  --color-yellow: #ffc501;
+  --color-mint-deep: #c7d8bf;
+  --color-yellow: #fade26;
   --color-teal: #4b837d;
   --color-cream: #fdfdf1;
-  --color-pink: #ff99a9;
-  --color-mauve: #917c89;
-  --color-pill-text: #feffff;
+  --color-creator-grid: #f0ede9;
+  --color-creator-text: #3f3833;
+  --color-orange: #fe6a00;
+  --color-drop-green: #b9f018;
+  --color-drop-yellow-green: #e8ff76;
+  --color-drop-dot: #6a9a79;
+  --color-frame: #3b353b;
+  --color-frame-inner: #1a1419;
+  --color-peek: #d9d9d9;
+  --color-pill-text: #f8feff;
   --color-counter-text: #000001;
 
-  /* Card dimensions — sizes vary per view and live in view.tsx POSITIONS. */
+  /* Card dimensions */
   --card-radius: 32px;
   --card-border-width: 9px;
 
   /* Preview dimensions */
-  --preview-radius-top: 9.683px;
-  --preview-radius-bottom: 6.899px;
-  --preview-dashed-radius: 12px;
-
-  /* Header */
-  --header-height: 48px;
+  --preview-outer-radius: 11.965px;
+  --preview-inner-radius: 9.655px;
+  --preview-image-radius: 8.36px;
 
   /* Fonts */
   --font-display: 'Madimi One', sans-serif;
+  --font-pill: 'Capriola', sans-serif;
   --fs-title: 24px;
-  --fs-counter: 15px;
-  --fs-pill: 13px;
+  --fs-letter: 15px;
+  --fs-pill: 14px;
+  --fs-tag: 27.65px;
 }

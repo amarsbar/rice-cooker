@@ -1,30 +1,17 @@
-import { motion } from 'framer-motion';
 import styles from './SoundButton.module.css';
-import soundBgSvg from '@/assets/figma/sound-bg.svg';
+import soundRingSvg from '@/assets/figma/sound-ring.svg';
 import soundIconSvg from '@/assets/figma/sound-icon.svg';
-import { MORPH_TRANSITION, POSITIONS, useView } from '../view';
 
-/** Figma node 168:6743 / 168:6842 — teal speaker sitting inside the green tab. */
+/** Figma group 350:6571 — teal speaker sitting inside the green tab. A thin
+ *  teal ring (350:6572) wraps a filled teal circle (350:6573) with the
+ *  low-volume icon centered inside. */
 export function SoundButton() {
-  const view = useView();
   return (
     <>
-      <motion.div
-        className={styles.ring}
-        initial={false}
-        animate={POSITIONS[view].soundRing}
-        transition={MORPH_TRANSITION}
-      >
-        <img src={soundBgSvg} alt="" />
-      </motion.div>
-      <motion.div
-        className={styles.inner}
-        initial={false}
-        animate={POSITIONS[view].soundInner}
-        transition={MORPH_TRANSITION}
-      >
+      <img src={soundRingSvg} alt="" className={styles.ring} />
+      <div className={styles.inner}>
         <img src={soundIconSvg} alt="" className={styles.icon} />
-      </motion.div>
+      </div>
     </>
   );
 }

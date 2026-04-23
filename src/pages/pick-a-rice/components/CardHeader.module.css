@@ -1,82 +1,57 @@
-/* Logo (Figma 168:7238) — 37.818 × 24 at (18, 10). The SVG bleeds slightly
-   past the container via the inset-negative bleed div. */
+/* Logo (350:6545) — 37.78 × 24 at (17, 13). */
 .logo {
   position: absolute;
-  left: 18px;
-  top: 10px;
-  width: 37.818px;
+  left: 17px;
+  top: 13px;
+  width: 37.78px;
   height: 24px;
 }
 
-.logoBleed {
+/* Menu dots (350:6543) — 20 × 20 at (459, 25). */
+.menu {
   position: absolute;
-  inset: -6.43% -2% -6.43% -2.54%;
+  left: 459px;
+  top: 25px;
+  width: 19.999px;
+  height: 19.999px;
 }
 
-.logoBleed > img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  max-width: none;
+/* "PICK A RICE" letter pills (350:6549) — flex row with three clusters. */
+.letters {
+  position: absolute;
+  left: 174px;
+  top: 22px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
 }
 
-/* "Pick a rice" title (168:7241) — centered horizontally, top 6px, 24px Madimi One, yellow */
-.title {
-  position: absolute;
-  left: 50%;
-  top: 6px;
-  transform: translateX(-50%);
-  font-family: var(--font-display);
-  font-size: var(--fs-title);
-  font-weight: 400;
-  color: var(--color-yellow);
-  line-height: normal;
-  text-align: center;
-  white-space: nowrap;
+/* Each cluster offsets its right edge by the 4px letters overlap so groups
+   sit flush. See 350:6550/6559/6562 (content-stretch + pr-[4px]). */
+.cluster {
+  display: flex;
+  align-items: center;
+  padding-right: 4px;
+  flex-shrink: 0;
 }
 
-/* Counter pills (168:7242, 7244, 7246) — 18.565 wide, yellow bg, fully rounded, black text */
-.pill {
-  position: absolute;
-  top: 10px;
+/* Individual letter pill (350:6551 et al.) — 18.565px wide, 2.561px padding,
+   yellow bg, fully rounded, 15px Madimi One black text. -4px right margin
+   creates the intra-cluster overlap. */
+.letter {
   width: 18.565px;
+  margin-right: -4px;
   padding: 2.561px;
   background: var(--color-yellow);
   border-radius: 237.773px;
+  flex-shrink: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-}
-
-.pill > p {
   font-family: var(--font-display);
-  font-size: var(--fs-counter);
+  font-size: var(--fs-letter);
   font-weight: 400;
   color: var(--color-counter-text);
   line-height: normal;
   text-align: center;
-  width: 100%;
-  flex-shrink: 0;
-}
-
-.pillStep {
-  left: 424px;
-}
-
-.pillSlash {
-  left: 436.8px;
-}
-
-.pillTotal {
-  left: 451.43px;
-}
-
-/* Dotted divider (168:7248) — 452 × 4 at (18, 42) */
-.divider {
-  position: absolute;
-  left: 18px;
-  top: 42px;
-  width: 452px;
-  height: 4px;
 }

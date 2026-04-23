@@ -59,8 +59,8 @@ async function injectCompositorRules(): Promise<void> {
 
 function createWindow(): void {
   const win = new BrowserWindow({
-    width: 615,
-    height: 598,
+    width: 600,
+    height: 537,
     title: APP_TITLE,
     transparent: true,
     frame: false,
@@ -84,29 +84,12 @@ function createWindow(): void {
   if (captureOut) {
     /** Time for fonts + large images to load and the initial layout to paint. */
     const INITIAL_SETTLE_MS = 1500;
-    /** Covers the full picking → preview sequence: 500ms morph + ~1s radial
-     *  cascade + buffer. Should stay >= the sum of constants in view.tsx. */
-    const ANIMATION_SETTLE_MS = 1800;
 
     win.webContents.once('did-finish-load', async () => {
       const { writeFile } = await import('node:fs/promises');
       await new Promise((r) => setTimeout(r, INITIAL_SETTLE_MS));
-      const pickingImg = await win.webContents.capturePage();
-      await writeFile(captureOut.replace(/\.png$/, '') + '-picking.png', pickingImg.toPNG());
-
-      if (process.env['RICE_CAPTURE_BOTH']) {
-        const clicked = await win.webContents.executeJavaScript(
-          '(() => { const el = document.querySelector("[class*=stage]"); if (!el) return false; el.click(); return true; })()'
-        );
-        if (!clicked) {
-          console.warn('[rice-cooker] capture: stage element not found, skipping preview shot');
-        } else {
-          await new Promise((r) => setTimeout(r, ANIMATION_SETTLE_MS));
-          const previewImg = await win.webContents.capturePage();
-          await writeFile(captureOut.replace(/\.png$/, '') + '-preview.png', previewImg.toPNG());
-        }
-      }
-
+      const img = await win.webContents.capturePage();
+      await writeFile(captureOut, img.toPNG());
       app.exit(0);
     });
   }

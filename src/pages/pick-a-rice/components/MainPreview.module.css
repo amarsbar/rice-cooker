@@ -1,0 +1,186 @@
+/* Outer frame (350:6513) — 453 × 263 at (25, 97.02), dark-grey bg. */
+.outer {
+  position: absolute;
+  left: 25px;
+  top: 97.02px;
+  width: 453px;
+  height: 263px;
+  background: var(--color-frame);
+  border-radius: var(--preview-outer-radius);
+}
+
+/* Inner clipping container (350:6514) — 441 × 251 at (31, 103.02) sitting
+   6px inside the outer. Clips the theme screenshot to rounded corners. */
+.inner {
+  position: absolute;
+  left: 31px;
+  top: 103.02px;
+  width: 441px;
+  height: 251px;
+  background: var(--color-frame-inner);
+  border-radius: var(--preview-inner-radius);
+  overflow: hidden;
+}
+
+/* Theme screenshot (350:6515) — 429 × 241, centered inside .inner (+1px
+   horizontal bias from Figma), top 5px. */
+.image {
+  position: absolute;
+  left: calc(50% + 1px);
+  top: 5px;
+  width: 429px;
+  height: 241px;
+  transform: translateX(-50%);
+  border-radius: var(--preview-image-radius);
+  object-fit: cover;
+  pointer-events: none;
+}
+
+/* Frame-corner flourishes (350:6516/6519/6522/6525) — 31.951 × 22.411 each,
+   dark-grey paw/leaf sprites mirrored into the four corners. */
+.corner {
+  position: absolute;
+  width: 31.951px;
+  height: 22.411px;
+  pointer-events: none;
+}
+
+.cornerTr {
+  left: 446px;
+  top: 81.16px;
+}
+
+.cornerTl {
+  left: 25px;
+  top: 81.16px;
+  transform: scaleX(-1);
+}
+
+.cornerBr {
+  left: 446px;
+  top: 353px;
+  transform: scaleY(-1);
+}
+
+.cornerBl {
+  left: 25px;
+  top: 353px;
+  transform: scale(-1, -1);
+}
+
+/* Pills (350:6534 top / 350:6536 bottom) — centered horizontally with a
+   +1px bias, 30px tall, 12px horizontal padding, fully rounded. */
+.pill {
+  position: absolute;
+  left: calc(50% + 1px);
+  transform: translateX(-50%);
+  height: 30px;
+  padding: 0 12px;
+  background: var(--color-frame);
+  border-radius: 55.556px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pill > p {
+  font-family: var(--font-pill);
+  font-size: var(--fs-pill);
+  font-weight: 400;
+  color: var(--color-pill-text);
+  line-height: normal;
+  text-align: center;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
+}
+
+.pillTop {
+  top: 73px;
+}
+
+.pillBottom {
+  top: 354px;
+}
+
+/* Carousel arrow buttons (350:6528 right / 350:6531 left) — 24 × 24 dark
+   circles flanking the frame at vertical center. Left one is shifted a few
+   pixels off the frame for symmetry with the right. */
+.arrowButton {
+  position: absolute;
+  top: 216.02px;
+  width: 24px;
+  height: 24px;
+  background: var(--color-frame);
+  border: none;
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-pill-text);
+  overflow: hidden;
+}
+
+.arrowButtonLeft {
+  left: 14px;
+}
+
+.arrowButtonRight {
+  left: 463px;
+}
+
+/* Arrow glyph — 8.2 × 5.64 mask of the eva:arrow-up icon, rotated to face
+   left/right. currentColor on the parent controls the fill. */
+.arrow {
+  display: block;
+  width: 8.205px;
+  height: 5.641px;
+  background-color: currentColor;
+  -webkit-mask-image: url('../../../assets/figma/arrow.svg');
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-image: url('../../../assets/figma/arrow.svg');
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+}
+
+.arrowLeft {
+  transform: rotate(-90deg);
+}
+
+.arrowRight {
+  transform: rotate(90deg);
+}
+
+/* Page-indicator dots (350:6538-6541) — 10 × 10 dark circles flanking the
+   top and bottom pills. */
+.dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: var(--color-frame);
+  border-radius: 50%;
+}
+
+.dotTl {
+  left: 189px;
+  top: 90px;
+}
+
+.dotTr {
+  left: 301px;
+  top: 90px;
+}
+
+.dotBl {
+  left: 180px;
+  top: 356px;
+}
+
+.dotBr {
+  left: 312px;
+  top: 356px;
+}

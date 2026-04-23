@@ -1,9 +1,0 @@
-/* Positioned so the 735 × 544 pattern is centered on the 614.4 × 597.4 stage.
-   Overhangs the left/right edges by ~60 px; the radial fade already makes
-   those dots invisible, so the overhang is harmless. */
-.dots {
-  position: absolute;
-  left: -60.3px;
-  top: 26.7px;
-  pointer-events: none;
-}
