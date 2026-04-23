@@ -51,7 +51,6 @@ pub struct ApplyParams<'a> {
     /// Path to the rice's `shell.qml` relative to the repo root, as declared by the
     /// curated catalog. Defaults to `"shell.qml"` from the CLI.
     pub entry: &'a str,
-    pub dry_run: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -118,14 +117,6 @@ pub fn run_apply<W: Write>(
         }
     };
 
-    if params.dry_run {
-        events.emit(&Event::Success {
-            active: None,
-            dry_run: true,
-        })?;
-        return Ok(true);
-    }
-
     if !wet_pipeline(&rice_dir, &entry_rel, &log_file, events)? {
         return Ok(false);
     }
@@ -141,7 +132,6 @@ pub fn run_apply<W: Write>(
     );
     events.emit(&Event::Success {
         active: Some(params.name.to_string()),
-        dry_run: false,
     })?;
     Ok(true)
 }
@@ -154,20 +144,37 @@ pub fn run_exit<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<
         None => return Ok(false),
     };
 
+    // Read + validate the replay record BEFORE killing the active shell.
+    // If cwd wasn't captured we can't safely replay (relative `-p` paths
+    // would load the wrong shell.qml from the backend's own cwd), and
+    // killing the user's existing shell only to then fail leaves them
+    // with nothing running. Validate first, kill second.
+    let original = try_stage!(events, "commit", "read_original", cache.original());
+    let replay = match original {
+        Some(shell) => {
+            if shell.argv.is_empty() {
+                emit_fail(events, "launch", "argv_missing", None, None)?;
+                return Ok(false);
+            }
+            match shell.cwd.as_deref() {
+                Some(c) => Some((shell.argv.clone(), PathBuf::from(c))),
+                None => {
+                    emit_fail(events, "launch", "cwd_missing", None, None)?;
+                    return Ok(false);
+                }
+            }
+        }
+        None => None,
+    };
+
     step(events, Step::KillQuickshell, StepState::Start)?;
     try_stage!(events, "kill_quickshell", process::kill_quickshell());
     step(events, Step::KillQuickshell, StepState::Done)?;
 
-    let original = try_stage!(events, "commit", "read_original", cache.original());
-    if let Some(shell) = original {
-        let cwd = shell
-            .cwd
-            .as_deref()
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from("."));
+    if let Some((argv, cwd)) = replay {
         let log_file = cache.last_run_log();
         step(events, Step::Launch, StepState::Start)?;
-        if let Err(e) = process::launch_argv(&shell.argv, &cwd, &log_file) {
+        if let Err(e) = process::launch_argv(&argv, &cwd, &log_file) {
             let tail = read_tail(&log_file);
             emit_fail(events, "launch", &format!("{e:#}"), None, Some(tail))?;
             return Ok(false);
@@ -175,11 +182,12 @@ pub fn run_exit<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<
         step(events, Step::Launch, StepState::Done)?;
     }
 
-    try_stage!(events, "commit", "clear", cache.clear_active());
-    events.emit(&Event::Success {
-        active: None,
-        dry_run: false,
-    })?;
+    try_stage!(events, "commit", "clear_active", cache.clear_active());
+    // Drop the stale `original` record too: exit has relaunched the pre-rice shell,
+    // so on the next `apply`, preflight should re-capture whatever is currently
+    // running rather than inheriting what we captured on the previous apply.
+    try_stage!(events, "commit", "clear_original", cache.clear_original());
+    events.emit(&Event::Success { active: None })?;
     Ok(true)
 }
 
@@ -230,7 +238,12 @@ fn acquire_lock<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<
             emit_fail(events, "lock", "already_held", None, None)?;
             Ok(None)
         }
-        Err(LockError::Io(e)) => Err(e.into()),
+        // Matches the try_stage! contract: after `hello` is emitted, any failure
+        // must surface through a Fail event and exit code 1 — never bare exit 2.
+        Err(LockError::Io(e)) => {
+            emit_fail(events, "lock", "io", None, Some(format!("{e:#}")))?;
+            Ok(None)
+        }
     }
 }
 
@@ -347,7 +360,18 @@ fn wet_pipeline<W: Write>(
     step(events, Step::Launch, StepState::Done)?;
 
     step(events, Step::Verify, StepState::Start)?;
-    match process::verify(rice_dir, entry_rel, log_file)? {
+    // Match explicitly instead of `?`-propagating: after emitting
+    // `Step::Verify Start`, any Err from `verify()` (e.g., pgrep syntax error)
+    // must surface as a Fail event with exit code 1, not bare exit 2.
+    let verify_result = match process::verify(rice_dir, entry_rel, log_file) {
+        Ok(r) => r,
+        Err(e) => {
+            let tail = read_tail(log_file);
+            emit_fail(events, "verify", &format!("{e:#}"), None, Some(tail))?;
+            return Ok(false);
+        }
+    };
+    match verify_result {
         VerifyResult::Ok => {
             step(events, Step::Verify, StepState::Done)?;
             Ok(true)

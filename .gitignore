@@ -8,3 +8,5 @@ dist
 .env
 .env.local
 backend/target
+backend/screenshots/
+.claude/

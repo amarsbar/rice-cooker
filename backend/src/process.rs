@@ -9,7 +9,16 @@ use anyhow::{Context, Result, anyhow};
 const NOTIFIERS: &[&str] = &["dunst", "mako", "swaync"];
 const KILL_POLL_MS: u64 = 50;
 const KILL_WAIT_MS: u64 = 500;
-const VERIFY_WAIT_MS: u64 = 300;
+// Observed rendering timings on a fast laptop (eDP-1 Hyprland):
+//   dms / linux-retroism: <1s to first layer
+//   noctalia:             ~3s to first layer (Hyprland IPC discovery,
+//                         wallpaper pipeline init, I18n load, etc)
+// We verify by polling hyprctl layers / log ERROR / process-alive in a
+// loop up to the timeout. Fast rices return in one iteration; slow
+// rices get enough runway. Setting the poll interval low keeps
+// happy-path rice switches snappy.
+const VERIFY_POLL_MS: u64 = 250;
+const VERIFY_TIMEOUT_MS: u64 = 5000;
 const LOG_TAIL_LINES: usize = 20;
 
 // Match both `quickshell` and its `qs` symlink (shipped by the same package), with
@@ -89,6 +98,28 @@ fn pgrep_matches(args: &[&str]) -> Result<bool> {
     }
 }
 
+/// Return the PIDs matched by `pgrep <args>`. Empty vec on no match; Err on
+/// syntax / fatal. Shared exit-code discipline with `pgrep_matches`.
+fn pgrep_pids(args: &[&str]) -> Result<Vec<u32>> {
+    let out = Command::new("pgrep")
+        .args(args)
+        .stderr(Stdio::null())
+        .output()
+        .context("spawning pgrep")?;
+    match out.status.code() {
+        Some(0) => {
+            let pids: Vec<u32> = String::from_utf8_lossy(&out.stdout)
+                .lines()
+                .filter_map(|l| l.trim().parse::<u32>().ok())
+                .collect();
+            Ok(pids)
+        }
+        Some(1) => Ok(Vec::new()),
+        Some(c) => Err(anyhow!("pgrep {:?} failed with exit code {}", args, c)),
+        None => Err(anyhow!("pgrep {:?} terminated by signal", args)),
+    }
+}
+
 pub fn launch_detached(rice_dir: &Path, entry_rel: &Path, log_file: &Path) -> Result<()> {
     let argv = vec![
         "quickshell".to_string(),
@@ -134,26 +165,142 @@ pub enum VerifyResult {
 }
 
 pub fn verify(rice_dir: &Path, entry_rel: &Path, log_file: &Path) -> Result<VerifyResult> {
-    thread::sleep(Duration::from_millis(VERIFY_WAIT_MS));
     let pat = quickshell_cmdline_pattern(entry_rel);
-    let alive = pgrep_matches(&["-xf", &pat])?;
-    if alive {
-        return Ok(VerifyResult::Ok);
-    }
-    // Quickshell writes its authoritative startup log to
-    // `$XDG_RUNTIME_DIR/quickshell/by-id/<id>/log.log`, NOT to stderr — the
-    // stderr file we redirect into via `setsid` is empty for the important
-    // cases (missing QML module, parse error, etc). Prefer the runtime log
-    // when we can find one matching our entry path, and fall back to our
-    // stderr capture if not.
     let entry_abs = rice_dir.join(entry_rel);
-    let log_contents = find_quickshell_runtime_log(&entry_abs)
-        .and_then(|p| fs::read_to_string(&p).ok())
-        .or_else(|| fs::read_to_string(log_file).ok())
-        .unwrap_or_else(|| format!("<no log content for {}>", entry_abs.display()));
-    Ok(VerifyResult::Dead {
-        log_tail: tail_lines(&log_contents, LOG_TAIL_LINES),
-    })
+    let deadline = std::time::Instant::now() + Duration::from_millis(VERIFY_TIMEOUT_MS);
+    // Some(true) returns Ok immediately, so a deadline firing means
+    // we saw only Some(false) and/or None during the whole window.
+    // Track Some(false) explicitly; None is treated as a transient
+    // "hyprctl didn't answer" that doesn't rescue a negative run.
+    let mut hypr_ever_said_no = false;
+
+    // Poll loop. First signal wins; on timeout we decide based on what
+    // hyprctl was saying over the whole window.
+    loop {
+        thread::sleep(Duration::from_millis(VERIFY_POLL_MS));
+
+        // pgrep failures (syntax error, EPERM on /proc, etc.) must not
+        // be silently collapsed to "process dead" — that would hide
+        // real environment problems as false qs_exited failures.
+        let pids = pgrep_pids(&["-xf", &pat])?;
+        let alive = !pids.is_empty();
+
+        // Prefer the per-launch log_file; fall back to quickshell's
+        // runtime log only if ours is missing or empty. The runtime log
+        // path can match a previous run of the same config and leak
+        // stale ERROR lines into this verify window.
+        let log_contents = fs::read_to_string(log_file)
+            .ok()
+            .filter(|s| !s.is_empty())
+            .or_else(|| {
+                find_quickshell_runtime_log(&entry_abs).and_then(|p| fs::read_to_string(&p).ok())
+            })
+            .unwrap_or_default();
+
+        // Process died → Dead.
+        if !alive {
+            return Ok(VerifyResult::Dead {
+                log_tail: tail_lines_or_placeholder(&log_contents, &entry_abs),
+            });
+        }
+        // Log says "Failed to load configuration" → Dead. This is the
+        // specific marker quickshell emits when top-level QML load fails;
+        // the "caused by" chain follows it. We deliberately do NOT match
+        // on "ERROR:" alone — quickshell emits that prefix for
+        // Qt-deprecation notices and non-fatal runtime errors (e.g.
+        // `ERROR: qs:@... should be coerced to void`) that don't stop
+        // the shell from rendering.
+        if log_contents.contains("Failed to load configuration") {
+            return Ok(VerifyResult::Dead {
+                log_tail: tail_lines_or_placeholder(&log_contents, &entry_abs),
+            });
+        }
+        // Compositor check. Some(true) = definitively rendering;
+        // Some(false) = hyprctl answered "no layers for this PID" —
+        // keep polling (layers may appear later); None = hyprctl
+        // unavailable / no answer this poll (treated as transient).
+        match hyprland_owns_layers(&pids) {
+            Some(true) => return Ok(VerifyResult::Ok),
+            Some(false) => hypr_ever_said_no = true,
+            None => {}
+        }
+
+        if std::time::Instant::now() >= deadline {
+            // Time's up. Re-check liveness one last time: the `alive`
+            // sample above is up to VERIFY_POLL_MS stale, and the
+            // expensive hyprctl path can make it older still. A shell
+            // that crashed during the last poll window should be
+            // reported Dead, not Ok.
+            if !pgrep_matches(&["-xf", &pat])? {
+                return Ok(VerifyResult::Dead {
+                    log_tail: tail_lines_or_placeholder(&log_contents, &entry_abs),
+                });
+            }
+            // If hyprctl ever said "no layers" and we never saw
+            // Some(true) (otherwise we'd have returned early), the
+            // shell is up but not rendering → Dead. A run with only
+            // None responses (hyprctl unavailable / non-Hyprland
+            // compositor) leaves hypr_ever_said_no false and falls
+            // back to alive + log-clean = Ok.
+            if hypr_ever_said_no {
+                let base_tail = tail_lines_or_placeholder(&log_contents, &entry_abs);
+                let msg = format!(
+                    "{base_tail}\n<rice-cooker: shell alive + log-clean but created 0 layer-shell surfaces in {}ms — the rice likely needs a runtime dep (wallpaper path, dbus service, specific env) that isn't present>",
+                    VERIFY_TIMEOUT_MS
+                );
+                return Ok(VerifyResult::Dead { log_tail: msg });
+            }
+            return Ok(VerifyResult::Ok);
+        }
+    }
+}
+
+fn tail_lines_or_placeholder(log: &str, entry_abs: &Path) -> String {
+    if log.is_empty() {
+        format!("<no log content for {}>", entry_abs.display())
+    } else {
+        tail_lines(log, LOG_TAIL_LINES)
+    }
+}
+
+/// Return `Some(true)` if Hyprland's layer-shell list contains any surface
+/// owned by one of the given PIDs. `Some(false)` if Hyprland answered
+/// definitively that none of those PIDs own a layer. `None` if we
+/// couldn't ask (hyprctl not on PATH, hung past 1s, JSON unparseable,
+/// not a Hyprland session) — the caller treats None as "no signal".
+fn hyprland_owns_layers(pids: &[u32]) -> Option<bool> {
+    // `timeout` so a wedged compositor can't block past verify()'s deadline.
+    let out = Command::new("timeout")
+        .args(["--signal=KILL", "1", "hyprctl", "layers", "-j"])
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let body = String::from_utf8(out.stdout).ok()?;
+    let root: serde_json::Value = serde_json::from_str(&body).ok()?;
+    // Shape: { "<monitor>": { "levels": { "0": [ {pid, ...}, ... ], ... } } }
+    let root_obj = root.as_object()?;
+    let pid_set: std::collections::HashSet<u32> = pids.iter().copied().collect();
+    for monitor in root_obj.values() {
+        let Some(levels) = monitor.get("levels").and_then(|v| v.as_object()) else {
+            continue;
+        };
+        for layer_list in levels.values() {
+            let Some(arr) = layer_list.as_array() else {
+                continue;
+            };
+            for layer in arr {
+                if let Some(pid) = layer.get("pid").and_then(|v| v.as_u64())
+                    && pid_set.contains(&(pid as u32))
+                {
+                    return Some(true);
+                }
+            }
+        }
+    }
+    Some(false)
 }
 
 /// Locate the `log.log` quickshell wrote for a specific entry path by scanning
