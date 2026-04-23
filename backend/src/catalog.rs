@@ -158,22 +158,21 @@ fn validate_entry(name: &str, entry: &RiceEntry) -> Result<()> {
         return Err(anyhow!("{name}: symlink_dst is required"));
     }
     let dst = &entry.symlink_dst;
-    if !(dst.starts_with('~') || dst.starts_with('/')) {
+    // Doc contract: dst must stay under `$HOME`. Enforce structurally by
+    // requiring the `~/<subpath>` shape. Bare absolute paths are out —
+    // `/etc/x`, `/usr/x`, `/home/other-user/x`, etc. all fail here
+    // instead of leaking through a "forbidden-prefix" blocklist that
+    // would miss `/home/other-user`, `/tmp`, `/mnt`, and any path the
+    // list didn't happen to enumerate.
+    if !dst.starts_with("~/") {
         return Err(anyhow!(
-            "{name}: symlink_dst must start with ~ or /, got {dst:?}"
+            "{name}: symlink_dst must be under $HOME (start with `~/`), got {dst:?}"
         ));
     }
-    if dst == "~" || dst == "~/" || dst == "/" {
+    if dst == "~/" {
         return Err(anyhow!(
-            "{name}: symlink_dst cannot be $HOME or / itself: {dst:?}"
+            "{name}: symlink_dst cannot be $HOME itself: {dst:?}"
         ));
-    }
-    for forbidden in ["/etc", "/usr", "/var", "/boot", "/opt"] {
-        if dst == forbidden || dst.starts_with(&format!("{forbidden}/")) {
-            return Err(anyhow!(
-                "{name}: symlink_dst cannot be under {forbidden}: {dst:?}"
-            ));
-        }
     }
     // Use Path::components for the `..` check (mirrors the symlink_src
     // check). `dst.contains("..")` would both over-match (rejecting

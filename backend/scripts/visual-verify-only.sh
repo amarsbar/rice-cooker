@@ -26,14 +26,23 @@ mapfile -t ENTRIES < <(awk '
     END { if (name != "") print name "|" repo }
 ' "$CATALOG")
 
-# Filter to requested rices if args given.
+# Filter to requested rices if args given. Iterate CLI args in the
+# user's given order (not catalog order) so `... dms caelestia` runs
+# dms first, caelestia second — matches the mental model of "run these
+# three, in this order".
 if (( $# > 0 )); then
-    declare -A want
-    for a in "$@"; do want["$a"]=1; done
-    filtered=()
+    declare -A by_name
     for e in "${ENTRIES[@]}"; do
-        name="${e%%|*}"
-        [[ -n "${want[$name]:-}" ]] && filtered+=("$e")
+        by_name["${e%%|*}"]="$e"
+    done
+    filtered=()
+    for a in "$@"; do
+        if [[ -n "${by_name[$a]:-}" ]]; then
+            filtered+=("${by_name[$a]}")
+        else
+            echo "unknown rice: $a" >&2
+            exit 1
+        fi
     done
     ENTRIES=("${filtered[@]}")
 fi
@@ -46,12 +55,16 @@ for entry in "${ENTRIES[@]}"; do
     repo="${entry##*|}"
     out=$("$BIN" apply --name "$name" --repo "$repo" --entry "shell.qml" 2>&1 || true)
     final=$(echo "$out" | tail -1)
-    type=$(echo "$final" | grep -oE '"type":"[a-z_]+"' | head -1 | cut -d'"' -f4)
+    # `|| true` on each grep chain: under `set -euo pipefail`, a pipeline
+    # whose grep finds no match returns 1, which kills the script before
+    # the case below runs. We want "no match" to produce an empty string
+    # and fall into the `*)` unknown branch, not abort the whole run.
+    type=$(echo "$final" | grep -oE '"type":"[a-z_]+"' | head -1 | cut -d'"' -f4 || true)
     case "$type" in
         success) printf '%-24s ✓ success\n' "$name"; pass=$((pass+1)) ;;
         fail)
-            reason=$(echo "$final" | grep -oE '"reason":"[^"]+"' | head -1 | cut -d'"' -f4)
-            stage=$(echo "$final" | grep -oE '"stage":"[^"]+"' | head -1 | cut -d'"' -f4)
+            reason=$(echo "$final" | grep -oE '"reason":"[^"]+"' | head -1 | cut -d'"' -f4 || true)
+            stage=$(echo "$final" | grep -oE '"stage":"[^"]+"' | head -1 | cut -d'"' -f4 || true)
             printf '%-24s ✗ fail  %s/%s\n' "$name" "$stage" "$reason"
             fail=$((fail+1)); fail_names+=("$name")
             ;;

@@ -316,4 +316,59 @@ mod tests {
     fn installed_returns_empty_for_empty_input() {
         assert!(installed(&[]).unwrap().is_empty());
     }
+
+    #[test]
+    fn validate_pkg_names_accepts_real_arch_names() {
+        // Covers the full allowed charset: letters, digits, `.`, `_`,
+        // `+`, `-`, `@`. These are the patterns pacman itself tolerates
+        // (gtk+, libc++, lib32-*, python-foo.bar, etc).
+        let ok: Vec<String> = [
+            "paru",
+            "hyprpolkitagent",
+            "caelestia-shell-git",
+            "gtk+",
+            "libc++",
+            "lib32-glibc",
+            "python-foo.bar",
+            "weechat_matrix",
+            "pkg@1.0",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        assert!(validate_pkg_names(&ok).is_ok());
+    }
+
+    #[test]
+    fn validate_pkg_names_rejects_flag_injection() {
+        // Leading `-` turns the name into an argv flag for paru/pacman.
+        for bad in ["-rf", "--noconfirm", "-S"] {
+            let err = validate_pkg_names(&[bad.to_string()])
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("starting with '-'"), "got: {err}");
+        }
+    }
+
+    #[test]
+    fn validate_pkg_names_rejects_path_traversal_and_weird_chars() {
+        // Path chars (/, \) and `..` would let a caller escape to an
+        // absolute or relative path; shell metacharacters would inject
+        // into downstream tooling that stringifies the name.
+        for bad in [
+            "../evil",
+            "foo/bar",
+            "foo\\bar",
+            "foo..bar",
+            "foo;rm -rf /",
+            "foo bar",
+            "foo$(whoami)",
+            "",
+        ] {
+            assert!(
+                validate_pkg_names(&[bad.to_string()]).is_err(),
+                "accepted: {bad:?}"
+            );
+        }
+    }
 }

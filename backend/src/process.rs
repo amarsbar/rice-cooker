@@ -226,10 +226,20 @@ pub fn verify(rice_dir: &Path, entry_rel: &Path, log_file: &Path) -> Result<Veri
         }
 
         if std::time::Instant::now() >= deadline {
-            // Time's up. If hyprctl ever said "no layers" and we never
-            // saw Some(true) (otherwise we'd have returned early),
-            // the shell is up but not rendering → Dead. A run with
-            // only None responses (hyprctl unavailable / non-Hyprland
+            // Time's up. Re-check liveness one last time: the `alive`
+            // sample above is up to VERIFY_POLL_MS stale, and the
+            // expensive hyprctl path can make it older still. A shell
+            // that crashed during the last poll window should be
+            // reported Dead, not Ok.
+            if !pgrep_matches(&["-xf", &pat])? {
+                return Ok(VerifyResult::Dead {
+                    log_tail: tail_lines_or_placeholder(&log_contents, &entry_abs),
+                });
+            }
+            // If hyprctl ever said "no layers" and we never saw
+            // Some(true) (otherwise we'd have returned early), the
+            // shell is up but not rendering → Dead. A run with only
+            // None responses (hyprctl unavailable / non-Hyprland
             // compositor) leaves hypr_ever_said_no false and falls
             // back to alive + log-clean = Ok.
             if hypr_ever_said_no {

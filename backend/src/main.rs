@@ -111,6 +111,9 @@ fn run() -> Result<()> {
             f.dry_run = *dry_run;
             f.force = *force;
             let out = install::uninstall(&dirs, f)?;
+            if f.dry_run {
+                return Ok(());
+            }
             println!("uninstalled: {}", out.name);
             if let Some(dir) = out.rcsave_dir {
                 println!("user files preserved at: {}", dir.display());
@@ -127,6 +130,9 @@ fn run() -> Result<()> {
             f.dry_run = *dry_run;
             f.force = *force;
             let out = install::switch(&cat, &dirs, name, f)?;
+            if f.dry_run {
+                return Ok(());
+            }
             println!("switched: {} -> {}", out.from, out.to);
             if let Some(dir) = out.rcsave_dir {
                 println!("user files preserved at: {}", dir.display());

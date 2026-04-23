@@ -72,9 +72,16 @@ pub fn create_symlink(clone_dir: &Path, entry: &RiceEntry, home: &Path) -> Resul
     // NotFound (expected — tmp usually doesn't exist) but surface
     // unexpected errors so a root-owned `.rctmp` or similar doesn't
     // get silently masked by the subsequent symlink-EEXIST failure.
+    // If a prior run (or a user) left a directory at the .rctmp path,
+    // remove_file fails with EISDIR — fall back to remove_dir_all so
+    // install isn't wedged by a stale dir we created ourselves.
     match fs::remove_file(&tmp) {
         Ok(()) => {}
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) if e.kind() == std::io::ErrorKind::IsADirectory => {
+            fs::remove_dir_all(&tmp)
+                .with_context(|| format!("clearing stale temp dir {}", tmp.display()))?;
+        }
         Err(e) => {
             return Err(anyhow!("clearing stale temp {}: {e}", tmp.display()));
         }
@@ -155,6 +162,20 @@ mod tests {
         let err = create_symlink(&clone, &mk_entry(".", "~/.config/qs/x"), home).unwrap_err();
         assert!(err.to_string().contains("exists as a directory"));
         assert!(user_dir.join("mine.conf").exists());
+    }
+
+    #[test]
+    fn refuses_to_replace_regular_file() {
+        let t = tempdir().unwrap();
+        let home = t.path();
+        let clone = home.join("clone");
+        fs::create_dir_all(&clone).unwrap();
+        let user_file = home.join(".config/qs/x");
+        fs::create_dir_all(user_file.parent().unwrap()).unwrap();
+        fs::write(&user_file, "mine").unwrap();
+        let err = create_symlink(&clone, &mk_entry(".", "~/.config/qs/x"), home).unwrap_err();
+        assert!(err.to_string().contains("exists as a regular file"));
+        assert_eq!(fs::read_to_string(&user_file).unwrap(), "mine");
     }
 
     #[test]
