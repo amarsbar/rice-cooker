@@ -1,33 +1,20 @@
-import { motion } from 'framer-motion';
 import styles from './BottomDrop.module.css';
 import dropShapeSvg from '@/assets/figma/drop-shape.svg';
-import dropInnerSvg from '@/assets/figma/drop-inner.svg';
-import { MORPH_TRANSITION, POSITIONS, useView } from '../view';
+import dropLeafSvg from '@/assets/figma/drop-leaf.svg';
 
-/** Figma nodes 168:6756+6757 / 168:6855+6856 — mint-green drop shape with
- *  the small marker circle inside. */
+/** Figma group 350:6583 + 350:6584 — mint drop shape tucked under the right
+ *  edge of the card, with a rotated "sprout" glyph and three faint green
+ *  dots sitting inside it. */
 export function BottomDrop() {
-  const view = useView();
   return (
     <>
-      <motion.div
-        className={styles.shape}
-        initial={false}
-        animate={POSITIONS[view].dropShape}
-        transition={MORPH_TRANSITION}
-      >
-        <div className={styles.shapeBleed}>
-          <img src={dropShapeSvg} alt="" />
-        </div>
-      </motion.div>
-      <motion.div
-        className={styles.inner}
-        initial={false}
-        animate={POSITIONS[view].dropInner}
-        transition={MORPH_TRANSITION}
-      >
-        <img src={dropInnerSvg} alt="" />
-      </motion.div>
+      <img src={dropShapeSvg} alt="" className={styles.shape} />
+      <div className={styles.leaf}>
+        <img src={dropLeafSvg} alt="" className={styles.leafImg} />
+      </div>
+      <span className={`${styles.dot} ${styles.dotTop}`} />
+      <span className={`${styles.dot} ${styles.dotBottom}`} />
+      <span className={`${styles.dot} ${styles.dotLeft}`} />
     </>
   );
 }

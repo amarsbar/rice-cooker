@@ -1,7 +1,9 @@
 .tab {
   position: absolute;
+  left: 500px;
+  top: 270px;
   width: 59px;
-  height: 81px;
+  height: 90px;
   background: var(--color-mint);
   border-top-right-radius: 16px;
 }

@@ -1,9 +1,25 @@
-/* Figma node 168:7234 — main card.
-   Position + size are motion-driven (see view.tsx / POSITIONS). */
 .card {
   position: absolute;
+  left: 0;
+  top: 0;
+  width: 500px;
+  height: 440px;
   background: var(--color-card-bg);
   border: var(--card-border-width) solid var(--color-mint);
   border-radius: var(--card-radius);
   overflow: hidden;
+}
+
+/* Image 4394 — 552 × 558 centered inside the card content box with a
+   +15px vertical offset so the focal point sits slightly below center. */
+.bg {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 15px);
+  width: 552px;
+  height: 558px;
+  transform: translate(-50%, -50%);
+  object-fit: cover;
+  max-width: none;
+  pointer-events: none;
 }

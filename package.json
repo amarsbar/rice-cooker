@@ -16,11 +16,11 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "framer-motion": "^12.38.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@fontsource/capriola": "^5.2.7",
     "@fontsource/madimi-one": "^5.0.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",

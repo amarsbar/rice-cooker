@@ -1,33 +1,57 @@
-/* Drop outer shape — SVG viewBox is 102.529 wide, so the inner bleed div
-   offsets the image 1.41% from the left edge to match Figma's 104px bounding box. */
+/* Mint drop shape (350:6583 / Vector 668) — 104 × 48 at (317, 437). */
 .shape {
   position: absolute;
+  left: 317px;
+  top: 437px;
   width: 104px;
   height: 48px;
+  pointer-events: none;
 }
 
-.shapeBleed {
+/* Rotated sprout glyph (350:6586 → 350:6587) — natural 30.086 × 38.45 image
+   rotated -90°, centered inside the visual bounding box the Figma nested
+   flex container produces (352.41, 445.64 to 390.86, 475.73). */
+.leaf {
   position: absolute;
-  inset: 0 0 0 1.41%;
+  left: 352.41px;
+  top: 445.64px;
+  width: 38.45px;
+  height: 30.086px;
+  pointer-events: none;
 }
 
-.shapeBleed > img {
-  display: block;
-  width: 100%;
-  height: 100%;
+.leafImg {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 30.086px;
+  height: 38.45px;
   max-width: none;
+  transform: translate(-50%, -50%) rotate(-90deg);
 }
 
-.inner {
+/* Faint green pip-dots — 2.563 × 2.563, 40% opacity. */
+.dot {
   position: absolute;
-  width: 44.86px;
-  height: 31.395px;
+  width: 2.563px;
+  height: 2.563px;
+  background: var(--color-drop-dot);
+  border-radius: 50%;
+  opacity: 0.4;
+  pointer-events: none;
 }
 
-.inner > img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  max-width: none;
+.dotTop {
+  left: 354px;
+  top: 443px;
+}
+
+.dotBottom {
+  left: 354px;
+  top: 475.83px;
+}
+
+.dotLeft {
+  left: 347px;
+  top: 459.1px;
 }

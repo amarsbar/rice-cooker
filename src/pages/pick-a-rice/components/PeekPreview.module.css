@@ -1,0 +1,155 @@
+/* Peek container (350:6486) — 473 × 311 centered horizontally (+0.5px) at
+   top 398. Sits mostly below the card's visible area; only the top ~24px
+   shows through the card's overflow-clip. 30% opacity dims the whole thing
+   as a "next rice peek" cue. */
+.peek {
+  position: absolute;
+  left: calc(50% + 0.5px);
+  top: 398px;
+  width: 473px;
+  height: 311px;
+  transform: translateX(-50%);
+  opacity: 0.3;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Image wrapper (350:6487) — 413 × 231 at top 45, centered horizontally
+   (with -1px bias), 1px grey outline + 8.36px radius. */
+.imageWrap {
+  position: absolute;
+  left: calc(50% - 1px);
+  top: 45px;
+  width: 413px;
+  height: 231px;
+  transform: translateX(-50%);
+  border: 1px solid var(--color-peek);
+  border-radius: var(--preview-image-radius);
+  overflow: hidden;
+}
+
+.image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+}
+
+/* Curved flourishes (350:6490/6492/6494/6499) — large wavy brackets around
+   the image. The TL and BL instances mirror the right-side assets. */
+.curve {
+  position: absolute;
+  pointer-events: none;
+}
+
+.curveTr {
+  left: 268px;
+  top: 12px;
+  width: 200.209px;
+  height: 130.387px;
+}
+
+.curveTl {
+  left: 5px;
+  top: 12px;
+  width: 200.209px;
+  height: 130.387px;
+  transform: scaleX(-1);
+}
+
+.curveBr {
+  left: 278px;
+  top: 183px;
+  width: 187.978px;
+  height: 122.807px;
+}
+
+.curveBl {
+  left: 7px;
+  top: 183px;
+  width: 187.978px;
+  height: 122.807px;
+  transform: scaleX(-1);
+}
+
+/* Pills (350:6488 top / 350:6510 bottom) — centered horizontally (+0.5px),
+   30 high, light grey with black text. */
+.pill {
+  position: absolute;
+  left: calc(50% + 0.5px);
+  transform: translateX(-50%);
+  height: 30px;
+  padding: 0 12px;
+  background: var(--color-peek);
+  border-radius: 55.556px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pill > p {
+  font-family: var(--font-pill);
+  font-size: var(--fs-pill);
+  font-weight: 400;
+  color: #000;
+  line-height: normal;
+  text-align: center;
+  white-space: nowrap;
+  letter-spacing: -0.03em;
+}
+
+.pillTop {
+  top: 1px;
+}
+
+.pillBottom {
+  top: 271px;
+}
+
+/* Carousel arrow circles (350:6504/6507) — 24 × 24 light grey, dark arrow. */
+.arrowButton {
+  position: absolute;
+  top: 150px;
+  width: 24px;
+  height: 24px;
+  background: var(--color-peek);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1e1e1e;
+  overflow: hidden;
+}
+
+.arrowButtonLeft {
+  left: 4px;
+}
+
+.arrowButtonRight {
+  left: 442px;
+}
+
+.arrow {
+  display: block;
+  width: 8.205px;
+  height: 5.641px;
+  background-color: currentColor;
+  -webkit-mask-image: url('../../../assets/figma/arrow.svg');
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-image: url('../../../assets/figma/arrow.svg');
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+}
+
+.arrowLeft {
+  transform: rotate(-90deg);
+}
+
+.arrowRight {
+  transform: rotate(90deg);
+}

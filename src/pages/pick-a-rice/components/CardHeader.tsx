@@ -1,32 +1,31 @@
 import styles from './CardHeader.module.css';
 import logoSvg from '@/assets/figma/logo.svg';
-import dividerSvg from '@/assets/figma/divider-dotted.svg';
+import menuDotsSvg from '@/assets/figma/menu-dots.svg';
 
-interface CardHeaderProps {
-  step: number;
-  total: number;
-  title?: string;
-}
-
-export function CardHeader({ step, total, title = 'Pick a rice' }: CardHeaderProps) {
+/** Figma nodes 350:6545 (logo), 350:6548 (PICK A RICE letter pills), and
+ *  350:6542 (3-dot menu) — the card's top row. */
+export function CardHeader() {
   return (
     <>
-      <div className={styles.logo}>
-        <div className={styles.logoBleed}>
-          <img src={logoSvg} alt="" />
-        </div>
+      <img src={logoSvg} alt="" className={styles.logo} />
+      <div className={styles.letters}>
+        <LetterCluster chars="PICK" />
+        <LetterCluster chars="A" />
+        <LetterCluster chars="RICE" />
       </div>
-      <p className={styles.title}>{title}</p>
-      <div className={`${styles.pill} ${styles.pillStep}`}>
-        <p>{step}</p>
-      </div>
-      <div className={`${styles.pill} ${styles.pillSlash}`}>
-        <p>/</p>
-      </div>
-      <div className={`${styles.pill} ${styles.pillTotal}`}>
-        <p>{total}</p>
-      </div>
-      <img src={dividerSvg} alt="" className={styles.divider} />
+      <img src={menuDotsSvg} alt="" className={styles.menu} />
     </>
+  );
+}
+
+function LetterCluster({ chars }: { chars: string }) {
+  return (
+    <div className={styles.cluster}>
+      {chars.split('').map((c, i) => (
+        <span key={i} className={styles.letter}>
+          {c}
+        </span>
+      ))}
+    </div>
   );
 }

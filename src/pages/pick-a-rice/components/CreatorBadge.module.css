@@ -1,29 +1,39 @@
-/* Cloud halo (168:7830) — 200 × 200. Position is motion-driven. */
-.cloud {
+/* Creator badge frame (350:6594) — 200 × 200 at (400, 337). */
+.badge {
   position: absolute;
+  left: 400px;
+  top: 337px;
   width: 199.999px;
   height: 200.001px;
 }
 
-.cloud > img {
+/* Cloud outline (350:6595) — fills the full badge. */
+.cloud {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  max-width: none;
+  pointer-events: none;
 }
 
-/* Inner cream circle (168:7867) — 176 × 176, fully rounded. */
+/* Cream inner circle (350:6632) — 176 × 176 centered; clips everything
+   inside to the circle shape. */
 .inner {
   position: absolute;
+  left: 50%;
+  top: 50%;
   width: 176px;
   height: 176px;
   background: var(--color-cream);
   border-radius: 50%;
   overflow: hidden;
+  transform: translate(-50%, -50%);
 }
 
-/* Background decor (168:7868) — 190 × 191.805, centered with top:-8 and -0.39% inset */
+/* Dotted grid background (350:6633) — 190 × 191.805 centered horizontally,
+   extended 8px above the circle's top so the grid bleeds past the top edge
+   before being clipped by the round inner. The bleed div then grows the
+   image another 0.39% on each side to avoid tiling seams. */
 .decor {
   position: absolute;
   left: 50%;
@@ -31,215 +41,148 @@
   width: 190px;
   height: 191.805px;
   transform: translateX(-50%);
+  pointer-events: none;
 }
 
-.decor > img {
+.decorBleed {
   position: absolute;
   inset: -0.39%;
-  width: auto;
+}
+
+.decorBleed > img {
+  display: block;
+  width: 100%;
+  height: 100%;
   max-width: none;
-  height: auto;
 }
 
-/* Pills wrapper — just a fade layer for the Ricename/By/creator trio */
-.pills {
+/* Step/count pill (350:6636) — 25px wide, yellow, fully rounded,
+   centered horizontally (+0.5px), top 6. */
+.stepPill {
   position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.pill {
-  position: absolute;
-  height: 33px;
-  padding: 8px;
-  border-radius: 181.56px;
+  left: calc(50% + 0.5px);
+  top: 6px;
+  width: 25px;
+  padding: 2.561px;
+  background: var(--color-yellow);
+  border-radius: 237.773px;
+  transform: translateX(-50%);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  transform: translate(-50%, -50%);
 }
 
-.pill > p {
+.stepPill > p {
   font-family: var(--font-display);
-  font-size: var(--fs-pill);
+  font-size: var(--fs-letter);
   font-weight: 400;
-  color: var(--color-pill-text);
-  line-height: normal;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.pillName {
-  left: calc(50% - 6.5px);
-  top: calc(50% - 22.5px);
-  background: var(--color-pink);
-}
-
-.pillBy {
-  left: calc(50% - 45.5px);
-  top: calc(50% + 8.5px);
-  background: var(--color-mauve);
-}
-
-.pillCreator {
-  left: calc(50% + 16px);
-  top: calc(50% + 14.5px);
-  background: var(--color-mauve);
-}
-
-/* Preview state label (168:7943) — black at peak 40% opacity, 24px,
-   centered horizontally, 16px above center */
-.previewLabel {
-  position: absolute;
-  left: 50%;
-  top: calc(50% - 16px);
-  transform: translateX(-50%);
-  font-family: var(--font-display);
-  font-size: var(--fs-title);
-  font-weight: 400;
-  color: var(--color-card-bg);
+  color: var(--color-creator-text);
   line-height: normal;
   text-align: center;
-  white-space: nowrap;
+  width: 100%;
+}
+
+/* Halo dots (Ellipse 4173/4174/4175) — three yellow pips curving from the
+   top of the circle toward the "1" pill's right side. Rendered as simple
+   circles at the center-points derived from Figma's flex/rotate wrappers. */
+.halo {
+  position: absolute;
+  background: var(--color-yellow);
+  border-radius: 50%;
   pointer-events: none;
 }
 
-/* Sparkle 1 (168:7877) — outer 19.623 × 20.172 at (43, 8.77), rotated -10.94deg */
-.sparkle1 {
+.haloLg {
+  /* Ellipse 4175 — center (88 + 24.95, 18.9475), diameter 14.564. */
+  width: 14.564px;
+  height: 14.564px;
+  left: calc(50% + 24.95px - 7.282px);
+  top: calc(18.9475px - 7.282px);
+}
+
+.haloMd {
+  /* Ellipse 4174 — center (88 + 40.8, 25.0965), diameter 9.612. */
+  width: 9.612px;
+  height: 9.612px;
+  left: calc(50% + 40.8px - 4.806px);
+  top: calc(25.0965px - 4.806px);
+}
+
+.haloSm {
+  /* Ellipse 4173 — center (88 + 51.69, 32.2045), diameter 6.873. */
+  width: 6.873px;
+  height: 6.873px;
+  left: calc(50% + 51.69px - 3.4365px);
+  top: calc(32.2045px - 3.4365px);
+}
+
+/* Tag text (350:6648-6650) — Madimi One 27.65px in the brown ink color. */
+.tag {
   position: absolute;
-  left: 43px;
-  top: 8.77px;
-  width: 19.623px;
-  height: 20.172px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  font-family: var(--font-display);
+  font-size: var(--fs-tag);
+  font-weight: 400;
+  color: var(--color-creator-text);
+  line-height: normal;
+  white-space: nowrap;
 }
 
-.rot1 {
-  transform: rotate(-10.94deg);
-  flex: none;
+.tagTop {
+  /* "niri" */
+  left: 70px;
+  top: 59px;
 }
 
-.sparkle1Inner {
-  position: relative;
-  width: 16.637px;
-  height: 17.33px;
+.tagBottom {
+  /* "dms" */
+  left: 52px;
+  top: 81px;
 }
 
-.sparkle1Bleed {
+.tagPlus {
+  /* "+" */
+  left: 108px;
+  top: 78px;
+}
+
+/* WASD/arrow key indicator (Group 2147208885) — four rounded 10px squares
+   forming a T shape (W on top; A/S/D across the bottom row). Pressing the
+   matching key turns that square orange; otherwise all four are yellow. */
+.key {
   position: absolute;
-  inset: 10.84% 7.42% 7.34% 7.95%;
+  width: 10px;
+  height: 10px;
+  border-radius: 4px;
+  background: var(--color-yellow);
+  pointer-events: none;
+  transition: background-color 80ms ease-out;
 }
 
-.sparkle1Bleed > img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  max-width: none;
+.keyPressed {
+  background: var(--color-orange);
 }
 
-/* Sparkle 2 (168:7878) — outer 20.125 × 20.935 at (57, 4), rotated -20.57deg */
-.sparkle2 {
-  position: absolute;
-  left: 57px;
-  top: 4px;
-  width: 20.125px;
-  height: 20.935px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* 350:6640 — top square (W / ArrowUp). */
+.key_up {
+  left: 86.08px;
+  top: 148px;
 }
 
-.rot2 {
-  transform: rotate(-20.57deg);
-  flex: none;
+/* 350:6641 — center of the bottom row (S / ArrowDown). */
+.key_down {
+  left: 86px;
+  top: 159.92px;
 }
 
-.sparkle2Inner {
-  position: relative;
-  width: 15.251px;
-  height: 16.637px;
+/* 350:6642 — right of the bottom row (D / ArrowRight). */
+.key_right {
+  left: 98px;
+  top: 160px;
 }
 
-.sparkle2Bleed {
-  position: absolute;
-  inset: 8.61% 7.95% 10.1% 12.69%;
-}
-
-.sparkle2Bleed > img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-}
-
-/* Flower 1 (168:7879) — outer 20.62 × 21.215 at (99, 147), scaleY(-1) rotate(60deg) */
-.flower1 {
-  position: absolute;
-  left: 99px;
-  top: 147px;
-  width: 20.62px;
-  height: 21.215px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.rot3 {
-  transform: scaleY(-1) rotate(60deg);
-  flex: none;
-}
-
-.flower1Inner {
-  position: relative;
-  width: 16.125px;
-  height: 14.5px;
-}
-
-.flower1Bleed {
-  position: absolute;
-  inset: 0;
-}
-
-.flower1Bleed > img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-}
-
-/* Flower 2 (168:7882) — outer 21.92 × 20.052 at (81.76, 153), scaleY(-1) rotate(-12.66deg) */
-.flower2 {
-  position: absolute;
-  left: 81.76px;
-  top: 153px;
-  width: 21.92px;
-  height: 20.052px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.rot4 {
-  transform: scaleY(-1) rotate(-12.66deg);
-  flex: none;
-}
-
-.flower2Inner {
-  position: relative;
-  width: 18.798px;
-  height: 16.329px;
-}
-
-.flower2Bleed {
-  position: absolute;
-  inset: 0;
-}
-
-.flower2Bleed > img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  max-width: none;
+/* 350:6643 — left of the bottom row (A / ArrowLeft). */
+.key_left {
+  left: 74px;
+  top: 160px;
 }
