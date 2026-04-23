@@ -31,10 +31,7 @@ pub fn clone_at_commit(repo_url: &str, commit: &str, dest: &Path) -> anyhow::Res
     if commit.starts_with('-') {
         anyhow::bail!("refusing commit starting with '-': {commit}");
     }
-    // Defense-in-depth: reject commit args that aren't a hex SHA
-    // (≥7 chars) or the PLACEHOLDER sentinel. The catalog validator
-    // already enforces this, but a future caller that bypasses the
-    // catalog still can't pass arbitrary strings into git checkout.
+    // Defense-in-depth if a future caller bypasses the catalog validator.
     let is_hex_sha = commit.len() >= 7 && commit.chars().all(|c| c.is_ascii_hexdigit());
     let is_placeholder = commit.contains("PLACEHOLDER");
     if !is_hex_sha && !is_placeholder {
@@ -42,9 +39,8 @@ pub fn clone_at_commit(repo_url: &str, commit: &str, dest: &Path) -> anyhow::Res
             "refusing commit that is neither a hex SHA (≥7 chars) nor PLACEHOLDER: {commit}"
         );
     }
-    // Full clone (not shallow), since we need a specific historical SHA.
-    // --no-checkout so we land without a working tree and can check out
-    // the pinned commit explicitly.
+    // Full clone (shallow can't reach arbitrary historical SHAs); --no-checkout
+    // lets us check out the pinned commit explicitly below.
     if let Some(parent) = dest.parent() {
         fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
     }
@@ -68,11 +64,8 @@ pub fn clone_at_commit(repo_url: &str, commit: &str, dest: &Path) -> anyhow::Res
     Ok(())
 }
 
-// Preconfigured `git` invocation. `-c protocol.ext.allow=never` forbids the `ext::`
-// protocol (arbitrary-command RCE) — cheap defense-in-depth in case a curated entry
-// or upstream rename ever sneaks one in. The terminal/askpass env guards were
-// dropped when the backend moved to a curated-URL world: public rice repos won't
-// prompt for credentials.
+// `-c protocol.ext.allow=never` forbids the `ext::` protocol (arbitrary-command
+// RCE) in case a curated entry or upstream rename ever sneaks one in.
 fn git_cmd() -> Command {
     let mut cmd = Command::new("git");
     cmd.args(["-c", "protocol.ext.allow=never"]);
@@ -110,7 +103,6 @@ mod tests {
         run(&["add", "."], &work);
         run(&["commit", "-m", "init"], &work);
 
-        // Grab the freshly committed SHA so tests can check out specific commits.
         let sha_out = Command::new("git")
             .args(["rev-parse", "HEAD"])
             .current_dir(&work)
@@ -160,8 +152,6 @@ mod tests {
     fn clone_at_commit_refuses_non_hex_non_placeholder_commit() {
         let dest_dir = tempdir().expect("dest tempdir");
         let dest = dest_dir.path().join("clone");
-        // "HEAD" isn't hex — the defense-in-depth guard should reject it
-        // before we spawn git.
         let err = clone_at_commit("/does/not/matter", "HEAD", &dest).unwrap_err();
         assert!(err.to_string().contains("refusing commit"), "got: {err:#}");
     }

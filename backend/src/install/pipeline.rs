@@ -130,11 +130,8 @@ pub fn run_try<W: Write>(
     step(events, Step::Preflight, StepState::Done)?;
 
     if current.as_deref() == Some(name) {
-        // Liveness check: current.json can be stale if the shell crashed or
-        // was manually killed. Only short-circuit when the process is actually
-        // running; otherwise fall through and re-launch. Tagged `liveness` (not
-        // `preflight`) so a Fail here doesn't appear to contradict the
-        // Step::Preflight Done already emitted above.
+        // current.json can be stale (crash, manual kill) — only short-circuit
+        // if the process is actually running; otherwise fall through and launch.
         let alive = try_stage!(events, "liveness", process::rice_shell_alive(name));
         if alive {
             events.emit(&Event::Success {
@@ -161,8 +158,8 @@ pub fn run_try<W: Write>(
     let added_explicit = try_stage!(events, "deps", do_deps(&all_deps));
     step(events, Step::Deps, StepState::Done)?;
 
-    // Record + current.json persisted BEFORE symlink so a symlink failure
-    // still leaves a record uninstall can use to roll back the packages.
+    // Record persists BEFORE symlink so a symlink failure still leaves
+    // a record uninstall can use to roll back the packages.
     step(events, Step::Record, StepState::Start)?;
     try_stage!(
         events,
@@ -252,8 +249,7 @@ fn uninstall_locked<W: Write>(
     name: &str,
     replay: bool,
 ) -> Result<bool> {
-    // record_json validates name; route through try_stage! so a tampered
-    // current.json surfaces as a Fail, not bare Err past the post-hello contract.
+    // A tampered current.json must surface as a Fail, not bare Err (post-hello contract).
     let record_path = try_stage!(events, "record", "path", paths.record_json(name));
     let record = try_stage!(events, "record", "load", load_record(&record_path));
 
@@ -281,8 +277,8 @@ fn uninstall_locked<W: Write>(
     }
     step(events, Step::Deps, StepState::Done)?;
 
-    // Remove symlink only if it still points where we left it. User could
-    // have retargeted or replaced it; we don't clobber that.
+    // Only remove the symlink if it still points where we left it — don't
+    // clobber a user-retargeted or user-replaced entry.
     step(events, Step::Symlink, StepState::Start)?;
     try_stage!(events, "symlink", {
         match fs::symlink_metadata(&record.symlink_path) {
@@ -312,8 +308,8 @@ fn uninstall_locked<W: Write>(
     });
     step(events, Step::Symlink, StepState::Done)?;
 
-    // Clear current.json (the pointer) BEFORE removing the record (the target).
-    // If the record delete subsequently fails, status still reports None sanely.
+    // Clear the pointer (current.json) BEFORE the target (record) — so if the
+    // record removal then fails, status still reports None sanely.
     step(events, Step::Record, StepState::Start)?;
     try_stage!(events, "record", "clear_current", clear_current(paths));
     match fs::remove_file(&record_path) {
@@ -339,9 +335,8 @@ fn uninstall_locked<W: Write>(
         return Ok(true);
     }
 
-    // Replay the captured pre-rice shell. Always clear `original` afterward —
-    // even if replay fails, the captured argv is stale relative to whatever
-    // the user has launched since. When both fail, the replay error wins.
+    // Always clear `original` after replay — even on failure the captured argv
+    // is stale relative to whatever the user has launched since.
     let original = try_stage!(events, "replay", "read_original", paths.original());
     let replay_err = if let Some(shell) = original
         && !shell.argv.is_empty()
@@ -370,9 +365,8 @@ fn uninstall_locked<W: Write>(
             Ok(false)
         }
         (Some((reason, tail)), Some(ce)) => {
-            // Both failed: include the clear_original error in the Fail so the
-            // user sees that `original` on disk is stale and will mis-replay
-            // on the next try. Dropping `ce` would leave a silent landmine.
+            // Include the clear_original error — dropping it leaves a silent
+            // landmine: stale `original` on disk will mis-replay on the next try.
             emit_fail(
                 events,
                 "replay",
@@ -415,7 +409,7 @@ pub fn status(paths: &Paths) -> Result<StatusRow> {
 
 // ── install step helpers ──────────────────────────────────────────────────────
 
-/// HEAD matches `commit` (catalog allows short-SHA prefixes).
+/// True when HEAD matches `commit`; accepts either side as a prefix.
 pub(crate) fn clone_cache_hit(clone_dir: &Path, commit: &str) -> bool {
     if !clone_dir.join(".git").exists() {
         return false;
@@ -449,7 +443,7 @@ fn do_clone(paths: &Paths, name: &str, entry: &RiceEntry) -> Result<()> {
 
 fn do_deps(all_deps: &[String]) -> Result<Vec<String>> {
     let missing = deps::missing(all_deps)?;
-    // Fast path: nothing to install → skip both pacman -Qqe snapshots.
+    // Skip both pacman -Qqe snapshots when there's nothing to install.
     if missing.is_empty() {
         return Ok(Vec::new());
     }
@@ -571,9 +565,7 @@ fn diff_explicit(pre: &[String], post: &[String]) -> Vec<String> {
     added
 }
 
-/// Try std::fs first, fall back to `rm -rf --` on PermissionDenied etc.
-/// Covers makepkg's 0111-perm `pkg/` dir and whatever other surprises a
-/// rice's hooks leave behind.
+/// Fall back to `rm -rf --` — std::fs can't traverse makepkg's 0111 `pkg/`.
 fn remove_dir_all_forceful(path: &Path) -> Result<()> {
     let fs_err = match fs::remove_dir_all(path) {
         Ok(()) => return Ok(()),
@@ -654,7 +646,6 @@ mod tests {
         let t = tempfile::tempdir().unwrap();
         let sha = init_repo_at(t.path());
         assert!(clone_cache_hit(t.path(), &sha));
-        // Short-SHA catalog entries still hit when clone is at the full SHA.
         assert!(clone_cache_hit(t.path(), &sha[..7]));
     }
 
@@ -663,7 +654,6 @@ mod tests {
         let t = tempfile::tempdir().unwrap();
         let _sha = init_repo_at(t.path());
         assert!(!clone_cache_hit(t.path(), "deadbeef00000000"));
-        // Missing dir + dir without .git both invalidate.
         let t2 = tempfile::tempdir().unwrap();
         assert!(!clone_cache_hit(t2.path(), "deadbeef"));
         assert!(!clone_cache_hit(&t2.path().join("not-there"), "deadbeef"));
@@ -693,7 +683,6 @@ mod tests {
         let out = std::str::from_utf8(&buf).unwrap();
         assert!(out.contains(r#""type":"success""#));
         assert!(!out.contains(r#""type":"fail""#));
-        // No destructive steps fired.
         assert!(!out.contains(r#""step":"kill_quickshell""#));
         assert!(!out.contains(r#""step":"deps""#));
     }

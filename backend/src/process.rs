@@ -27,11 +27,9 @@ pub fn rice_shell_alive(name: &str) -> Result<bool> {
     pgrep_matches(&["-xf", &qs_cmdline_pattern(name)])
 }
 
-/// The exact cmdline `launch_detached_by_name` emits into /proc, used by
-/// both `rice_shell_alive` (pgrep) and `verify_by_name` (pgrep) so liveness,
-/// verify, and launch can't desync. `regex::escape` is load-bearing: catalog
-/// names can contain `.`, `+`, etc. that would otherwise match too broadly
-/// under pgrep's BRE interpretation.
+/// Shared by liveness + verify so they can't desync from launch. `regex::escape`
+/// is load-bearing — catalog names may contain `.`, `+`, etc. that pgrep's BRE
+/// would match too broadly.
 fn qs_cmdline_pattern(name: &str) -> String {
     format!("quickshell -c {}", regex::escape(name))
 }
@@ -55,9 +53,8 @@ pub fn kill_quickshell() -> Result<()> {
     }
 
     run_pkill(&["-KILL", "-f", QS_MATCH_PATTERN])?;
-    // Re-verify after SIGKILL: `quickshell --no-duplicate` is the default, so
-    // our follow-up launch would exit immediately (and silently) if a previous
-    // qs is still alive. Returning Err here lets the caller surface the cause.
+    // `quickshell --no-duplicate` is the default, so a follow-up launch
+    // would silently exit if a prior qs survived SIGKILL. Verify it's gone.
     thread::sleep(Duration::from_millis(KILL_POLL_MS));
     if quickshell_running()? {
         return Err(anyhow!(
@@ -67,8 +64,7 @@ pub fn kill_quickshell() -> Result<()> {
     Ok(())
 }
 
-// pkill exits 0 = matched, 1 = no match, 2 = syntax, 3 = fatal. Treat 0/1 as
-// success; anything else is a real error.
+// pkill: 0 matched, 1 no-match, 2 syntax, 3 fatal.
 fn run_pkill(args: &[&str]) -> Result<()> {
     let status = Command::new("pkill")
         .args(args)
@@ -87,8 +83,7 @@ fn quickshell_running() -> Result<bool> {
     pgrep_matches(&["-f", QS_MATCH_PATTERN])
 }
 
-// pgrep exit codes mirror pkill. Conflating syntax/fatal with no-match would
-// silently bypass the post-SIGKILL re-verify.
+// Conflating syntax/fatal with no-match would silently bypass the post-SIGKILL re-verify.
 fn pgrep_matches(args: &[&str]) -> Result<bool> {
     let status = Command::new("pgrep")
         .args(args)
@@ -121,25 +116,21 @@ fn pgrep_pids(args: &[&str]) -> Result<Vec<u32>> {
     }
 }
 
-/// Launch `quickshell -c <name>` as a detached session leader. Quickshell
-/// resolves `<name>` against `$XDG_CONFIG_HOME/quickshell/<name>/shell.qml`,
-/// which is the target of the symlink our install pipeline creates.
+/// quickshell resolves `<name>` against `$XDG_CONFIG_HOME/quickshell/<name>/shell.qml`
+/// — the target of the symlink our install pipeline creates.
 pub fn launch_detached_by_name(name: &str, log_file: &Path, cwd: &Path) -> Result<()> {
     let argv = vec!["quickshell".to_string(), "-c".to_string(), name.to_string()];
     launch_argv(&argv, cwd, log_file)
 }
 
-/// Relaunch from a persisted argv+cwd pair. Used by uninstall to restore the
-/// user's pre-rice shell regardless of how it was invoked (`-p <path>` or
-/// `-c <name>`).
+/// Relaunch from a persisted argv+cwd pair, regardless of `-p <path>` vs `-c <name>`.
 pub fn launch_argv(argv: &[String], cwd: &Path, log_file: &Path) -> Result<()> {
     let (argv0, rest) = argv
         .split_first()
         .ok_or_else(|| anyhow!("empty argv; nothing to launch"))?;
     let log = fs::File::create(log_file)
         .with_context(|| format!("opening log {}", log_file.display()))?;
-    // setsid's exit reflects spawn success only; child health is checked by
-    // `verify_by_name`.
+    // setsid's exit reflects spawn success only — `verify_by_name` checks child health.
     let status = Command::new("setsid")
         .arg("-f")
         .arg(argv0)
@@ -162,8 +153,6 @@ pub enum VerifyResult {
     Dead { log_tail: String },
 }
 
-/// Poll up to VERIFY_TIMEOUT_MS for `quickshell -c <name>` alive + log-clean
-/// + (on Hyprland) owning a layer-shell surface.
 pub fn verify_by_name(name: &str, log_file: &Path) -> Result<VerifyResult> {
     let pat = qs_cmdline_pattern(name);
     let deadline = Instant::now() + Duration::from_millis(VERIFY_TIMEOUT_MS);
@@ -181,9 +170,8 @@ pub fn verify_by_name(name: &str, log_file: &Path) -> Result<VerifyResult> {
                 log_tail: tail_lines_or_placeholder(&log_contents, name),
             });
         }
-        // Specific marker quickshell emits on top-level QML load failure.
-        // Deliberately NOT matching bare "ERROR:" — quickshell emits that
-        // prefix for Qt deprecation notices and non-fatal runtime errors.
+        // Not matching bare "ERROR:" — quickshell emits that for Qt deprecation
+        // notices and other non-fatal runtime errors.
         if log_contents.contains("Failed to load configuration") {
             return Ok(VerifyResult::Dead {
                 log_tail: tail_lines_or_placeholder(&log_contents, name),
@@ -202,9 +190,8 @@ pub fn verify_by_name(name: &str, log_file: &Path) -> Result<VerifyResult> {
                     log_tail: tail_lines_or_placeholder(&log_contents, name),
                 });
             }
-            // Alive + log-clean + hyprctl said "no layers" ⇒ rice is up but
-            // not rendering. Non-Hyprland compositor leaves hypr_ever_said_no
-            // false and falls back to alive + log-clean = Ok.
+            // Non-Hyprland compositors leave hypr_ever_said_no false and fall
+            // back to alive + log-clean = Ok.
             if hypr_ever_said_no {
                 let base_tail = tail_lines_or_placeholder(&log_contents, name);
                 return Ok(VerifyResult::Dead {
@@ -226,8 +213,8 @@ fn tail_lines_or_placeholder(log: &str, name: &str) -> String {
     }
 }
 
-/// Some(answer) if hyprctl responded; None on any failure. `timeout` so a
-/// wedged compositor can't block past verify's deadline.
+/// Some(answer) if hyprctl responded; None on any failure. The `timeout` guard
+/// keeps a wedged compositor from blocking past verify's deadline.
 fn hyprland_owns_layers(pids: &[u32]) -> Option<bool> {
     let out = Command::new("timeout")
         .args(["--signal=KILL", "1", "hyprctl", "layers", "-j"])
@@ -270,8 +257,7 @@ pub fn tail_lines(text: &str, n: usize) -> String {
 
 // ── /proc introspection: record the user's pre-rice shell ─────────────────────
 
-/// Parse null-separated argv bytes from /proc/<pid>/cmdline. Trailing NUL
-/// tolerated (Linux appends one). Invalid UTF-8 becomes U+FFFD.
+/// Tolerates the trailing NUL Linux appends; invalid UTF-8 becomes U+FFFD.
 pub fn parse_cmdline(bytes: &[u8]) -> Vec<String> {
     if bytes.is_empty() {
         return Vec::new();
@@ -289,7 +275,6 @@ pub struct QuickshellProc {
     pub cwd: Option<PathBuf>,
 }
 
-/// First /proc entry whose argv[0] basename is `quickshell` or `qs`.
 pub fn find_running_quickshell() -> Result<Option<QuickshellProc>> {
     for entry in fs::read_dir("/proc")? {
         let Ok(entry) = entry else { continue };
@@ -297,10 +282,9 @@ pub fn find_running_quickshell() -> Result<Option<QuickshellProc>> {
         let Ok(pid) = name.to_string_lossy().parse::<i32>() else {
             continue;
         };
-        // NotFound = process exited between readdir and read (common).
-        // PermissionDenied = hidepid or another user's entry (skip).
-        // Anything else = propagate — if our own qs is unreadable for a weird
-        // reason, we shouldn't silently record "nothing was running".
+        // Skip races (process exited) and other users' entries (hidepid). Any
+        // other error propagates — silently dropping it would mis-record our
+        // own unreadable qs as "nothing was running".
         let bytes = match fs::read(format!("/proc/{pid}/cmdline")) {
             Ok(b) => b,
             Err(e)

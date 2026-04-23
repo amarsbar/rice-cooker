@@ -26,6 +26,7 @@ xdg = "3"
 
 [dev-dependencies]
 assert_cmd = "2"
+insta = "1.47.2"
 tempfile = "3"
 
 [profile.dev]

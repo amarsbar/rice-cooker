@@ -8,9 +8,8 @@ use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use xdg::BaseDirectories;
 
-/// Argv + cwd of the user's pre-apply shell, captured via /proc so `exit`
-/// can replay it verbatim. argv (not a bare `-p` path) preserves forms like
-/// `qs -c <name>`; cwd matters when argv contains a relative `-p` path.
+/// Full argv (not a bare `-p` path) preserves forms like `qs -c <name>`.
+/// cwd matters when argv contains a relative `-p` path.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OriginalShell {
     pub argv: Vec<String>,
@@ -18,9 +17,8 @@ pub struct OriginalShell {
     pub cwd: Option<String>,
 }
 
-/// Resolved filesystem layout. Fields populated eagerly so per-call lookups
-/// are infallible. `home` is the raw $HOME (for `~/` expansion in catalog
-/// `symlink_dst`), not the rice-cooker-prefixed XDG data dir.
+/// `home` is the raw $HOME (used for `~/` expansion in catalog `symlink_dst`),
+/// not the rice-cooker-prefixed XDG data dir.
 pub struct Paths {
     pub home: PathBuf,
     pub cache_home: PathBuf,
@@ -32,9 +30,8 @@ impl Paths {
     pub fn from_env() -> Result<Self> {
         let home = resolve_home_from(std::env::var("HOME").ok().as_deref())?;
         let xdg = BaseDirectories::with_prefix("rice-cooker");
-        // RICE_COOKER_CACHE_DIR is an escape hatch from the old Cache::resolve_root
-        // contract — lets users (and tests against built binaries) redirect the
-        // whole cache root without touching XDG env vars.
+        // RICE_COOKER_CACHE_DIR redirects the whole cache root without touching
+        // XDG env vars — convenient for tests against the built binary.
         let cache_home = match std::env::var("RICE_COOKER_CACHE_DIR") {
             Ok(s) if !s.is_empty() => PathBuf::from(s),
             _ => xdg.get_cache_home().ok_or_else(|| {
@@ -52,8 +49,7 @@ impl Paths {
         })
     }
 
-    /// Test-only construction with explicit roots (bypasses XDG env).
-    /// `find_catalog` and `searched_catalog_paths` return empty under this.
+    /// Test-only. `find_catalog` and `searched_catalog_paths` return empty.
     pub fn at_roots(home: PathBuf, cache_home: PathBuf, data_home: PathBuf) -> Self {
         Self {
             home,
@@ -96,9 +92,7 @@ impl Paths {
         self.xdg.as_ref()?.find_data_file("catalog.toml")
     }
 
-    /// Every filesystem path `find_catalog` would check, in search order.
-    /// Used by `main::catalog_path` to produce a "not found" error that
-    /// enumerates exactly where we looked. Empty under `at_roots`.
+    /// Search order for `find_catalog`; feeds the "not found" error message.
     pub fn searched_catalog_paths(&self) -> Vec<PathBuf> {
         let Some(xdg) = self.xdg.as_ref() else {
             return Vec::new();
@@ -126,17 +120,14 @@ impl Paths {
         let path = self.original_file();
         match fs::read_to_string(&path) {
             Ok(s) if s.trim().is_empty() => Ok(None),
-            // Malformed (e.g. plain-path from older backend) reads as unrecorded
-            // so `exit` completes cleanly; next `apply` preflight re-captures.
+            // Malformed content (e.g. plain path from an older backend) reads
+            // as unrecorded; next `try` preflight re-captures.
             Ok(s) => Ok(serde_json::from_str::<OriginalShell>(s.trim()).ok()),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
             Err(e) => Err(e).with_context(|| format!("reading {}", path.display())),
         }
     }
 
-    /// True when the file exists AND parses as empty or a valid OriginalShell.
-    /// Stale/malformed content reads as unrecorded so the next `apply`
-    /// preflight re-captures.
     pub fn original_is_recorded(&self) -> bool {
         match fs::read_to_string(self.original_file()) {
             Ok(s) if s.trim().is_empty() => true,
@@ -153,15 +144,12 @@ impl Paths {
         write_line_file(&self.original_file(), &body)
     }
 
-    /// Called from `exit` after relaunch — drops the stale record so the next
-    /// `apply` re-captures from /proc.
     pub fn clear_original(&self) -> Result<()> {
         remove_if_exists(&self.original_file())
     }
 }
 
-/// Pure-function form of `resolve_home` so tests don't have to mutate the
-/// process-global `HOME` env var.
+/// Pure form so tests don't have to mutate process-global `HOME`.
 pub fn resolve_home_from(home: Option<&str>) -> Result<PathBuf> {
     let home = home.filter(|s| !s.is_empty()).ok_or_else(|| {
         anyhow!(
@@ -187,8 +175,6 @@ fn validate_name(name: &str) -> Result<()> {
     Ok(())
 }
 
-/// Expand leading `~/` or `$HOME/` to `home`. Bare `~` / `$HOME` also resolve.
-/// Anything else is taken verbatim.
 pub fn expand_home(raw: &str, home: &Path) -> PathBuf {
     if let Some(rest) = raw.strip_prefix("~/") {
         home.join(rest)
@@ -211,7 +197,7 @@ fn remove_if_exists(p: &Path) -> Result<()> {
     }
 }
 
-// No parent-dir fsync: `original` is cache; next try preflight re-captures.
+// No parent-dir fsync: `original` is cache; next `try` preflight re-captures.
 fn write_line_file(path: &Path, contents: &str) -> Result<()> {
     let mut tmp = path.as_os_str().to_os_string();
     tmp.push(".tmp");
@@ -309,8 +295,8 @@ mod tests {
 
     #[test]
     fn original_stale_plain_text_reads_as_unrecorded() {
-        // Old backend versions wrote a bare path; migration contract is that
-        // such a file reads as None and triggers a re-record on the next apply.
+        // Older backend versions wrote a bare path; migration contract is that
+        // such a file reads as None and re-records on the next try.
         let (_t, p) = tmp_paths();
         fs::write(p.original_file(), "shell.qml\n").unwrap();
         assert!(p.original().unwrap().is_none());
@@ -334,10 +320,7 @@ mod tests {
         assert!(p.searched_catalog_paths().is_empty());
     }
 
-    // Pin the lock filename so a future refactor that silently re-splits
-    // install vs apply locks (e.g., renaming to `apply.lock`) fails loudly.
-    // Contention semantics on a single path are covered by
-    // lock::tests::acquire_contend_drop_cycle.
+    // Pins the lock filename so a future re-split (install vs apply) fails loudly.
     #[test]
     fn lock_path_is_cache_home_slash_lock() {
         let p = Paths::at_roots(

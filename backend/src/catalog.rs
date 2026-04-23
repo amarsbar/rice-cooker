@@ -103,10 +103,8 @@ fn validate_entry(name: &str, entry: &RiceEntry) -> Result<()> {
     if entry.commit.is_empty() {
         return Err(anyhow!("{name}: commit is empty"));
     }
-    // Commit must be plausible hex SHA OR explicit placeholder text.
-    // Placeholder ("PLACEHOLDER..." etc.) parses through so `list`/
-    // `status` can inspect unreleased entries; `install` refuses at
-    // runtime via is_placeholder_commit.
+    // Placeholder parses through so `list`/`status` can inspect unreleased
+    // entries; install refuses at runtime via `is_placeholder_commit`.
     let is_hex = entry.commit.chars().all(|c| c.is_ascii_hexdigit());
     let is_placeholder = entry.commit.contains("PLACEHOLDER");
     if !(is_hex || is_placeholder) || (is_hex && entry.commit.len() < 7) {
@@ -123,11 +121,8 @@ fn validate_entry(name: &str, entry: &RiceEntry) -> Result<()> {
     if entry.symlink_src.is_empty() {
         return Err(anyhow!("{name}: symlink_src is required"));
     }
-    // symlink_src is joined onto clone_dir at install time. Reject
-    // absolute paths (which Path::join would treat as a full replacement,
-    // escaping clone_dir entirely) and any `..` component (Path::join
-    // preserves `..` literally; the OS backs out of clone_dir when it
-    // later dereferences the joined path).
+    // symlink_src gets Path::join'd onto clone_dir; absolute paths would
+    // escape clone_dir outright and `..` would escape at dereference time.
     let src = std::path::Path::new(&entry.symlink_src);
     if src.is_absolute() {
         return Err(anyhow!(
@@ -148,12 +143,6 @@ fn validate_entry(name: &str, entry: &RiceEntry) -> Result<()> {
         return Err(anyhow!("{name}: symlink_dst is required"));
     }
     let dst = &entry.symlink_dst;
-    // Doc contract: dst must stay under `$HOME`. Enforce structurally by
-    // requiring the `~/<subpath>` shape. Bare absolute paths are out —
-    // `/etc/x`, `/usr/x`, `/home/other-user/x`, etc. all fail here
-    // instead of leaking through a "forbidden-prefix" blocklist that
-    // would miss `/home/other-user`, `/tmp`, `/mnt`, and any path the
-    // list didn't happen to enumerate.
     if !dst.starts_with("~/") {
         return Err(anyhow!(
             "{name}: symlink_dst must be under $HOME (start with `~/`), got {dst:?}"
@@ -164,13 +153,7 @@ fn validate_entry(name: &str, entry: &RiceEntry) -> Result<()> {
             "{name}: symlink_dst cannot be $HOME itself: {dst:?}"
         ));
     }
-    // Use Path::components for the `..` check (mirrors the symlink_src
-    // check). `dst.contains("..")` would both over-match (rejecting
-    // benign names like `..foo`) and confuse real traversal with
-    // substring noise; `Component::ParentDir` matches only a pure `..`
-    // component, which is exactly what escapes `$HOME`.
-    let dst_path = std::path::Path::new(dst);
-    if dst_path
+    if std::path::Path::new(dst)
         .components()
         .any(|c| matches!(c, std::path::Component::ParentDir))
     {

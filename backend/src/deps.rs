@@ -8,7 +8,6 @@ use std::process::{Command, ExitStatus, Stdio};
 
 use anyhow::{Context, Result, anyhow};
 
-/// Which AUR helper is available. Preference: paru > yay.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Helper {
     Paru,
@@ -16,9 +15,6 @@ pub enum Helper {
 }
 
 impl Helper {
-    /// Walk `$PATH` directly rather than shelling out to `which` —
-    /// avoids a fork per lookup AND avoids false "not found" reports
-    /// on minimal systems where `which` itself is missing.
     pub fn detect() -> Option<Self> {
         let path = env::var_os("PATH")?;
         for (name, helper) in [("paru", Helper::Paru), ("yay", Helper::Yay)] {
@@ -39,14 +35,7 @@ impl Helper {
     }
 }
 
-/// Best-effort polkit-agent preflight. pkexec without a running agent
-/// hangs / silently fails; detect and surface a clear error instead.
-///
-/// pgrep exits 0 on match, 1 on no-match; anything else is pgrep
-/// itself breaking (syntax error, /proc restricted, EPERM from
-/// sandboxing). Treat those as "environment unknown" with a distinct
-/// error so the user doesn't chase a missing polkit agent that's
-/// actually running.
+/// pkexec without a running agent hangs / silently fails — preflight instead.
 pub fn check_polkit_agent() -> Result<()> {
     let status = Command::new("pgrep")
         .arg("-f")
@@ -74,22 +63,8 @@ pub fn check_polkit_agent() -> Result<()> {
     }
 }
 
-/// Install packages via the AUR helper with pkexec as the sudo backend.
-/// paru uses `--sudobin`, yay uses `--sudo`; both take a binary name and
-/// invoke it as `<sudobin> pacman -S ...` internally.
-///
-/// `--needed` skips already-installed packages. `--noconfirm` suppresses
-/// paru/yay's own confirmation prompts (not polkit's, which are user-
-/// visible).
-///
-/// Review-prompt suppression is helper-specific:
-/// * paru gets `--skipreview` (one flag skips all PKGBUILD diff menus).
-/// * yay has no `--skipreview`; it gets `--answerclean/diff/edit/upgrade N`
-///   which pre-answers each of yay's individual menus as "no", so the
-///   menu renders and auto-advances without user input.
-///
-/// Needed for GUI operation; standard tradeoff for a curated catalog
-/// where the pinned commit is reviewed upstream, not per install.
+/// Non-interactive install via paru/yay with pkexec as the sudo backend.
+/// paru gets `--skipreview`; yay has no equivalent, so pre-answer its menus as "N".
 pub fn install_packages(pkgs: &[String]) -> Result<()> {
     if pkgs.is_empty() {
         return Ok(());
@@ -100,18 +75,11 @@ pub fn install_packages(pkgs: &[String]) -> Result<()> {
         .ok_or_else(|| anyhow!("neither paru nor yay found in PATH — install one first"))?;
 
     let mut cmd = Command::new(helper.bin());
-    // Flag shape is helper-specific. Paru has --skipreview (skips all
-    // review menus). Yay has separate menu-suppression flags plus
-    // --answer* to pre-answer each menu as "no" — we set both for
-    // belt-and-suspenders non-interactivity.
     match helper {
         Helper::Paru => {
             cmd.args(["--sudobin", "pkexec", "--skipreview"]);
         }
         Helper::Yay => {
-            // yay has no --skipreview; menu flags have no `no` variants.
-            // Pre-answer each menu as "N" so the menu renders and
-            // auto-advances without user input.
             cmd.args([
                 "--sudo",
                 "pkexec",
@@ -141,9 +109,7 @@ pub fn install_packages(pkgs: &[String]) -> Result<()> {
     Ok(())
 }
 
-/// Remove packages via pkexec pacman directly. No helper needed for
-/// removal — we have the exact list from the install record, no dep
-/// resolution required.
+/// The install record has the exact package list, so skip the helper and go straight to pacman.
 pub fn remove_packages(pkgs: &[String]) -> Result<()> {
     if pkgs.is_empty() {
         return Ok(());
@@ -164,20 +130,9 @@ pub fn remove_packages(pkgs: &[String]) -> Result<()> {
     Ok(())
 }
 
-/// Map a failed pkexec-driven command's exit status to a human error.
-///
-/// Exit codes 126/127 are ambiguous: they CAN indicate polkit
-/// outcomes (126 = action denied / not in policy, 127 = no agent
-/// reachable) but they're also POSIX shell conventions for "found
-/// but not executable" / "not found" — which pacman hooks, broken
-/// post-install scripts, or missing `execve` targets will surface
-/// through paru unchanged. So we always include the label + exit
-/// code and frame the polkit interpretation as "typical", not
-/// definitive. Signal terminations include the signal number instead
-/// of silently collapsing to "killed".
-///
-/// `check_polkit_agent` preflights the common "no agent" case, so
-/// 127 in practice usually means a real pacman-hook breakage.
+/// Exit 126/127 are ambiguous: polkit denial/no-agent AND POSIX shell
+/// "not executable"/"not found" (e.g. broken pacman hooks). Frame the
+/// polkit interpretation as "typical", not definitive.
 fn pkexec_error(status: ExitStatus, label: &str) -> anyhow::Error {
     if let Some(sig) = status.signal() {
         return anyhow!("{label} killed by signal {sig}");
@@ -197,18 +152,9 @@ fn pkexec_error(status: ExitStatus, label: &str) -> anyhow::Error {
     }
 }
 
-/// Defense-in-depth check before passing names to paru/yay/pacman.
-/// Rejects:
-/// - empty strings
-/// - names beginning with `-` (could be argv flag)
-/// - names containing path characters (`/`, `\`, or `..`)
-/// - names with characters outside `[A-Za-z0-9._+@-]` (covers real
-///   Arch package names; anything else is suspicious)
-///
-/// The catalog validator already controls what reaches
-/// `pacman_deps`/`aur_deps`; this means a future caller that
-/// bypasses the catalog still can't feed arbitrary argv into
-/// pkexec-privileged pacman.
+/// Defense-in-depth. The catalog validator already gates what reaches
+/// `pacman_deps`/`aur_deps`; this ensures a future catalog-bypassing caller
+/// still can't feed arbitrary argv into pkexec-privileged pacman.
 fn validate_pkg_names(pkgs: &[String]) -> Result<()> {
     for p in pkgs {
         if p.is_empty() {
@@ -232,8 +178,6 @@ fn validate_pkg_names(pkgs: &[String]) -> Result<()> {
     Ok(())
 }
 
-/// True if `p` exists, is a regular file, and has at least one exec
-/// bit set. Used by `Helper::detect` to avoid relying on `which`.
 fn is_executable_file(p: &Path) -> bool {
     use std::os::unix::fs::PermissionsExt;
     match std::fs::metadata(p) {
@@ -242,13 +186,9 @@ fn is_executable_file(p: &Path) -> bool {
     }
 }
 
-/// `pacman -Q <pkg>` — Ok(true) if installed, Ok(false) if the pkg
-/// isn't present. Distinguishes "not installed" (pacman exit 1) from
-/// "pacman itself is broken" (any other exit / exec failure). The
-/// broken-pacman case propagates as Err so callers can fail-stop
-/// instead of silently collapsing to "nothing needs action" — which
-/// on uninstall would skip `pacman -Rns` entirely and leave the
-/// rice's packages on disk with no tool-visible owner.
+/// Distinguishes "not installed" (exit 1) from "pacman is broken" (any other
+/// failure). The broken case must propagate — silently collapsing it would
+/// make uninstall skip `pacman -Rns` entirely and orphan the rice's packages.
 pub fn is_installed(pkg: &str) -> Result<bool> {
     let status = Command::new("pacman")
         .args(["-Q", pkg])
@@ -269,9 +209,6 @@ pub fn is_installed(pkg: &str) -> Result<bool> {
     }
 }
 
-/// Subset of `pkgs` that are NOT currently installed. Propagates
-/// pacman-query errors so an install against a broken pacman aborts
-/// instead of trying to re-install the full dep set.
 pub fn missing(pkgs: &[String]) -> Result<Vec<String>> {
     let mut out = Vec::new();
     for p in pkgs {
@@ -282,11 +219,8 @@ pub fn missing(pkgs: &[String]) -> Result<Vec<String>> {
     Ok(out)
 }
 
-/// Subset of `pkgs` that ARE currently installed. Used on uninstall
-/// to skip `pacman -Rns` for already-removed entries (which would
-/// exit non-zero and block retry). Propagates pacman-query errors so
-/// uninstall against a broken pacman aborts rather than silently
-/// skipping package removal.
+/// Used on uninstall to skip `pacman -Rns` for already-removed entries (which
+/// would exit non-zero and block retry).
 pub fn installed(pkgs: &[String]) -> Result<Vec<String>> {
     let mut out = Vec::new();
     for p in pkgs {
@@ -319,9 +253,6 @@ mod tests {
 
     #[test]
     fn validate_pkg_names_accepts_real_arch_names() {
-        // Covers the full allowed charset: letters, digits, `.`, `_`,
-        // `+`, `-`, `@`. These are the patterns pacman itself tolerates
-        // (gtk+, libc++, lib32-*, python-foo.bar, etc).
         let ok: Vec<String> = [
             "paru",
             "hyprpolkitagent",
@@ -341,7 +272,6 @@ mod tests {
 
     #[test]
     fn validate_pkg_names_rejects_flag_injection() {
-        // Leading `-` turns the name into an argv flag for paru/pacman.
         for bad in ["-rf", "--noconfirm", "-S"] {
             let err = validate_pkg_names(&[bad.to_string()])
                 .unwrap_err()
@@ -352,9 +282,6 @@ mod tests {
 
     #[test]
     fn validate_pkg_names_rejects_path_traversal_and_weird_chars() {
-        // Path chars (/, \) and `..` would let a caller escape to an
-        // absolute or relative path; shell metacharacters would inject
-        // into downstream tooling that stringifies the name.
         for bad in [
             "../evil",
             "foo/bar",
