@@ -20,8 +20,6 @@ commit = "0283b44960791ab12cde19c9797d70976a0b96a4"
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/caelestia"
 aur_deps = ["caelestia-shell-git"]
-[caelestia.entry]
-path = "shell.qml"
 
 [noctalia]
 display_name = "Noctalia"
@@ -30,8 +28,6 @@ repo = "https://github.com/noctalia-dev/noctalia-shell"
 commit = "d7b68652e79bce5813dc4fea7e51636a5da3e1b7"
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/noctalia"
-[noctalia.entry]
-path = "shell.qml"
 
 [dms]
 display_name = "DankMaterialShell"
@@ -40,8 +36,6 @@ repo = "https://github.com/AvengeMedia/DankMaterialShell"
 commit = "c6ed64b24e414cd4b9588b645a6345b15fa697f4"
 symlink_src = "quickshell"
 symlink_dst = "~/.config/quickshell/dms"
-[dms.entry]
-path = "shell.qml"
 
 [end-4]
 display_name = "illogical-impulse (end-4 dots-hyprland)"
@@ -54,8 +48,6 @@ pacman_deps = ["qt6-positioning"]
 documented_system_effects = [
   "upstream installer modifies waybar/hypr/gtk configs (we do not run it)",
 ]
-[end-4.entry]
-path = "shell.qml"
 
 [Ambxst]
 display_name = "Ambxst"
@@ -65,8 +57,6 @@ commit = "844cb9d3fc465ff13b504c99469fb6c4d695e399"
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/Ambxst"
 pacman_deps = ["syntax-highlighting"]
-[Ambxst.entry]
-path = "shell.qml"
 
 [iNiR]
 display_name = "iNiR"
@@ -76,8 +66,6 @@ commit = "a69d17fe6c919cdcedd4802b4ee56535b02449be"
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/iNiR"
 pacman_deps = ["kirigami", "syntax-highlighting"]
-[iNiR.entry]
-path = "shell.qml"
 
 [nucleus]
 display_name = "Nucleus"
@@ -86,8 +74,6 @@ repo = "https://github.com/nucleus-hq/nucleus-shell"
 commit = "2db58fc9d8c4ffc8c6b3b063692febf6c0686201"
 symlink_src = "quickshell/nucleus-shell"
 symlink_dst = "~/.config/quickshell/nucleus"
-[nucleus.entry]
-path = "shell.qml"
 
 [NibrasShell]
 display_name = "NibrasShell"
@@ -97,8 +83,6 @@ commit = "9760442e925981f74d2129d1f74ec93b2e5293d7"
 symlink_src = "config/quickshell"
 symlink_dst = "~/.config/quickshell/NibrasShell"
 pacman_deps = ["kirigami"]
-[NibrasShell.entry]
-path = "shell.qml"
 
 [linux-retroism]
 display_name = "linux-retroism"
@@ -107,8 +91,6 @@ repo = "https://github.com/diinki/linux-retroism"
 commit = "255eb6a7b5a0d26413eea8dc5f47e8d67bb4b1ff"
 symlink_src = "configs/quickshell"
 symlink_dst = "~/.config/quickshell/linux-retroism"
-[linux-retroism.entry]
-path = "shell.qml"
 
 [Zaphkiel]
 display_name = "Zaphkiel"
@@ -117,8 +99,6 @@ repo = "https://github.com/Rexcrazy804/Zaphkiel"
 commit = "6029924d393940d1f34a8e93dc7b89e24d797ff9"
 symlink_src = "dots/quickshell/kurukurubar"
 symlink_dst = "~/.config/quickshell/Zaphkiel"
-[Zaphkiel.entry]
-path = "shell.qml"
 
 [eqsh]
 display_name = "eqsh"
@@ -127,8 +107,6 @@ repo = "https://github.com/eq-desktop/eqsh"
 commit = "2eea698ec832a1b3dacb8cd5d566a5416cb11dff"
 symlink_src = "eqsh"
 symlink_dst = "~/.config/quickshell/eqsh"
-[eqsh.entry]
-path = "shell.qml"
 
 [dotfiles-hyprland]
 display_name = "dotfiles-hyprland"
@@ -137,8 +115,6 @@ repo = "https://github.com/cxOrz/dotfiles-hyprland"
 commit = "1a1bfc247de5137a4c084667cfb45f5b19415e42"
 symlink_src = ".config/quickshell"
 symlink_dst = "~/.config/quickshell/dotfiles-hyprland"
-[dotfiles-hyprland.entry]
-path = "shell.qml"
 
 [whisker]
 display_name = "whisker"
@@ -147,8 +123,6 @@ repo = "https://github.com/corecathx/whisker"
 commit = "ab1edb84b7b8cf1c0514d12f1c639f8c863e3900"
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/whisker"
-[whisker.entry]
-path = "shell.qml"
 
 [dhrruvsharma-shell]
 display_name = "dhrruvsharma-shell"
@@ -157,8 +131,6 @@ repo = "https://github.com/dhrruvsharma/shell"
 commit = "7a69584217a009ee9eea8e180ecb2471569a3187"
 symlink_src = "quickshell"
 symlink_dst = "~/.config/quickshell/dhrruvsharma-shell"
-[dhrruvsharma-shell.entry]
-path = "shell.qml"
 
 [Moonveil]
 display_name = "Moonveil"
@@ -167,5 +139,3 @@ repo = "https://github.com/notcandy001/Moonveil"
 commit = "e421611fbd9406f8cea3447849064e030f068cce"
 symlink_src = "dots/.config/quickshell/CrescentShell"
 symlink_dst = "~/.config/quickshell/Moonveil"
-[Moonveil.entry]
-path = "shell.qml"

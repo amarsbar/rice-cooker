@@ -1,113 +1,69 @@
-//! Symlink install — `ln -sfnT <clone>/<symlink_src> <symlink_dst>`.
-//! ~30 LOC. No git-status, no fallbacks. Uninstall removes the symlink
-//! and clone; users who edited files inside the clone should copy them
-//! out first (the clone is at ~/.cache/rice-cooker/rices/<name>/).
+//! Atomic symlink install — `ln -sfnT <clone>/<symlink_src> <symlink_dst>`.
 
 use std::fs;
 use std::os::unix::fs::symlink;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{Context, Result, anyhow};
 
 use crate::catalog::RiceEntry;
 use crate::paths::expand_home;
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct SymlinkPaths {
-    pub symlink_path: PathBuf,
-    pub symlink_target: PathBuf,
-}
-
-/// Create `symlink_dst` pointing at `<clone>/<symlink_src>`. Creates
-/// parent dirs. Overwrites stale symlinks. Refuses to replace a real
-/// directory at the target (protects the user's existing config).
-pub fn create_symlink(clone_dir: &Path, entry: &RiceEntry, home: &Path) -> Result<SymlinkPaths> {
+/// Create `symlink_dst` pointing at `<clone>/<symlink_src>`. Creates parent
+/// dirs. Overwrites stale rice-cooker symlinks. Refuses to replace a
+/// user-owned directory or regular file.
+pub fn create_symlink(clone_dir: &Path, entry: &RiceEntry, home: &Path) -> Result<()> {
     let src = clone_dir.join(&entry.symlink_src);
     let dst = expand_home(&entry.symlink_dst, home);
-
-    if let Some(parent) = dst.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("creating parent of {}", dst.display()))?;
-    }
-
-    match fs::symlink_metadata(&dst) {
-        Ok(md) => {
-            let ft = md.file_type();
-            if ft.is_dir() {
-                return Err(anyhow!(
-                    "{} exists as a directory; refusing to replace with a symlink",
-                    dst.display()
-                ));
-            }
-            if !ft.is_symlink() {
-                // Real file (not a symlink). Could be user-created config.
-                // Refuse rather than silently clobber.
-                return Err(anyhow!(
-                    "{} exists as a regular file; refusing to replace with a symlink (move or remove it first)",
-                    dst.display()
-                ));
-            }
-            // Stale symlink — will be replaced atomically by the rename below.
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-        Err(e) => return Err(anyhow!("reading {}: {e}", dst.display())),
-    }
-
-    // Create the new symlink at a sibling temp path, then atomically
-    // rename over dst. Skipping this and doing remove+symlink leaves a
-    // window where dst doesn't exist — any reader in that window gets
-    // ENOENT, and a racing process could mkdir the path and make the
-    // symlink call fail with EEXIST. rename handles both.
     let parent = dst
         .parent()
         .ok_or_else(|| anyhow!("{}: no parent dir", dst.display()))?;
     let file_name = dst
         .file_name()
         .ok_or_else(|| anyhow!("{}: no file name", dst.display()))?;
+    fs::create_dir_all(parent).with_context(|| format!("creating parent of {}", dst.display()))?;
+
+    match fs::symlink_metadata(&dst) {
+        Ok(md) if md.file_type().is_dir() => {
+            return Err(anyhow!("{} exists as a directory", dst.display()));
+        }
+        Ok(md) if !md.file_type().is_symlink() => {
+            return Err(anyhow!(
+                "{} exists as a regular file (move or remove it first)",
+                dst.display()
+            ));
+        }
+        Ok(_) => {} // stale symlink — replaced atomically by the rename below
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(anyhow!("reading {}: {e}", dst.display())),
+    }
+
+    // Atomic-rename dance: create at sibling `.rctmp`, then rename over dst.
+    // Plain remove+symlink leaves an ENOENT window + EEXIST race.
     let mut tmp_name = file_name.to_os_string();
     tmp_name.push(".rctmp");
     let tmp = parent.join(tmp_name);
-    // Clean up any stray tmp from a previous failed run. Swallow
-    // NotFound (expected — tmp usually doesn't exist) but surface
-    // unexpected errors so a root-owned `.rctmp` or similar doesn't
-    // get silently masked by the subsequent symlink-EEXIST failure.
-    // If a prior run (or a user) left a directory at the .rctmp path,
-    // remove_file fails with EISDIR — fall back to remove_dir_all so
-    // install isn't wedged by a stale dir we created ourselves.
     match fs::remove_file(&tmp) {
         Ok(()) => {}
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
         Err(e) if e.kind() == std::io::ErrorKind::IsADirectory => {
-            fs::remove_dir_all(&tmp)
-                .with_context(|| format!("clearing stale temp dir {}", tmp.display()))?;
+            fs::remove_dir_all(&tmp).with_context(|| format!("clearing stale {}", tmp.display()))?
         }
-        Err(e) => {
-            return Err(anyhow!("clearing stale temp {}: {e}", tmp.display()));
-        }
+        Err(e) => return Err(anyhow!("clearing stale {}: {e}", tmp.display())),
     }
     symlink(&src, &tmp)
         .with_context(|| format!("symlink {} -> {}", tmp.display(), src.display()))?;
-    if let Err(e) = fs::rename(&tmp, &dst) {
-        // Best-effort cleanup of the temp symlink on rename failure;
-        // swallow anything here — the real error is the rename failure.
+    fs::rename(&tmp, &dst).map_err(|e| {
         let _ = fs::remove_file(&tmp);
-        return Err(anyhow!(
-            "renaming {} -> {}: {e}",
-            tmp.display(),
-            dst.display()
-        ));
-    }
+        anyhow!("renaming {} -> {}: {e}", tmp.display(), dst.display())
+    })?;
 
-    Ok(SymlinkPaths {
-        symlink_path: dst,
-        symlink_target: src,
-    })
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::catalog::EntryPoint;
     use tempfile::tempdir;
 
     fn mk_entry(src: &str, dst: &str) -> RiceEntry {
@@ -121,20 +77,18 @@ mod tests {
             aur_deps: vec![],
             pacman_deps: vec![],
             interactive: false,
-            entry: EntryPoint::default(),
             documented_system_effects: vec![],
         }
     }
 
     #[test]
-    fn writes_symlink_and_records_paths() {
+    fn writes_symlink_into_expanded_home() {
         let t = tempdir().unwrap();
         let home = t.path();
         let clone = home.join("clone");
         fs::create_dir_all(&clone).unwrap();
-        let paths = create_symlink(&clone, &mk_entry(".", "~/.config/qs/x"), home).unwrap();
-        assert_eq!(paths.symlink_path, home.join(".config/qs/x"));
-        assert_eq!(fs::read_link(&paths.symlink_path).unwrap(), clone);
+        create_symlink(&clone, &mk_entry(".", "~/.config/qs/x"), home).unwrap();
+        assert_eq!(fs::read_link(home.join(".config/qs/x")).unwrap(), clone);
     }
 
     #[test]

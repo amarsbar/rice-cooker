@@ -1,0 +1,22 @@
+---
+source: tests/cli.rs
+expression: stdout
+---
+[
+  {
+    "name": "one",
+    "display_name": "One",
+    "description": "first rice",
+    "installed": false,
+    "documented_system_effects": [
+      "writes /etc/thing"
+    ]
+  },
+  {
+    "name": "two",
+    "display_name": "Two",
+    "description": "",
+    "installed": false,
+    "documented_system_effects": []
+  }
+]

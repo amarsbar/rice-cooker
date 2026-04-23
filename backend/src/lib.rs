@@ -1,4 +1,3 @@
-pub mod apply;
 pub mod catalog;
 pub mod deps;
 pub mod events;

@@ -3,9 +3,8 @@ use std::path::Path;
 
 use fs4::fs_std::FileExt;
 
-/// A process-held exclusive lock tied to a lockfile path.
-/// Dropping the `ApplyLock` releases the lock. The lockfile itself persists on disk;
-/// that's fine — it's a rendezvous point, not a flag.
+/// Process-held advisory lock. The lockfile persists on disk — it's a
+/// rendezvous point, not a flag; stale content has no meaning.
 pub struct ApplyLock {
     file: File,
 }
@@ -16,8 +15,7 @@ impl std::fmt::Debug for ApplyLock {
     }
 }
 
-/// Distinct error returned when the lock is held by another process.
-/// This lets callers tell "someone else is already applying" apart from IO errors.
+/// Distinguishes contention from real IO failure at the type level.
 #[derive(Debug)]
 pub enum LockError {
     AlreadyHeld,
@@ -54,9 +52,7 @@ impl From<std::io::Error> for LockError {
 }
 
 impl ApplyLock {
-    /// Try to acquire the lock non-blocking. Returns `LockError::AlreadyHeld` if another
-    /// process currently holds it, or `LockError::Io` on underlying IO failure.
-    /// Parent directories are NOT auto-created — caller ensures the parent exists.
+    /// Non-blocking. Parent directory must already exist.
     pub fn try_acquire(path: &Path) -> Result<Self, LockError> {
         let file = OpenOptions::new()
             .read(true)
@@ -65,7 +61,6 @@ impl ApplyLock {
             .truncate(false)
             .open(path)?;
 
-        // fs4 returns Ok(true) on acquired, Ok(false) on contention, Err on real IO failure.
         match file.try_lock_exclusive() {
             Ok(true) => Ok(ApplyLock { file }),
             Ok(false) => Err(LockError::AlreadyHeld),
@@ -76,7 +71,6 @@ impl ApplyLock {
 
 impl Drop for ApplyLock {
     fn drop(&mut self) {
-        // Best-effort; ignore errors.
         let _ = self.file.unlock();
     }
 }
@@ -90,15 +84,12 @@ mod tests {
     fn acquire_contend_drop_cycle() {
         let dir = tempdir().unwrap();
         let lock_path = dir.path().join("apply.lock");
-        // Fresh acquire succeeds.
         let first = ApplyLock::try_acquire(&lock_path).expect("first acquire");
-        // Second acquire while first is held → AlreadyHeld.
         let held = ApplyLock::try_acquire(&lock_path);
         assert!(
             matches!(held, Err(LockError::AlreadyHeld)),
             "expected AlreadyHeld, got {held:?}"
         );
-        // Drop the first; a subsequent acquire succeeds.
         drop(first);
         assert!(ApplyLock::try_acquire(&lock_path).is_ok());
     }

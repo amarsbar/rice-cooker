@@ -66,21 +66,11 @@ pub fn write_current(paths: &Paths, name: &str) -> Result<()> {
     atomic_write_fsync(&paths.current_json(), body.as_bytes())
 }
 
-/// Write `body` to `path` atomically and durably: write-to-tmp, fsync
-/// the tmp file, rename over `path`, then fsync the parent directory so
-/// the rename itself survives power loss.
-///
-/// Without the file fsync, a crash between rename and kernel writeback
-/// can leave a zero-byte record file at `path`; without the directory
-/// fsync, the rename may be lost and the content only visible under
-/// the `.tmp` name. Parent-dir fsync failure doesn't abort: by that
-/// point the file itself is durable at the new name, and returning
-/// Err here would desync `save_record` → `write_current` ordering
-/// (record on disk, current.json skipped, packages orphaned). We warn
-/// to stderr and continue.
-///
-/// On any earlier error, the `.tmp` file is best-effort unlinked so
-/// failures don't litter the installs dir.
+/// Write-to-tmp, fsync file, rename, fsync parent dir. Both fsyncs are needed:
+/// the file's to avoid a post-rename zero-byte window, the parent's so the
+/// rename itself survives power loss. Parent-fsync failure only warns — the
+/// content is durable by then, and erroring here would desync save_record →
+/// write_current (record on disk, current.json skipped, packages orphaned).
 fn atomic_write_fsync(path: &Path, body: &[u8]) -> Result<()> {
     let parent = path
         .parent()
@@ -112,38 +102,28 @@ fn atomic_write_fsync(path: &Path, body: &[u8]) -> Result<()> {
         return Err(e);
     }
 
-    match fs::File::open(parent) {
-        Ok(dir) => {
-            if let Err(e) = dir.sync_all() {
-                eprintln!(
-                    "rice-cooker: warn: fsync {}: {e} (file content is durable; rename may not survive power loss)",
-                    parent.display()
-                );
-            }
-        }
-        Err(e) => {
-            eprintln!(
-                "rice-cooker: warn: open {} for fsync: {e} (file content is durable; rename may not survive power loss)",
-                parent.display()
-            );
-        }
+    if let Err(e) = fs::File::open(parent).and_then(|d| d.sync_all()) {
+        eprintln!(
+            "rice-cooker: warn: fsync {}: {e} (file content is durable; rename may not survive power loss)",
+            parent.display()
+        );
     }
     Ok(())
 }
 
 pub fn read_current(paths: &Paths) -> Result<Option<String>> {
-    match fs::read_to_string(paths.current_json()) {
-        Ok(s) => {
-            #[derive(Deserialize)]
-            struct Cur {
-                name: String,
-            }
-            let c: Cur = serde_json::from_str(&s).context("parsing current.json")?;
-            Ok(Some(c.name))
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(e).context("reading current.json"),
+    let s = match fs::read_to_string(paths.current_json()) {
+        Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e).context("reading current.json"),
+    };
+    #[derive(Deserialize)]
+    struct Cur {
+        name: String,
     }
+    serde_json::from_str::<Cur>(&s)
+        .map(|c| Some(c.name))
+        .context("parsing current.json")
 }
 
 pub fn clear_current(paths: &Paths) -> Result<()> {
