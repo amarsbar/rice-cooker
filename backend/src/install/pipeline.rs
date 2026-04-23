@@ -205,6 +205,7 @@ pub fn run_try<W: Write>(
         }
     }
 
+    let _ = Command::new("hyprctl").arg("reload").output();
     events.emit(&Event::Success {
         active: Some(name.to_string()),
     })?;
@@ -238,6 +239,7 @@ pub fn run_uninstall<W: Write>(
     if !replay_original_shell(paths, events)? {
         return Ok(false);
     }
+    let _ = Command::new("hyprctl").arg("reload").output();
     events.emit(&Event::Success { active: None })?;
     Ok(true)
 }
