@@ -22,6 +22,13 @@ const LOG_TAIL_LINES: usize = 20;
 // positives; `(^|/)` before handles the path prefix case.
 pub const QS_MATCH_PATTERN: &str = r"(^|/)(quickshell|qs)( |$)";
 
+/// True when `quickshell -c <name>` has a running process. Uses the same
+/// cmdline literal verify_by_name emits so the pattern stays in sync.
+pub fn rice_shell_alive(name: &str) -> Result<bool> {
+    let pat = format!("quickshell -c {}", regex::escape(name));
+    pgrep_matches(&["-xf", &pat])
+}
+
 pub fn kill_notif_daemons() -> Result<()> {
     for name in NOTIFIERS {
         run_pkill(&["-TERM", "-x", name])?;

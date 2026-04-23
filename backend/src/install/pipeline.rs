@@ -130,10 +130,21 @@ pub fn run_try<W: Write>(
     step(events, Step::Preflight, StepState::Done)?;
 
     if current.as_deref() == Some(name) {
-        events.emit(&Event::Success {
-            active: Some(name.to_string()),
-        })?;
-        return Ok(true);
+        // Liveness check: current.json can be stale if the shell crashed or
+        // was manually killed. Only short-circuit when the process is actually
+        // running; otherwise fall through and re-launch.
+        let alive = try_stage!(
+            events,
+            "preflight",
+            "liveness",
+            process::rice_shell_alive(name)
+        );
+        if alive {
+            events.emit(&Event::Success {
+                active: Some(name.to_string()),
+            })?;
+            return Ok(true);
+        }
     }
 
     // Evict outgoing rice (replay=false — we launch a new one next).

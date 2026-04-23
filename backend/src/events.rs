@@ -192,7 +192,7 @@ mod tests {
         let mut w = EventWriter::new(&mut buf);
         w.emit(&Event::Hello {
             version: 1,
-            subcommand: "apply".into(),
+            subcommand: "try".into(),
         })
         .unwrap();
         w.emit(&Event::Step {
@@ -204,7 +204,7 @@ mod tests {
         let out = String::from_utf8(buf).unwrap();
         assert_eq!(
             out,
-            "{\"type\":\"hello\",\"version\":1,\"subcommand\":\"apply\"}\n\
+            "{\"type\":\"hello\",\"version\":1,\"subcommand\":\"try\"}\n\
              {\"type\":\"step\",\"step\":\"clone\",\"state\":\"start\"}\n"
         );
     }
