@@ -12,7 +12,7 @@ use crate::catalog::{Catalog, RiceEntry, is_placeholder_commit};
 use crate::deps;
 use crate::events::{Event, EventWriter, SCHEMA_VERSION as EVENT_SCHEMA_VERSION, Step, StepState};
 use crate::git;
-use crate::lock::{ApplyLock, LockError};
+use crate::lock::{Lock, LockError};
 use crate::paths::{OriginalShell, Paths, expand_home};
 use crate::process::{self, VerifyResult};
 
@@ -507,8 +507,8 @@ fn emit_fail<W: Write>(
     Ok(())
 }
 
-fn acquire_lock<W: Write>(paths: &Paths, events: &mut EventWriter<W>) -> Result<Option<ApplyLock>> {
-    match ApplyLock::try_acquire(&paths.lock()) {
+fn acquire_lock<W: Write>(paths: &Paths, events: &mut EventWriter<W>) -> Result<Option<Lock>> {
+    match Lock::try_acquire(&paths.lock()) {
         Ok(l) => Ok(Some(l)),
         Err(LockError::AlreadyHeld) => {
             emit_fail(events, "lock", "already_held", None)?;

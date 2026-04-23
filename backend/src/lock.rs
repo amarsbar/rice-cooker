@@ -5,13 +5,13 @@ use fs4::fs_std::FileExt;
 
 /// Process-held advisory lock. The lockfile persists on disk — it's a
 /// rendezvous point, not a flag; stale content has no meaning.
-pub struct ApplyLock {
+pub struct Lock {
     file: File,
 }
 
-impl std::fmt::Debug for ApplyLock {
+impl std::fmt::Debug for Lock {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ApplyLock").finish_non_exhaustive()
+        f.debug_struct("Lock").finish_non_exhaustive()
     }
 }
 
@@ -26,10 +26,7 @@ impl std::fmt::Display for LockError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             LockError::AlreadyHeld => {
-                write!(
-                    f,
-                    "another rice-cooker-backend process holds the apply lock"
-                )
+                write!(f, "another rice-cooker-backend process holds the lock")
             }
             LockError::Io(e) => write!(f, "{e}"),
         }
@@ -51,7 +48,7 @@ impl From<std::io::Error> for LockError {
     }
 }
 
-impl ApplyLock {
+impl Lock {
     /// Non-blocking. Parent directory must already exist.
     pub fn try_acquire(path: &Path) -> Result<Self, LockError> {
         let file = OpenOptions::new()
@@ -62,14 +59,14 @@ impl ApplyLock {
             .open(path)?;
 
         match file.try_lock_exclusive() {
-            Ok(true) => Ok(ApplyLock { file }),
+            Ok(true) => Ok(Lock { file }),
             Ok(false) => Err(LockError::AlreadyHeld),
             Err(e) => Err(LockError::Io(e)),
         }
     }
 }
 
-impl Drop for ApplyLock {
+impl Drop for Lock {
     fn drop(&mut self) {
         let _ = self.file.unlock();
     }
@@ -83,14 +80,14 @@ mod tests {
     #[test]
     fn acquire_contend_drop_cycle() {
         let dir = tempdir().unwrap();
-        let lock_path = dir.path().join("apply.lock");
-        let first = ApplyLock::try_acquire(&lock_path).expect("first acquire");
-        let held = ApplyLock::try_acquire(&lock_path);
+        let lock_path = dir.path().join("lock");
+        let first = Lock::try_acquire(&lock_path).expect("first acquire");
+        let held = Lock::try_acquire(&lock_path);
         assert!(
             matches!(held, Err(LockError::AlreadyHeld)),
             "expected AlreadyHeld, got {held:?}"
         );
         drop(first);
-        assert!(ApplyLock::try_acquire(&lock_path).is_ok());
+        assert!(Lock::try_acquire(&lock_path).is_ok());
     }
 }
