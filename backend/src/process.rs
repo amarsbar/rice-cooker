@@ -266,11 +266,12 @@ fn tail_lines_or_placeholder(log: &str, entry_abs: &Path) -> String {
 /// Return `Some(true)` if Hyprland's layer-shell list contains any surface
 /// owned by one of the given PIDs. `Some(false)` if Hyprland answered
 /// definitively that none of those PIDs own a layer. `None` if we
-/// couldn't ask (hyprctl not on PATH, JSON unparseable, not a Hyprland
-/// session) — the caller treats None as "no signal" and proceeds.
+/// couldn't ask (hyprctl not on PATH, hung past 1s, JSON unparseable,
+/// not a Hyprland session) — the caller treats None as "no signal".
 fn hyprland_owns_layers(pids: &[u32]) -> Option<bool> {
-    let out = Command::new("hyprctl")
-        .args(["layers", "-j"])
+    // `timeout` so a wedged compositor can't block past verify()'s deadline.
+    let out = Command::new("timeout")
+        .args(["--signal=KILL", "1", "hyprctl", "layers", "-j"])
         .stderr(Stdio::null())
         .output()
         .ok()?;
