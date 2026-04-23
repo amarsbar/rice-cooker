@@ -1,12 +1,11 @@
-<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 41.8033 56.6671" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g id="Group 1321315869">
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 41.8033 56.6662" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Group 1321315874">
 <path id="Ellipse 2017" d="M41.8033 20.9016C41.8033 32.4453 32.4453 41.8033 20.9016 41.8033C9.35798 41.8033 0 32.4453 0 20.9016C0 9.35798 9.35798 0 20.9016 0C32.4453 0 41.8033 9.35798 41.8033 20.9016ZM8.36065 20.9016C8.36065 27.8278 13.9754 33.4426 20.9016 33.4426C27.8278 33.4426 33.4426 27.8278 33.4426 20.9016C33.4426 13.9754 27.8278 8.36065 20.9016 8.36065C13.9754 8.36065 8.36065 13.9754 8.36065 20.9016Z" fill="var(--fill-0, #FE6A00)"/>
-<rect id="Rectangle 3471743" x="13.9375" y="37.1592" width="13.9344" height="18.5792" fill="var(--fill-0, #FE6A00)"/>
-<circle id="Ellipse 2158" cx="21" cy="21" r="13" fill="var(--fill-0, #DFECDB)"/>
-<rect id="Rectangle 3471744" x="11.6094" y="54.3447" width="18.5792" height="2.3224" rx="1.1612" fill="var(--fill-0, #FE6A00)"/>
+<rect id="Rectangle 3471743" x="13.9375" y="37.1602" width="13.9344" height="18.5792" fill="var(--fill-0, #FE6A00)"/>
+<rect id="Rectangle 3471744" x="11.6094" y="54.3438" width="18.5792" height="2.3224" rx="1.1612" fill="var(--fill-0, #FE6A00)"/>
 <g id="x">
-<path id="Vector" d="M25.5396 16.2568L16.25 25.5465" stroke="var(--stroke-0, #4B837D)" stroke-width="2.58883" stroke-linecap="round" stroke-linejoin="round"/>
-<path id="Vector_2" d="M16.25 16.2568L25.5396 25.5465" stroke="var(--stroke-0, #4B837D)" stroke-width="2.58883" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector" d="M25.5396 16.2578L16.25 25.5474" stroke="var(--stroke-0, #FE6A00)" stroke-width="2.58883" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_2" d="M16.25 16.2578L25.5396 25.5474" stroke="var(--stroke-0, #FE6A00)" stroke-width="2.58883" stroke-linecap="round" stroke-linejoin="round"/>
 </g>
 </g>
 </svg>
