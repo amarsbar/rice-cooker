@@ -17,6 +17,10 @@ ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BIN=$ROOT/target/release/rice-cooker-backend
 CAT=$ROOT/catalog.toml
 RENDER_SETTLE=2   # seconds to wait after `try` returns before hyprctl check
+# Run via systemd-run --scope so the backend lands in the user session's
+# cgroup tree and polkit recognizes us as a session subject — auth_admin_keep
+# should then retain across rice boundaries.
+RUN=(systemd-run --user --scope --quiet --collect)
 
 # Rices to try, in order. Skip caelestia (tested separately) + dotfiles-hyprland (known bad).
 RICES=(
@@ -32,7 +36,7 @@ sleep 1
 
 pass=0
 fail=0
-declare -a failed_names
+failed_names=()
 
 # Returns 0 if the NDJSON at $1 contains a line with "type":"success" and
 # no "type":"fail". Otherwise 1.
@@ -72,7 +76,7 @@ for name in "${RICES[@]}"; do
     rm -f "$HOME/.local/share/rice-cooker/installs/current.json"
 
     # try — full pipeline: clone + deps + symlink + record + kill qs + launch + verify.
-    if ! "$BIN" --catalog "$CAT" try "$name" >/tmp/rc-try.log 2>/tmp/rc-try.err; then
+    if ! "${RUN[@]}" "$BIN" --catalog "$CAT" try "$name" >/tmp/rc-try.log 2>/tmp/rc-try.err; then
         reason=$(ndjson_fail_reason /tmp/rc-try.log)
         printf '%-24s FAIL try: %s\n' "$name" "${reason:-unknown}"
         tail -5 /tmp/rc-try.err
@@ -90,7 +94,7 @@ for name in "${RICES[@]}"; do
     dst_expanded=$(symlink_dst_for "$name")
     if [ ! -L "$dst_expanded" ]; then
         echo "SYMLINK MISSING at $dst_expanded"
-        "$BIN" --catalog "$CAT" uninstall >/dev/null 2>&1
+        "${RUN[@]}" "$BIN" --catalog "$CAT" uninstall >/dev/null 2>&1
         fail=$((fail+1)); failed_names+=("$name:symlink-missing")
         continue
     fi
@@ -102,7 +106,7 @@ for name in "${RICES[@]}"; do
 
     # uninstall — should kill qs, remove deps/symlink/record, and (since
     # we had no captured original shell going in) skip the replay step.
-    if ! "$BIN" --catalog "$CAT" uninstall >/tmp/rc-uninstall.log 2>/tmp/rc-uninstall.err; then
+    if ! "${RUN[@]}" "$BIN" --catalog "$CAT" uninstall >/tmp/rc-uninstall.log 2>/tmp/rc-uninstall.err; then
         reason=$(ndjson_fail_reason /tmp/rc-uninstall.log)
         printf '%-24s FAIL uninstall: %s\n' "$name" "${reason:-unknown}"
         tail -5 /tmp/rc-uninstall.err
