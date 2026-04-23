@@ -97,14 +97,11 @@ impl Paths {
         let Some(xdg) = self.xdg.as_ref() else {
             return Vec::new();
         };
-        let mut out = Vec::new();
-        if let Some(h) = xdg.get_data_home() {
-            out.push(h.join("catalog.toml"));
-        }
-        for d in xdg.get_data_dirs() {
-            out.push(d.join("catalog.toml"));
-        }
-        out
+        xdg.get_data_home()
+            .into_iter()
+            .chain(xdg.get_data_dirs())
+            .map(|d| d.join("catalog.toml"))
+            .collect()
     }
 
     pub fn ensure_rices(&self) -> Result<()> {
@@ -118,29 +115,25 @@ impl Paths {
 
     pub fn original(&self) -> Result<Option<OriginalShell>> {
         let path = self.original_file();
-        match fs::read_to_string(&path) {
-            Ok(s) if s.trim().is_empty() => Ok(None),
-            // Malformed content (e.g. plain path from an older backend) reads
-            // as unrecorded; next `try` preflight re-captures.
-            Ok(s) => Ok(serde_json::from_str::<OriginalShell>(s.trim()).ok()),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(e) => Err(e).with_context(|| format!("reading {}", path.display())),
-        }
+        let s = match fs::read_to_string(&path) {
+            Ok(s) => s,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(e) => return Err(e).with_context(|| format!("reading {}", path.display())),
+        };
+        // Malformed content (empty file from older backend, plain path, typo
+        // from a hand-edit) reads as None; next `try` preflight re-captures.
+        Ok(serde_json::from_str::<Option<OriginalShell>>(s.trim()).unwrap_or(None))
     }
 
     pub fn original_is_recorded(&self) -> bool {
-        match fs::read_to_string(self.original_file()) {
-            Ok(s) if s.trim().is_empty() => true,
-            Ok(s) => serde_json::from_str::<OriginalShell>(s.trim()).is_ok(),
-            Err(_) => false,
-        }
+        let Ok(s) = fs::read_to_string(self.original_file()) else {
+            return false;
+        };
+        serde_json::from_str::<Option<OriginalShell>>(s.trim()).is_ok()
     }
 
     pub fn set_original(&self, shell: Option<&OriginalShell>) -> Result<()> {
-        let body = match shell {
-            Some(s) => serde_json::to_string(s).context("serializing original shell")?,
-            None => String::new(),
-        };
+        let body = serde_json::to_string(&shell).context("serializing original shell")?;
         write_line_file(&self.original_file(), &body)
     }
 
@@ -211,8 +204,11 @@ fn write_line_file(path: &Path, contents: &str) -> Result<()> {
         .write(true)
         .open(&tmp)
         .with_context(|| format!("opening {}", tmp.display()))?;
-    let body = format!("{contents}\n");
-    if let Err(e) = f.write_all(body.as_bytes()).and_then(|_| f.sync_all()) {
+    let res = f
+        .write_all(contents.as_bytes())
+        .and_then(|_| f.write_all(b"\n"))
+        .and_then(|_| f.sync_all());
+    if let Err(e) = res {
         let _ = fs::remove_file(&tmp);
         return Err(e).with_context(|| format!("writing {}", tmp.display()));
     }
