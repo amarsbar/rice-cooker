@@ -77,9 +77,8 @@ pub fn run_try<W: Write>(
     hello(events, "try")?;
     try_stage!(events, "init", paths.ensure_rices());
     try_stage!(events, "init", paths.ensure_installs());
-    let _lock = match acquire_lock(paths, events)? {
-        Some(l) => l,
-        None => return Ok(false),
+    let Some(_lock) = acquire_lock(paths, events)? else {
+        return Ok(false);
     };
 
     let entry = match cat.get(name) {
@@ -106,7 +105,7 @@ pub fn run_try<W: Write>(
             return Ok(false);
         }
     };
-    let all_deps: Vec<String> = [entry.pacman_deps.clone(), entry.aur_deps.clone()].concat();
+    let all_deps: Vec<String> = [entry.pacman_deps.as_slice(), entry.aur_deps.as_slice()].concat();
 
     step(events, Step::Preflight, StepState::Start)?;
     try_stage!(events, "preflight", "git", git::preflight());
@@ -141,10 +140,10 @@ pub fn run_try<W: Write>(
         }
     }
 
-    // Evict outgoing rice (replay=false — we launch a new one next).
+    // Evict outgoing rice (no replay — we launch a new one next).
     if let Some(outgoing) = current.as_deref() {
         step(events, Step::Evict, StepState::Start)?;
-        if !uninstall_locked(paths, Flags::default(), events, outgoing, false)? {
+        if !uninstall_locked(paths, Flags::default(), events, outgoing)? {
             return Ok(false);
         }
         step(events, Step::Evict, StepState::Done)?;
@@ -220,9 +219,8 @@ pub fn run_uninstall<W: Write>(
     hello(events, "uninstall")?;
     try_stage!(events, "init", paths.ensure_rices());
     try_stage!(events, "init", paths.ensure_installs());
-    let _lock = match acquire_lock(paths, events)? {
-        Some(l) => l,
-        None => return Ok(false),
+    let Some(_lock) = acquire_lock(paths, events)? else {
+        return Ok(false);
     };
 
     step(events, Step::Preflight, StepState::Start)?;
@@ -234,20 +232,22 @@ pub fn run_uninstall<W: Write>(
         return Ok(true);
     };
 
-    if !uninstall_locked(paths, flags, events, &name, true)? {
+    if !uninstall_locked(paths, flags, events, &name)? {
+        return Ok(false);
+    }
+    if !replay_original_shell(paths, events)? {
         return Ok(false);
     }
     events.emit(&Event::Success { active: None })?;
     Ok(true)
 }
 
-/// Kill qs, clear state, and (if replay=true) replay the pre-rice shell.
+/// Kill qs and clear state for `name`.
 fn uninstall_locked<W: Write>(
     paths: &Paths,
     flags: Flags,
     events: &mut EventWriter<W>,
     name: &str,
-    replay: bool,
 ) -> Result<bool> {
     // A tampered current.json must surface as a Fail, not bare Err (post-hello contract).
     let record_path = try_stage!(events, "record", "path", paths.record_json(name));
@@ -277,35 +277,8 @@ fn uninstall_locked<W: Write>(
     }
     step(events, Step::Deps, StepState::Done)?;
 
-    // Only remove the symlink if it still points where we left it — don't
-    // clobber a user-retargeted or user-replaced entry.
     step(events, Step::Symlink, StepState::Start)?;
-    try_stage!(events, "symlink", {
-        match fs::symlink_metadata(&record.symlink_path) {
-            Ok(md) if md.file_type().is_symlink() => match fs::read_link(&record.symlink_path) {
-                Ok(t) if t == record.symlink_target => fs::remove_file(&record.symlink_path)
-                    .with_context(|| format!("removing symlink {}", record.symlink_path.display())),
-                Ok(t) => {
-                    eprintln!(
-                        "rice-cooker: skipping {}: target is {t:?}, expected {:?} (user-retargeted?)",
-                        record.symlink_path.display(),
-                        record.symlink_target
-                    );
-                    Ok(())
-                }
-                Err(e) => Err(anyhow!("read_link {}: {e}", record.symlink_path.display())),
-            },
-            Ok(_) => {
-                eprintln!(
-                    "rice-cooker: skipping {}: not a symlink anymore",
-                    record.symlink_path.display()
-                );
-                Ok(())
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(e) => Err(anyhow!("reading {}: {e}", record.symlink_path.display())),
-        }
-    });
+    try_stage!(events, "symlink", remove_rice_symlink(&record));
     step(events, Step::Symlink, StepState::Done)?;
 
     // Clear the pointer (current.json) BEFORE the target (record) — so if the
@@ -330,13 +303,13 @@ fn uninstall_locked<W: Write>(
         }
     }
     step(events, Step::Record, StepState::Done)?;
+    Ok(true)
+}
 
-    if !replay {
-        return Ok(true);
-    }
-
-    // Always clear `original` after replay — even on failure the captured argv
-    // is stale relative to whatever the user has launched since.
+/// Launch the captured pre-rice shell (if any) and clear `original`. Always
+/// clears — even on launch failure the captured argv is stale relative to
+/// whatever the user has launched since.
+fn replay_original_shell<W: Write>(paths: &Paths, events: &mut EventWriter<W>) -> Result<bool> {
     let original = try_stage!(events, "replay", "read_original", paths.original());
     let replay_err = if let Some(shell) = original
         && !shell.argv.is_empty()
@@ -383,6 +356,33 @@ fn uninstall_locked<W: Write>(
     }
 }
 
+fn remove_rice_symlink(record: &InstallRecord) -> Result<()> {
+    let md = match fs::symlink_metadata(&record.symlink_path) {
+        Ok(md) => md,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(anyhow!("reading {}: {e}", record.symlink_path.display())),
+    };
+    if !md.file_type().is_symlink() {
+        eprintln!(
+            "rice-cooker: skipping {}: not a symlink anymore",
+            record.symlink_path.display()
+        );
+        return Ok(());
+    }
+    let target = fs::read_link(&record.symlink_path)
+        .with_context(|| format!("read_link {}", record.symlink_path.display()))?;
+    if target != record.symlink_target {
+        eprintln!(
+            "rice-cooker: skipping {}: target is {target:?}, expected {:?} (user-retargeted?)",
+            record.symlink_path.display(),
+            record.symlink_target
+        );
+        return Ok(());
+    }
+    fs::remove_file(&record.symlink_path)
+        .with_context(|| format!("removing symlink {}", record.symlink_path.display()))
+}
+
 pub fn list(cat: &Catalog, paths: &Paths) -> Result<Vec<ListRow>> {
     let current = read_current(paths)?;
     Ok(cat
@@ -425,8 +425,9 @@ pub(crate) fn clone_cache_hit(clone_dir: &Path, commit: &str) -> bool {
     if !out.status.success() {
         return false;
     }
-    let head = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    head.starts_with(commit) || commit.starts_with(&head)
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let head = stdout.trim();
+    head.starts_with(commit) || commit.starts_with(head)
 }
 
 fn do_clone(paths: &Paths, name: &str, entry: &RiceEntry) -> Result<()> {

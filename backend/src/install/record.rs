@@ -102,38 +102,28 @@ fn atomic_write_fsync(path: &Path, body: &[u8]) -> Result<()> {
         return Err(e);
     }
 
-    match fs::File::open(parent) {
-        Ok(dir) => {
-            if let Err(e) = dir.sync_all() {
-                eprintln!(
-                    "rice-cooker: warn: fsync {}: {e} (file content is durable; rename may not survive power loss)",
-                    parent.display()
-                );
-            }
-        }
-        Err(e) => {
-            eprintln!(
-                "rice-cooker: warn: open {} for fsync: {e} (file content is durable; rename may not survive power loss)",
-                parent.display()
-            );
-        }
+    if let Err(e) = fs::File::open(parent).and_then(|d| d.sync_all()) {
+        eprintln!(
+            "rice-cooker: warn: fsync {}: {e} (file content is durable; rename may not survive power loss)",
+            parent.display()
+        );
     }
     Ok(())
 }
 
 pub fn read_current(paths: &Paths) -> Result<Option<String>> {
-    match fs::read_to_string(paths.current_json()) {
-        Ok(s) => {
-            #[derive(Deserialize)]
-            struct Cur {
-                name: String,
-            }
-            let c: Cur = serde_json::from_str(&s).context("parsing current.json")?;
-            Ok(Some(c.name))
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(e).context("reading current.json"),
+    let s = match fs::read_to_string(paths.current_json()) {
+        Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e).context("reading current.json"),
+    };
+    #[derive(Deserialize)]
+    struct Cur {
+        name: String,
     }
+    serde_json::from_str::<Cur>(&s)
+        .map(|c| Some(c.name))
+        .context("parsing current.json")
 }
 
 pub fn clear_current(paths: &Paths) -> Result<()> {

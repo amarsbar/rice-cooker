@@ -7,9 +7,9 @@
 
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Component, Path};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -53,8 +53,7 @@ pub struct RiceEntry {
 }
 
 impl Catalog {
-    #[allow(clippy::should_implement_trait)]
-    pub fn from_str(s: &str) -> Result<Self> {
+    pub fn parse(s: &str) -> Result<Self> {
         let cat: Catalog = toml::from_str(s).context("parsing catalog.toml")?;
         for (name, entry) in &cat.rices {
             validate_name(name)?;
@@ -66,7 +65,7 @@ impl Catalog {
     pub fn from_file(path: &Path) -> Result<Self> {
         let body = fs::read_to_string(path)
             .with_context(|| format!("reading catalog {}", path.display()))?;
-        Self::from_str(&body)
+        Self::parse(&body)
     }
 
     pub fn get(&self, name: &str) -> Option<&RiceEntry> {
@@ -82,85 +81,73 @@ pub fn is_placeholder_commit(commit: &str) -> bool {
 }
 
 pub fn validate_name(name: &str) -> Result<()> {
-    if name.is_empty()
+    let bad = name.is_empty()
         || name == "."
         || name == ".."
         || name.starts_with('-')
-        || name.chars().any(|c| matches!(c, '/' | '\\' | '\0'))
-    {
-        return Err(anyhow!("invalid rice name {name:?}"));
-    }
+        || name.chars().any(|c| matches!(c, '/' | '\\' | '\0'));
+    ensure!(!bad, "invalid rice name {name:?}");
     Ok(())
 }
 
 fn validate_entry(name: &str, entry: &RiceEntry) -> Result<()> {
-    if entry.display_name.is_empty() {
-        return Err(anyhow!("{name}: display_name is empty"));
-    }
-    if entry.repo.is_empty() {
-        return Err(anyhow!("{name}: repo is empty"));
-    }
-    if entry.commit.is_empty() {
-        return Err(anyhow!("{name}: commit is empty"));
-    }
+    ensure!(
+        !entry.display_name.is_empty(),
+        "{name}: display_name is empty"
+    );
+    ensure!(!entry.repo.is_empty(), "{name}: repo is empty");
+    ensure!(!entry.commit.is_empty(), "{name}: commit is empty");
+
     // Placeholder parses through so `list`/`status` can inspect unreleased
     // entries; install refuses at runtime via `is_placeholder_commit`.
-    let is_hex = entry.commit.chars().all(|c| c.is_ascii_hexdigit());
-    let is_placeholder = entry.commit.contains("PLACEHOLDER");
-    if !(is_hex || is_placeholder) || (is_hex && entry.commit.len() < 7) {
-        return Err(anyhow!(
-            "{name}: commit must be a hex SHA (≥7 chars) or contain \"PLACEHOLDER\", got {:?}",
-            entry.commit
-        ));
-    }
-    if entry.interactive {
-        return Err(anyhow!(
-            "{name}: interactive = true is not supported in v1 (see docs/issues/interactive-installs.md)"
-        ));
-    }
-    if entry.symlink_src.is_empty() {
-        return Err(anyhow!("{name}: symlink_src is required"));
-    }
+    let is_valid_hex =
+        entry.commit.len() >= 7 && entry.commit.chars().all(|c| c.is_ascii_hexdigit());
+    ensure!(
+        is_valid_hex || is_placeholder_commit(&entry.commit),
+        "{name}: commit must be a hex SHA (≥7 chars) or contain \"PLACEHOLDER\", got {:?}",
+        entry.commit
+    );
+
+    ensure!(
+        !entry.interactive,
+        "{name}: interactive = true is not supported in v1 (see docs/issues/interactive-installs.md)"
+    );
+
+    ensure!(
+        !entry.symlink_src.is_empty(),
+        "{name}: symlink_src is required"
+    );
     // symlink_src gets Path::join'd onto clone_dir; absolute paths would
     // escape clone_dir outright and `..` would escape at dereference time.
-    let src = std::path::Path::new(&entry.symlink_src);
-    if src.is_absolute() {
-        return Err(anyhow!(
-            "{name}: symlink_src must be relative to the clone dir, got {:?}",
-            entry.symlink_src
-        ));
-    }
-    if src
-        .components()
-        .any(|c| matches!(c, std::path::Component::ParentDir))
-    {
-        return Err(anyhow!(
-            "{name}: symlink_src must not contain .. segments, got {:?}",
-            entry.symlink_src
-        ));
-    }
-    if entry.symlink_dst.is_empty() {
-        return Err(anyhow!("{name}: symlink_dst is required"));
-    }
+    let src = Path::new(&entry.symlink_src);
+    ensure!(
+        !src.is_absolute(),
+        "{name}: symlink_src must be relative to the clone dir, got {:?}",
+        entry.symlink_src
+    );
+    ensure!(
+        !src.components().any(|c| matches!(c, Component::ParentDir)),
+        "{name}: symlink_src must not contain .. segments, got {:?}",
+        entry.symlink_src
+    );
+
     let dst = &entry.symlink_dst;
-    if !dst.starts_with("~/") {
-        return Err(anyhow!(
-            "{name}: symlink_dst must be under $HOME (start with `~/`), got {dst:?}"
-        ));
-    }
-    if dst == "~/" {
-        return Err(anyhow!(
-            "{name}: symlink_dst cannot be $HOME itself: {dst:?}"
-        ));
-    }
-    if std::path::Path::new(dst)
-        .components()
-        .any(|c| matches!(c, std::path::Component::ParentDir))
-    {
-        return Err(anyhow!(
-            "{name}: symlink_dst must not contain .. components: {dst:?}"
-        ));
-    }
+    ensure!(!dst.is_empty(), "{name}: symlink_dst is required");
+    ensure!(
+        dst.starts_with("~/"),
+        "{name}: symlink_dst must be under $HOME (start with `~/`), got {dst:?}"
+    );
+    ensure!(
+        dst != "~/",
+        "{name}: symlink_dst cannot be $HOME itself: {dst:?}"
+    );
+    ensure!(
+        !Path::new(dst)
+            .components()
+            .any(|c| matches!(c, Component::ParentDir)),
+        "{name}: symlink_dst must not contain .. components: {dst:?}"
+    );
+
     Ok(())
 }
 
@@ -179,7 +166,7 @@ mod tests {
 
     #[test]
     fn parses_minimal() {
-        let c = Catalog::from_str(MINIMAL).unwrap();
+        let c = Catalog::parse(MINIMAL).unwrap();
         let e = c.get("dms").unwrap();
         assert_eq!(e.display_name, "DMS");
         assert!(e.aur_deps.is_empty());
@@ -198,7 +185,7 @@ mod tests {
             symlink_dst = "~/.config/quickshell/x"
             interactive = true
         "#;
-        let err = Catalog::from_str(t).unwrap_err().to_string();
+        let err = Catalog::parse(t).unwrap_err().to_string();
         assert!(err.contains("interactive"), "got: {err}");
     }
 
@@ -214,7 +201,7 @@ mod tests {
             symlink_src = "."
             symlink_dst = "~/.config/quickshell/x"
         "#;
-        assert!(Catalog::from_str(t).is_ok());
+        assert!(Catalog::parse(t).is_ok());
     }
 
     #[test]
@@ -239,7 +226,7 @@ mod tests {
                 symlink_dst = "~/.config/quickshell/x"
                 "#
             );
-            assert!(Catalog::from_str(&t).is_err(), "accepted {bad:?}");
+            assert!(Catalog::parse(&t).is_err(), "accepted {bad:?}");
         }
     }
 
@@ -256,7 +243,7 @@ mod tests {
                 symlink_dst = "{bad}"
                 "#
             );
-            assert!(Catalog::from_str(&t).is_err(), "accepted {bad:?}");
+            assert!(Catalog::parse(&t).is_err(), "accepted {bad:?}");
         }
     }
 
@@ -288,7 +275,7 @@ mod tests {
                symlink_src = "."
                symlink_dst = """#,
         ] {
-            assert!(Catalog::from_str(body).is_err(), "accepted: {body}");
+            assert!(Catalog::parse(body).is_err(), "accepted: {body}");
         }
     }
 
@@ -303,7 +290,7 @@ mod tests {
             symlink_dst = "~/.config/quickshell/caelestia"
             aur_deps = ["caelestia-shell-git"]
         "#;
-        let c = Catalog::from_str(t).unwrap();
+        let c = Catalog::parse(t).unwrap();
         let e = c.get("caelestia").unwrap();
         assert_eq!(e.aur_deps, vec!["caelestia-shell-git"]);
     }
