@@ -161,13 +161,19 @@ pub fn run_exit<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<
     // with nothing running. Validate first, kill second.
     let original = try_stage!(events, "commit", "read_original", cache.original());
     let replay = match original {
-        Some(shell) => match shell.cwd.as_deref() {
-            Some(c) => Some((shell.argv.clone(), PathBuf::from(c))),
-            None => {
-                emit_fail(events, "launch", "cwd_missing", None, None)?;
+        Some(shell) => {
+            if shell.argv.is_empty() {
+                emit_fail(events, "launch", "argv_missing", None, None)?;
                 return Ok(false);
             }
-        },
+            match shell.cwd.as_deref() {
+                Some(c) => Some((shell.argv.clone(), PathBuf::from(c))),
+                None => {
+                    emit_fail(events, "launch", "cwd_missing", None, None)?;
+                    return Ok(false);
+                }
+            }
+        }
         None => None,
     };
 

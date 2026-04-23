@@ -223,5 +223,9 @@ fn catalog_path(flag: Option<&std::path::Path>) -> Result<PathBuf> {
             return Ok(p);
         }
     }
-    Ok(PathBuf::from("backend/catalog.toml"))
+    Err(anyhow::anyhow!(
+        "no catalog found at ./backend/catalog.toml or ./catalog.toml \
+         (cwd: {}). Pass --catalog <path> or set RICE_COOKER_CATALOG.",
+        cwd.display()
+    ))
 }
