@@ -5,15 +5,15 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 use rice_cooker_backend::apply::{self, ApplyParams};
-use rice_cooker_backend::cache::Cache;
 use rice_cooker_backend::catalog::Catalog;
 use rice_cooker_backend::events::EventWriter;
 use rice_cooker_backend::install::{self, Flags};
+use rice_cooker_backend::paths::Paths;
 
 #[derive(Parser)]
 #[command(name = "rice-cooker-backend", about = "Quickshell rice install engine")]
 struct Cli {
-    /// Alternate catalog file path (default: backend/catalog.toml).
+    /// Alternate catalog file path (default: XDG-data lookup for rice-cooker/catalog.toml).
     #[arg(long, global = true)]
     catalog: Option<PathBuf>,
     #[command(subcommand)]
@@ -79,12 +79,12 @@ fn main() -> ExitCode {
 
 fn run() -> Result<()> {
     let cli = Cli::parse();
+    let paths = Paths::from_env()?;
     let flags = Flags { force: false };
     match &cli.cmd {
         Cmd::Install { name } => {
-            let dirs = install::resolve_dirs()?;
-            let cat = Catalog::from_file(&catalog_path(cli.catalog.as_deref())?)?;
-            let out = install::install(&cat, &dirs, name, flags)?;
+            let cat = Catalog::from_file(&catalog_path(&paths, cli.catalog.as_deref())?)?;
+            let out = install::install(&cat, &paths, name, flags)?;
             println!("installed: {}", out.name);
             if !out.pacman_diff.added_explicit.is_empty() {
                 println!(
@@ -95,24 +95,21 @@ fn run() -> Result<()> {
             }
         }
         Cmd::Uninstall { force } => {
-            let dirs = install::resolve_dirs()?;
             let mut f = flags;
             f.force = *force;
-            let out = install::uninstall(&dirs, f)?;
+            let out = install::uninstall(&paths, f)?;
             println!("uninstalled: {}", out.name);
         }
         Cmd::Switch { name, force } => {
-            let dirs = install::resolve_dirs()?;
-            let cat = Catalog::from_file(&catalog_path(cli.catalog.as_deref())?)?;
+            let cat = Catalog::from_file(&catalog_path(&paths, cli.catalog.as_deref())?)?;
             let mut f = flags;
             f.force = *force;
-            let out = install::switch(&cat, &dirs, name, f)?;
+            let out = install::switch(&cat, &paths, name, f)?;
             println!("switched: {} -> {}", out.from, out.to);
         }
         Cmd::List => {
-            let dirs = install::resolve_dirs()?;
-            let cat = Catalog::from_file(&catalog_path(cli.catalog.as_deref())?)?;
-            for row in install::list(&cat, &dirs)? {
+            let cat = Catalog::from_file(&catalog_path(&paths, cli.catalog.as_deref())?)?;
+            for row in install::list(&cat, &paths)? {
                 let marker = if row.installed { "*" } else { " " };
                 print!("{marker} {:<24} {}", row.name, row.display_name);
                 if !row.description.is_empty() {
@@ -125,8 +122,7 @@ fn run() -> Result<()> {
             }
         }
         Cmd::Status => {
-            let dirs = install::resolve_dirs()?;
-            let row = install::status(&dirs)?;
+            let row = install::status(&paths)?;
             match row.installed {
                 Some(r) => {
                     println!("name:         {}", r.name);
@@ -145,25 +141,30 @@ fn run() -> Result<()> {
             }
         }
         Cmd::Apply { name, repo, entry } => {
-            let cache = Cache::from_env()?;
             let stdout = std::io::stdout();
             let mut lock = stdout.lock();
             let mut events = EventWriter::new(&mut lock);
             let params = ApplyParams { name, repo, entry };
-            apply::run_apply(&cache, &params, &mut events)?;
+            apply::run_apply(&paths, &params, &mut events)?;
         }
         Cmd::Exit => {
-            let cache = Cache::from_env()?;
             let stdout = std::io::stdout();
             let mut lock = stdout.lock();
             let mut events = EventWriter::new(&mut lock);
-            apply::run_exit(&cache, &mut events)?;
+            apply::run_exit(&paths, &mut events)?;
         }
     }
     Ok(())
 }
 
-fn catalog_path(flag: Option<&std::path::Path>) -> Result<PathBuf> {
+/// Resolve the catalog location in preference order:
+/// 1. `--catalog` flag
+/// 2. `$RICE_COOKER_CATALOG` env var
+/// 3. CWD-relative dev paths (`./backend/catalog.toml`, `./catalog.toml`)
+/// 4. `Paths::find_catalog()` — walks `$XDG_DATA_HOME` then `$XDG_DATA_DIRS`
+///    looking for `rice-cooker/catalog.toml` (standard XDG Base Directory lookup
+///    for read-only application data; the packaged install lands here).
+fn catalog_path(paths: &Paths, flag: Option<&std::path::Path>) -> Result<PathBuf> {
     if let Some(p) = flag {
         return Ok(p.to_path_buf());
     }
@@ -172,9 +173,6 @@ fn catalog_path(flag: Option<&std::path::Path>) -> Result<PathBuf> {
     {
         return Ok(PathBuf::from(p));
     }
-    // Resolve against CWD. Running from the repo root is the typical
-    // dev invocation (`backend/catalog.toml`), running from `backend/`
-    // is the typical script invocation (`catalog.toml`). Check both.
     let cwd = std::env::current_dir()?;
     for rel in ["backend/catalog.toml", "catalog.toml"] {
         let p = cwd.join(rel);
@@ -182,9 +180,22 @@ fn catalog_path(flag: Option<&std::path::Path>) -> Result<PathBuf> {
             return Ok(p);
         }
     }
+    if let Some(p) = paths.find_catalog() {
+        return Ok(p);
+    }
+    let xdg_list = paths
+        .searched_catalog_paths()
+        .into_iter()
+        .map(|p| format!("  {}", p.display()))
+        .collect::<Vec<_>>()
+        .join("\n");
     Err(anyhow::anyhow!(
-        "no catalog found at ./backend/catalog.toml or ./catalog.toml \
-         (cwd: {}). Pass --catalog <path> or set RICE_COOKER_CATALOG.",
-        cwd.display()
+        "no catalog found. Tried:\n  \
+         --catalog flag, $RICE_COOKER_CATALOG\n  \
+         ./backend/catalog.toml, ./catalog.toml (cwd: {})\n{}\n\
+         Install the rice-cooker package, pass --catalog <path>, or set \
+         RICE_COOKER_CATALOG.",
+        cwd.display(),
+        xdg_list
     ))
 }

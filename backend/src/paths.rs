@@ -1,0 +1,398 @@
+//! Unified filesystem layout for rice-cooker state.
+
+use std::fs;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+
+use anyhow::{Context, Result, anyhow};
+use serde::{Deserialize, Serialize};
+use xdg::BaseDirectories;
+
+/// Argv + cwd of the user's pre-apply shell, captured via /proc so `exit`
+/// can replay it verbatim. argv (not a bare `-p` path) preserves forms like
+/// `qs -c <name>`; cwd matters when argv contains a relative `-p` path.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OriginalShell {
+    pub argv: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<String>,
+}
+
+/// Resolved filesystem layout. Fields populated eagerly so per-call lookups
+/// are infallible. `home` is the raw $HOME (for `~/` expansion in catalog
+/// `symlink_dst`), not the rice-cooker-prefixed XDG data dir.
+pub struct Paths {
+    pub home: PathBuf,
+    pub cache_home: PathBuf,
+    pub data_home: PathBuf,
+    xdg: Option<BaseDirectories>,
+}
+
+impl Paths {
+    pub fn from_env() -> Result<Self> {
+        let home = resolve_home_from(std::env::var("HOME").ok().as_deref())?;
+        let xdg = BaseDirectories::with_prefix("rice-cooker");
+        // RICE_COOKER_CACHE_DIR is an escape hatch from the old Cache::resolve_root
+        // contract — lets users (and tests against built binaries) redirect the
+        // whole cache root without touching XDG env vars.
+        let cache_home = match std::env::var("RICE_COOKER_CACHE_DIR") {
+            Ok(s) if !s.is_empty() => PathBuf::from(s),
+            _ => xdg.get_cache_home().ok_or_else(|| {
+                anyhow!("cannot resolve cache home — set XDG_CACHE_HOME or ensure HOME is absolute")
+            })?,
+        };
+        let data_home = xdg.get_data_home().ok_or_else(|| {
+            anyhow!("cannot resolve data home — set XDG_DATA_HOME or ensure HOME is absolute")
+        })?;
+        Ok(Self {
+            home,
+            cache_home,
+            data_home,
+            xdg: Some(xdg),
+        })
+    }
+
+    /// Test-only construction with explicit roots (bypasses XDG env).
+    /// `find_catalog` and `searched_catalog_paths` return empty under this.
+    pub fn at_roots(home: PathBuf, cache_home: PathBuf, data_home: PathBuf) -> Self {
+        Self {
+            home,
+            cache_home,
+            data_home,
+            xdg: None,
+        }
+    }
+
+    pub fn lock(&self) -> PathBuf {
+        self.cache_home.join("lock")
+    }
+    pub fn rices_dir(&self) -> PathBuf {
+        self.cache_home.join("rices")
+    }
+    pub fn clone_dir(&self, name: &str) -> Result<PathBuf> {
+        validate_name(name)?;
+        Ok(self.rices_dir().join(name))
+    }
+    pub fn last_run_log(&self) -> PathBuf {
+        self.cache_home.join("last-run.log")
+    }
+
+    pub fn installs_dir(&self) -> PathBuf {
+        self.data_home.join("installs")
+    }
+    pub fn current_json(&self) -> PathBuf {
+        self.installs_dir().join("current.json")
+    }
+    pub fn record_json(&self, name: &str) -> Result<PathBuf> {
+        validate_name(name)?;
+        Ok(self.installs_dir().join(format!("{name}.json")))
+    }
+
+    pub fn active_file(&self) -> PathBuf {
+        self.cache_home.join("active")
+    }
+    pub fn original_file(&self) -> PathBuf {
+        self.cache_home.join("original")
+    }
+
+    pub fn find_catalog(&self) -> Option<PathBuf> {
+        self.xdg.as_ref()?.find_data_file("catalog.toml")
+    }
+
+    /// Every filesystem path `find_catalog` would check, in search order.
+    /// Used by `main::catalog_path` to produce a "not found" error that
+    /// enumerates exactly where we looked. Empty under `at_roots`.
+    pub fn searched_catalog_paths(&self) -> Vec<PathBuf> {
+        let Some(xdg) = self.xdg.as_ref() else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        if let Some(h) = xdg.get_data_home() {
+            out.push(h.join("catalog.toml"));
+        }
+        for d in xdg.get_data_dirs() {
+            out.push(d.join("catalog.toml"));
+        }
+        out
+    }
+
+    pub fn ensure_rices(&self) -> Result<()> {
+        fs::create_dir_all(self.rices_dir())
+            .with_context(|| format!("creating {}", self.rices_dir().display()))
+    }
+    pub fn ensure_installs(&self) -> Result<()> {
+        fs::create_dir_all(self.installs_dir())
+            .with_context(|| format!("creating {}", self.installs_dir().display()))
+    }
+
+    pub fn active(&self) -> Result<Option<String>> {
+        read_line_file(&self.active_file())
+    }
+
+    pub fn set_active(&self, name: &str) -> Result<()> {
+        write_line_file(&self.active_file(), name)
+    }
+
+    pub fn clear_active(&self) -> Result<()> {
+        remove_if_exists(&self.active_file())
+    }
+
+    pub fn original(&self) -> Result<Option<OriginalShell>> {
+        let path = self.original_file();
+        match fs::read_to_string(&path) {
+            Ok(s) if s.trim().is_empty() => Ok(None),
+            // Malformed (e.g. plain-path from older backend) reads as unrecorded
+            // so `exit` completes cleanly; next `apply` preflight re-captures.
+            Ok(s) => Ok(serde_json::from_str::<OriginalShell>(s.trim()).ok()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(e).with_context(|| format!("reading {}", path.display())),
+        }
+    }
+
+    /// True when the file exists AND parses as empty or a valid OriginalShell.
+    /// Stale/malformed content reads as unrecorded so the next `apply`
+    /// preflight re-captures.
+    pub fn original_is_recorded(&self) -> bool {
+        match fs::read_to_string(self.original_file()) {
+            Ok(s) if s.trim().is_empty() => true,
+            Ok(s) => serde_json::from_str::<OriginalShell>(s.trim()).is_ok(),
+            Err(_) => false,
+        }
+    }
+
+    pub fn set_original(&self, shell: Option<&OriginalShell>) -> Result<()> {
+        let body = match shell {
+            Some(s) => serde_json::to_string(s).context("serializing original shell")?,
+            None => String::new(),
+        };
+        write_line_file(&self.original_file(), &body)
+    }
+
+    /// Called from `exit` after relaunch — drops the stale record so the next
+    /// `apply` re-captures from /proc.
+    pub fn clear_original(&self) -> Result<()> {
+        remove_if_exists(&self.original_file())
+    }
+}
+
+/// Pure-function form of `resolve_home` so tests don't have to mutate the
+/// process-global `HOME` env var.
+pub fn resolve_home_from(home: Option<&str>) -> Result<PathBuf> {
+    let home = home.filter(|s| !s.is_empty()).ok_or_else(|| {
+        anyhow!(
+            "HOME must be set — rice-cooker needs it to expand `~/` in catalog \
+             symlink_dst entries (XDG_*_HOME vars are not a substitute)"
+        )
+    })?;
+    let home = PathBuf::from(home);
+    if home.as_os_str() == "/" {
+        return Err(anyhow!("HOME is '/' — refusing"));
+    }
+    Ok(home)
+}
+
+fn validate_name(name: &str) -> Result<()> {
+    if name.is_empty()
+        || name == "."
+        || name == ".."
+        || name.chars().any(|c| matches!(c, '/' | '\\' | '\0'))
+    {
+        return Err(anyhow!("invalid rice name: {name:?}"));
+    }
+    Ok(())
+}
+
+/// Expand leading `~/` or `$HOME/` to `home`. Bare `~` / `$HOME` also resolve.
+/// Anything else is taken verbatim.
+pub fn expand_home(raw: &str, home: &Path) -> PathBuf {
+    if let Some(rest) = raw.strip_prefix("~/") {
+        home.join(rest)
+    } else if raw == "~" {
+        home.to_path_buf()
+    } else if let Some(rest) = raw.strip_prefix("$HOME/") {
+        home.join(rest)
+    } else if raw == "$HOME" {
+        home.to_path_buf()
+    } else {
+        PathBuf::from(raw)
+    }
+}
+
+fn remove_if_exists(p: &Path) -> Result<()> {
+    match fs::remove_file(p) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e).with_context(|| format!("removing {}", p.display())),
+    }
+}
+
+fn read_line_file(path: &Path) -> Result<Option<String>> {
+    match fs::read_to_string(path) {
+        Ok(s) => {
+            let trimmed = s.trim_end_matches(['\n', '\r']).to_string();
+            if trimmed.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(trimmed))
+            }
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e).with_context(|| format!("reading {}", path.display())),
+    }
+}
+
+// No parent-dir fsync here (install/record.rs::atomic_write_fsync has one):
+// `active`/`original` are cache-tier session state, losing the rename on
+// power failure is acceptable — the next `apply` preflight re-captures.
+fn write_line_file(path: &Path, contents: &str) -> Result<()> {
+    let mut tmp = path.as_os_str().to_os_string();
+    tmp.push(".tmp");
+    let tmp = PathBuf::from(tmp);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
+    }
+    let mut f = fs::OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(&tmp)
+        .with_context(|| format!("opening {}", tmp.display()))?;
+    let body = format!("{contents}\n");
+    if let Err(e) = f.write_all(body.as_bytes()).and_then(|_| f.sync_all()) {
+        let _ = fs::remove_file(&tmp);
+        return Err(e).with_context(|| format!("writing {}", tmp.display()));
+    }
+    drop(f);
+    if let Err(e) = fs::rename(&tmp, path) {
+        let _ = fs::remove_file(&tmp);
+        return Err(e).with_context(|| format!("renaming {} -> {}", tmp.display(), path.display()));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tmp_paths() -> (tempfile::TempDir, Paths) {
+        let t = tempfile::tempdir().unwrap();
+        let home = t.path().to_path_buf();
+        let cache_home = home.join(".cache/rice-cooker");
+        let data_home = home.join(".local/share/rice-cooker");
+        fs::create_dir_all(&cache_home).unwrap();
+        fs::create_dir_all(&data_home).unwrap();
+        let paths = Paths::at_roots(home, cache_home, data_home);
+        paths.ensure_rices().unwrap();
+        paths.ensure_installs().unwrap();
+        (t, paths)
+    }
+
+    #[test]
+    fn expand_home_cases() {
+        let h = Path::new("/h");
+        assert_eq!(expand_home("~/x", h), PathBuf::from("/h/x"));
+        assert_eq!(expand_home("~", h), PathBuf::from("/h"));
+        assert_eq!(expand_home("$HOME/y", h), PathBuf::from("/h/y"));
+        assert_eq!(expand_home("/etc/hypr", h), PathBuf::from("/etc/hypr"));
+    }
+
+    #[test]
+    fn resolve_home_rejects_none_empty_and_root() {
+        assert!(resolve_home_from(None).is_err());
+        assert!(resolve_home_from(Some("")).is_err());
+        assert!(resolve_home_from(Some("/")).is_err());
+        assert_eq!(
+            resolve_home_from(Some("/home/x")).unwrap(),
+            PathBuf::from("/home/x")
+        );
+    }
+
+    #[test]
+    fn clone_and_record_reject_traversal() {
+        let (_t, p) = tmp_paths();
+        for good in ["caelestia", "noctalia-2", "rice_v1", "Foo.Bar"] {
+            assert_eq!(p.clone_dir(good).unwrap(), p.rices_dir().join(good));
+            assert_eq!(
+                p.record_json(good).unwrap(),
+                p.installs_dir().join(format!("{good}.json"))
+            );
+        }
+        for bad in ["", ".", "..", "a/b", "a\\b", "a\0b"] {
+            assert!(p.clone_dir(bad).is_err(), "clone_dir accepted: {bad:?}");
+            assert!(p.record_json(bad).is_err(), "record_json accepted: {bad:?}");
+        }
+    }
+
+    #[test]
+    fn active_reads_none_when_missing_or_empty_and_writes_roundtrip() {
+        let (_t, p) = tmp_paths();
+        assert!(p.active().unwrap().is_none());
+        fs::write(p.active_file(), "").unwrap();
+        assert!(p.active().unwrap().is_none());
+        p.set_active("first").unwrap();
+        p.set_active("second").unwrap();
+        assert_eq!(p.active().unwrap().as_deref(), Some("second"));
+    }
+
+    #[test]
+    fn original_none_recorded_flag_and_argv_roundtrip() {
+        let (_t, p) = tmp_paths();
+        assert!(!p.original_is_recorded());
+        assert!(p.original().unwrap().is_none());
+        p.set_original(None).unwrap();
+        assert!(p.original_is_recorded());
+        assert!(p.original().unwrap().is_none());
+        let shell = OriginalShell {
+            argv: vec!["qs".into(), "-c".into(), "clock".into()],
+            cwd: Some("/home/x".into()),
+        };
+        p.set_original(Some(&shell)).unwrap();
+        assert_eq!(p.original().unwrap(), Some(shell));
+    }
+
+    #[test]
+    fn original_stale_plain_text_reads_as_unrecorded() {
+        // Old backend versions wrote a bare path; migration contract is that
+        // such a file reads as None and triggers a re-record on the next apply.
+        let (_t, p) = tmp_paths();
+        fs::write(p.original_file(), "shell.qml\n").unwrap();
+        assert!(p.original().unwrap().is_none());
+        assert!(!p.original_is_recorded());
+    }
+
+    #[test]
+    fn clear_active_and_original_are_idempotent() {
+        let (_t, p) = tmp_paths();
+        p.set_active("x").unwrap();
+        p.clear_active().unwrap();
+        assert!(p.active().unwrap().is_none());
+        p.clear_active().unwrap();
+
+        p.set_original(None).unwrap();
+        assert!(p.original_is_recorded());
+        p.clear_original().unwrap();
+        assert!(!p.original_is_recorded());
+        p.clear_original().unwrap();
+    }
+
+    #[test]
+    fn find_catalog_and_searched_paths_empty_under_at_roots() {
+        let (_t, p) = tmp_paths();
+        assert!(p.find_catalog().is_none());
+        assert!(p.searched_catalog_paths().is_empty());
+    }
+
+    // Pin the lock filename so a future refactor that silently re-splits
+    // install vs apply locks (e.g., renaming to `apply.lock`) fails loudly.
+    // Contention semantics on a single path are covered by
+    // lock::tests::acquire_contend_drop_cycle.
+    #[test]
+    fn lock_path_is_cache_home_slash_lock() {
+        let p = Paths::at_roots(
+            PathBuf::from("/h"),
+            PathBuf::from("/c"),
+            PathBuf::from("/d"),
+        );
+        assert_eq!(p.lock(), PathBuf::from("/c/lock"));
+    }
+}

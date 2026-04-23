@@ -13,8 +13,8 @@ use crate::catalog::{Catalog, is_placeholder_commit};
 use crate::deps;
 use crate::git;
 use crate::lock::ApplyLock;
+use crate::paths::{Paths, expand_home};
 
-use super::env::{Dirs, expand_home};
 use super::record::{
     InstallRecord, PacmanDiff, SCHEMA_VERSION, clear_current, load_record, read_current,
     save_record, write_current,
@@ -57,13 +57,14 @@ pub struct StatusRow {
     pub installed: Option<InstallRecord>,
 }
 
-pub fn install(cat: &Catalog, dirs: &Dirs, name: &str, _flags: Flags) -> Result<InstallOutcome> {
-    dirs.ensure()?;
-    let _lock = ApplyLock::try_acquire(&dirs.lock_file()).map_err(|e| anyhow!("lock: {e}"))?;
-    install_locked(cat, dirs, name)
+pub fn install(cat: &Catalog, paths: &Paths, name: &str, _flags: Flags) -> Result<InstallOutcome> {
+    paths.ensure_rices()?;
+    paths.ensure_installs()?;
+    let _lock = ApplyLock::try_acquire(&paths.lock()).map_err(|e| anyhow!("lock: {e}"))?;
+    install_locked(cat, paths, name)
 }
 
-fn install_locked(cat: &Catalog, dirs: &Dirs, name: &str) -> Result<InstallOutcome> {
+fn install_locked(cat: &Catalog, paths: &Paths, name: &str) -> Result<InstallOutcome> {
     let entry = cat
         .get(name)
         .ok_or_else(|| anyhow!("{name}: not in catalog"))?;
@@ -75,14 +76,14 @@ fn install_locked(cat: &Catalog, dirs: &Dirs, name: &str) -> Result<InstallOutco
         ));
     }
 
-    if let Some(cur) = read_current(dirs)? {
+    if let Some(cur) = read_current(paths)? {
         return Err(anyhow!(
             "{cur} is already installed — run uninstall or switch first"
         ));
     }
 
     // Clone / re-clone.
-    let clone = dirs.clone_dir(name);
+    let clone = paths.clone_dir(name)?;
     if clone.exists() {
         remove_dir_all_forceful(&clone)
             .with_context(|| format!("removing stale clone {}", clone.display()))?;
@@ -115,7 +116,7 @@ fn install_locked(cat: &Catalog, dirs: &Dirs, name: &str) -> Result<InstallOutco
     // leaves a record that uninstall can use to remove the just-installed
     // packages. Symlink paths are deterministic from the entry + home,
     // so we can compute them without actually making the symlink yet.
-    let symlink_path = expand_home(&entry.symlink_dst, &dirs.home);
+    let symlink_path = expand_home(&entry.symlink_dst, &paths.home);
     let symlink_target = clone.join(&entry.symlink_src);
     let record = InstallRecord {
         schema_version: SCHEMA_VERSION,
@@ -128,15 +129,15 @@ fn install_locked(cat: &Catalog, dirs: &Dirs, name: &str) -> Result<InstallOutco
             added_explicit: added_explicit.clone(),
         },
     };
-    save_record(&dirs.record_json(name), &record)?;
-    write_current(dirs, name)?;
+    save_record(&paths.record_json(name)?, &record)?;
+    write_current(paths, name)?;
 
     // Now create the symlink. If it fails, the record is already on
     // disk so uninstall can roll back the packages — but the user
     // hitting this mid-install has no idea they need to uninstall;
     // `install <name>` would just keep erroring with "already
     // installed". Wrap the error with a remediation hint.
-    if let Err(e) = symlink_shape::create_symlink(&clone, entry, &dirs.home) {
+    if let Err(e) = symlink_shape::create_symlink(&clone, entry, &paths.home) {
         return Err(anyhow!(
             "{e:#}\n\
              install left {} package(s) registered to this rice but no symlink. \
@@ -151,15 +152,16 @@ fn install_locked(cat: &Catalog, dirs: &Dirs, name: &str) -> Result<InstallOutco
     })
 }
 
-pub fn uninstall(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
-    dirs.ensure()?;
-    let _lock = ApplyLock::try_acquire(&dirs.lock_file()).map_err(|e| anyhow!("lock: {e}"))?;
-    uninstall_locked(dirs, flags)
+pub fn uninstall(paths: &Paths, flags: Flags) -> Result<UninstallOutcome> {
+    paths.ensure_rices()?;
+    paths.ensure_installs()?;
+    let _lock = ApplyLock::try_acquire(&paths.lock()).map_err(|e| anyhow!("lock: {e}"))?;
+    uninstall_locked(paths, flags)
 }
 
-fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
-    let name = read_current(dirs)?.ok_or_else(|| anyhow!("no rice installed"))?;
-    let record = load_record(&dirs.record_json(&name))?;
+fn uninstall_locked(paths: &Paths, flags: Flags) -> Result<UninstallOutcome> {
+    let name = read_current(paths)?.ok_or_else(|| anyhow!("no rice installed"))?;
+    let record = load_record(&paths.record_json(&name)?)?;
 
     // Remove packages. Pre-filter already-removed so pacman doesn't
     // abort with "target not found" on retry. A pacman-query failure
@@ -176,7 +178,7 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
         }
     }
 
-    let clone = dirs.clone_dir(&name);
+    let clone = paths.clone_dir(&name)?;
 
     // Remove symlink — but only if it's still OUR symlink. User could
     // have replaced it with a regular file/dir since install; we don't
@@ -248,14 +250,12 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
         }
     }
     // Delete the record. NotFound is idempotent-OK.
-    match fs::remove_file(dirs.record_json(&name)) {
+    let record_path = paths.record_json(&name)?;
+    match fs::remove_file(&record_path) {
         Ok(()) => {}
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
         Err(e) => {
-            return Err(anyhow!(
-                "removing record {}: {e}",
-                dirs.record_json(&name).display()
-            ));
+            return Err(anyhow!("removing record {}: {e}", record_path.display()));
         }
     }
     // clear_current is the last bookkeeping step — record is already
@@ -265,7 +265,7 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
     // re-failing the whole uninstall after success on every other
     // step. In force mode we've already accepted degraded state, so
     // warn either way and let the user move on.
-    if let Err(e) = clear_current(dirs) {
+    if let Err(e) = clear_current(paths) {
         eprintln!(
             "rice-cooker: warn: could not clear current.json: {e}. \
              Remove it manually if `rice-cooker status` still reports {name} as installed."
@@ -275,19 +275,20 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
     Ok(UninstallOutcome { name })
 }
 
-pub fn switch(cat: &Catalog, dirs: &Dirs, to: &str, flags: Flags) -> Result<SwitchOutcome> {
-    dirs.ensure()?;
-    let _lock = ApplyLock::try_acquire(&dirs.lock_file()).map_err(|e| anyhow!("lock: {e}"))?;
-    let uo = uninstall_locked(dirs, flags)?;
-    let io = install_locked(cat, dirs, to)?;
+pub fn switch(cat: &Catalog, paths: &Paths, to: &str, flags: Flags) -> Result<SwitchOutcome> {
+    paths.ensure_rices()?;
+    paths.ensure_installs()?;
+    let _lock = ApplyLock::try_acquire(&paths.lock()).map_err(|e| anyhow!("lock: {e}"))?;
+    let uo = uninstall_locked(paths, flags)?;
+    let io = install_locked(cat, paths, to)?;
     Ok(SwitchOutcome {
         from: uo.name,
         to: io.name,
     })
 }
 
-pub fn list(cat: &Catalog, dirs: &Dirs) -> Result<Vec<ListRow>> {
-    let current = read_current(dirs)?;
+pub fn list(cat: &Catalog, paths: &Paths) -> Result<Vec<ListRow>> {
+    let current = read_current(paths)?;
     let mut rows = Vec::new();
     for (name, entry) in &cat.rices {
         rows.push(ListRow {
@@ -301,12 +302,12 @@ pub fn list(cat: &Catalog, dirs: &Dirs) -> Result<Vec<ListRow>> {
     Ok(rows)
 }
 
-pub fn status(dirs: &Dirs) -> Result<StatusRow> {
-    let name = match read_current(dirs)? {
+pub fn status(paths: &Paths) -> Result<StatusRow> {
+    let name = match read_current(paths)? {
         Some(n) => n,
         None => return Ok(StatusRow { installed: None }),
     };
-    let record = load_record(&dirs.record_json(&name))?;
+    let record = load_record(&paths.record_json(&name)?)?;
     Ok(StatusRow {
         installed: Some(record),
     })

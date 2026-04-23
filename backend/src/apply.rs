@@ -6,10 +6,10 @@ use serde::Serialize;
 
 use std::fs;
 
-use crate::cache::{Cache, OriginalShell};
 use crate::events::{Event, EventWriter, SCHEMA_VERSION, Step, StepState};
 use crate::git;
 use crate::lock::{ApplyLock, LockError};
+use crate::paths::{OriginalShell, Paths};
 use crate::process::{self, VerifyResult, find_running_quickshell};
 
 /// Turn a `Result<T, E>` into its Ok value, or emit a stage fail event and early-return
@@ -62,25 +62,25 @@ pub struct Status {
 }
 
 pub fn run_apply<W: Write>(
-    cache: &Cache,
+    paths: &Paths,
     params: &ApplyParams,
     events: &mut EventWriter<W>,
 ) -> Result<bool> {
     hello(events, "apply")?;
 
-    try_stage!(events, "init", cache.ensure_dirs());
-    let _lock = match acquire_lock(cache, events)? {
+    try_stage!(events, "init", paths.ensure_rices());
+    let _lock = match acquire_lock(paths, events)? {
         Some(l) => l,
         None => return Ok(false),
     };
 
-    if !preflight(cache, events)? {
+    if !preflight(paths, events)? {
         return Ok(false);
     }
 
     step(events, Step::Clone, StepState::Start)?;
-    let rice_dir = try_stage!(events, "input", cache.rice_dir(params.name));
-    let log_file = cache.last_run_log();
+    let rice_dir = try_stage!(events, "input", paths.clone_dir(params.name));
+    let log_file = paths.last_run_log();
     if let Err(e) = git::clone_or_update(params.repo, &rice_dir, &log_file) {
         let tail = read_tail(&log_file);
         emit_fail(events, "clone", &format!("{e:#}"), None, Some(tail))?;
@@ -128,7 +128,7 @@ pub fn run_apply<W: Write>(
         events,
         "commit",
         "set_active",
-        cache.set_active(params.name)
+        paths.set_active(params.name)
     );
     events.emit(&Event::Success {
         active: Some(params.name.to_string()),
@@ -136,10 +136,10 @@ pub fn run_apply<W: Write>(
     Ok(true)
 }
 
-pub fn run_exit<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<bool> {
+pub fn run_exit<W: Write>(paths: &Paths, events: &mut EventWriter<W>) -> Result<bool> {
     hello(events, "exit")?;
-    try_stage!(events, "init", cache.ensure_dirs());
-    let _lock = match acquire_lock(cache, events)? {
+    try_stage!(events, "init", paths.ensure_rices());
+    let _lock = match acquire_lock(paths, events)? {
         Some(l) => l,
         None => return Ok(false),
     };
@@ -149,7 +149,7 @@ pub fn run_exit<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<
     // would load the wrong shell.qml from the backend's own cwd), and
     // killing the user's existing shell only to then fail leaves them
     // with nothing running. Validate first, kill second.
-    let original = try_stage!(events, "commit", "read_original", cache.original());
+    let original = try_stage!(events, "commit", "read_original", paths.original());
     let replay = match original {
         Some(shell) => {
             if shell.argv.is_empty() {
@@ -172,7 +172,7 @@ pub fn run_exit<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<
     step(events, Step::KillQuickshell, StepState::Done)?;
 
     if let Some((argv, cwd)) = replay {
-        let log_file = cache.last_run_log();
+        let log_file = paths.last_run_log();
         step(events, Step::Launch, StepState::Start)?;
         if let Err(e) = process::launch_argv(&argv, &cwd, &log_file) {
             let tail = read_tail(&log_file);
@@ -182,23 +182,23 @@ pub fn run_exit<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<
         step(events, Step::Launch, StepState::Done)?;
     }
 
-    try_stage!(events, "commit", "clear_active", cache.clear_active());
+    try_stage!(events, "commit", "clear_active", paths.clear_active());
     // Drop the stale `original` record too: exit has relaunched the pre-rice shell,
     // so on the next `apply`, preflight should re-capture whatever is currently
     // running rather than inheriting what we captured on the previous apply.
-    try_stage!(events, "commit", "clear_original", cache.clear_original());
+    try_stage!(events, "commit", "clear_original", paths.clear_original());
     events.emit(&Event::Success { active: None })?;
     Ok(true)
 }
 
-pub fn get_status(cache: &Cache) -> Result<Status> {
+pub fn get_status(paths: &Paths) -> Result<Status> {
     Ok(Status {
-        active: cache.active()?,
+        active: paths.active()?,
         // Render the saved argv as a human-readable command line for display only;
         // the full argv lives in the cache file for exit-time restoration.
-        original: cache.original()?.map(|s| s.argv.join(" ")),
+        original: paths.original()?.map(|s| s.argv.join(" ")),
         quickshell_running: find_running_quickshell()?.is_some(),
-        cache_dir: cache.root().display().to_string(),
+        cache_dir: paths.cache_home.display().to_string(),
     })
 }
 
@@ -231,8 +231,8 @@ fn emit_fail<W: Write>(
     Ok(())
 }
 
-fn acquire_lock<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<Option<ApplyLock>> {
-    match ApplyLock::try_acquire(&cache.apply_lock()) {
+fn acquire_lock<W: Write>(paths: &Paths, events: &mut EventWriter<W>) -> Result<Option<ApplyLock>> {
+    match ApplyLock::try_acquire(&paths.lock()) {
         Ok(l) => Ok(Some(l)),
         Err(LockError::AlreadyHeld) => {
             emit_fail(events, "lock", "already_held", None, None)?;
@@ -247,34 +247,34 @@ fn acquire_lock<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<
     }
 }
 
-fn preflight<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<bool> {
+fn preflight<W: Write>(paths: &Paths, events: &mut EventWriter<W>) -> Result<bool> {
     step(events, Step::Preflight, StepState::Start)?;
     if git::preflight().is_err() {
         emit_fail(events, "preflight", "git_missing", None, None)?;
         return Ok(false);
     }
-    if !cache.original_is_recorded() {
+    if !paths.original_is_recorded() {
         try_stage!(
             events,
             "preflight",
             "record_original",
-            record_original(cache)
+            record_original(paths)
         );
     }
     step(events, Step::Preflight, StepState::Done)?;
     Ok(true)
 }
 
-fn record_original(cache: &Cache) -> Result<()> {
+fn record_original(paths: &Paths) -> Result<()> {
     match find_running_quickshell()? {
         Some(proc) => {
             let shell = OriginalShell {
                 argv: proc.cmdline,
                 cwd: proc.cwd.map(|p| p.to_string_lossy().into_owned()),
             };
-            cache.set_original(Some(&shell))?;
+            paths.set_original(Some(&shell))?;
         }
-        None => cache.set_original(None)?,
+        None => paths.set_original(None)?,
     }
     Ok(())
 }

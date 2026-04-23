@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
 
-use super::env::Dirs;
+use crate::paths::Paths;
 
 pub const SCHEMA_VERSION: u32 = 1;
 
@@ -61,9 +61,9 @@ pub fn load_record(path: &Path) -> Result<InstallRecord> {
     Ok(r)
 }
 
-pub fn write_current(dirs: &Dirs, name: &str) -> Result<()> {
+pub fn write_current(paths: &Paths, name: &str) -> Result<()> {
     let body = serde_json::json!({ "name": name }).to_string();
-    atomic_write_fsync(&dirs.current_json(), body.as_bytes())
+    atomic_write_fsync(&paths.current_json(), body.as_bytes())
 }
 
 /// Write `body` to `path` atomically and durably: write-to-tmp, fsync
@@ -131,8 +131,8 @@ fn atomic_write_fsync(path: &Path, body: &[u8]) -> Result<()> {
     Ok(())
 }
 
-pub fn read_current(dirs: &Dirs) -> Result<Option<String>> {
-    match fs::read_to_string(dirs.current_json()) {
+pub fn read_current(paths: &Paths) -> Result<Option<String>> {
+    match fs::read_to_string(paths.current_json()) {
         Ok(s) => {
             #[derive(Deserialize)]
             struct Cur {
@@ -146,8 +146,8 @@ pub fn read_current(dirs: &Dirs) -> Result<Option<String>> {
     }
 }
 
-pub fn clear_current(dirs: &Dirs) -> Result<()> {
-    match fs::remove_file(dirs.current_json()) {
+pub fn clear_current(paths: &Paths) -> Result<()> {
+    match fs::remove_file(paths.current_json()) {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(e) => Err(e).context("removing current.json"),
@@ -159,15 +159,15 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
 
-    fn tmp_dirs() -> (tempfile::TempDir, Dirs) {
+    fn tmp_paths() -> (tempfile::TempDir, Paths) {
         let t = tempdir().unwrap();
-        let d = Dirs {
-            home: t.path().to_path_buf(),
-            cache: t.path().join("cache"),
-            data: t.path().join("data"),
-        };
-        d.ensure().unwrap();
-        (t, d)
+        let home = t.path().to_path_buf();
+        let cache = t.path().join("cache");
+        let data = t.path().join("data");
+        let p = Paths::at_roots(home, cache, data);
+        p.ensure_rices().unwrap();
+        p.ensure_installs().unwrap();
+        (t, p)
     }
 
     fn sample() -> InstallRecord {
@@ -186,9 +186,9 @@ mod tests {
 
     #[test]
     fn record_round_trips_through_json() {
-        let (_t, d) = tmp_dirs();
+        let (_t, p) = tmp_paths();
         let r = sample();
-        let path = d.record_json(&r.name);
+        let path = p.record_json(&r.name).unwrap();
         save_record(&path, &r).unwrap();
         let back = load_record(&path).unwrap();
         assert_eq!(back, r);
@@ -196,19 +196,19 @@ mod tests {
 
     #[test]
     fn current_json_roundtrip() {
-        let (_t, d) = tmp_dirs();
-        assert_eq!(read_current(&d).unwrap(), None);
-        write_current(&d, "dms").unwrap();
-        assert_eq!(read_current(&d).unwrap().as_deref(), Some("dms"));
-        clear_current(&d).unwrap();
-        assert_eq!(read_current(&d).unwrap(), None);
-        clear_current(&d).unwrap();
+        let (_t, p) = tmp_paths();
+        assert_eq!(read_current(&p).unwrap(), None);
+        write_current(&p, "dms").unwrap();
+        assert_eq!(read_current(&p).unwrap().as_deref(), Some("dms"));
+        clear_current(&p).unwrap();
+        assert_eq!(read_current(&p).unwrap(), None);
+        clear_current(&p).unwrap();
     }
 
     #[test]
     fn load_rejects_future_schema_version() {
-        let (_t, d) = tmp_dirs();
-        let path = d.record_json("x");
+        let (_t, p) = tmp_paths();
+        let path = p.record_json("x").unwrap();
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(
             &path,

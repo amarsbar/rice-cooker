@@ -10,8 +10,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, anyhow};
 
 use crate::catalog::RiceEntry;
-
-use super::env::expand_home;
+use crate::paths::expand_home;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SymlinkPaths {
