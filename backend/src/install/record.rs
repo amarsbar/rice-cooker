@@ -154,17 +154,6 @@ pub fn clear_current(dirs: &Dirs) -> Result<()> {
     }
 }
 
-pub fn retire_to_previous(dirs: &Dirs, name: &str) -> Result<()> {
-    let from = dirs.record_json(name);
-    let to = dirs.previous_json();
-    if !from.exists() {
-        return Ok(());
-    }
-    fs::rename(&from, &to)
-        .with_context(|| format!("retiring {} -> {}", from.display(), to.display()))?;
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -214,16 +203,6 @@ mod tests {
         clear_current(&d).unwrap();
         assert_eq!(read_current(&d).unwrap(), None);
         clear_current(&d).unwrap();
-    }
-
-    #[test]
-    fn retire_moves_to_previous() {
-        let (_t, d) = tmp_dirs();
-        let r = sample();
-        save_record(&d.record_json(&r.name), &r).unwrap();
-        retire_to_previous(&d, "dms").unwrap();
-        assert!(!d.record_json("dms").exists());
-        assert!(d.previous_json().exists());
     }
 
     #[test]

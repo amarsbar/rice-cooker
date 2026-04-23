@@ -1,7 +1,7 @@
 //! Symlink install — `ln -sfnT <clone>/<symlink_src> <symlink_dst>`.
-//! ~30 LOC. No git-status, no fallbacks. If a user customized files
-//! inside the symlinked clone, the uninstall path `cp -rT`s the whole
-//! clone to rcsave before removing it.
+//! ~30 LOC. No git-status, no fallbacks. Uninstall removes the symlink
+//! and clone; users who edited files inside the clone should copy them
+//! out first (the clone is at ~/.cache/rice-cooker/rices/<name>/).
 
 use std::fs;
 use std::os::unix::fs::symlink;

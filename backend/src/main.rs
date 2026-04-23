@@ -40,10 +40,8 @@ enum Cmd {
     ///
     /// NOT atomic. If uninstall succeeds but install then fails (bad
     /// catalog entry, network flap, dep install failure), nothing is
-    /// left installed. A copy of the previous rice's clone tree is
-    /// preserved under ~/.cache/rice-cooker/rcsave/<prev>-<ts>-<pid>/
-    /// — restore from there if needed, then re-run install for the
-    /// rice you wanted.
+    /// left installed. Re-run `install <name>` once the underlying
+    /// failure is addressed.
     Switch {
         name: String,
         #[arg(long)]
@@ -115,9 +113,6 @@ fn run() -> Result<()> {
                 return Ok(());
             }
             println!("uninstalled: {}", out.name);
-            if let Some(dir) = out.rcsave_dir {
-                println!("user files preserved at: {}", dir.display());
-            }
         }
         Cmd::Switch {
             name,
@@ -134,9 +129,6 @@ fn run() -> Result<()> {
                 return Ok(());
             }
             println!("switched: {} -> {}", out.from, out.to);
-            if let Some(dir) = out.rcsave_dir {
-                println!("user files preserved at: {}", dir.display());
-            }
         }
         Cmd::List => {
             let dirs = install::resolve_dirs()?;

@@ -26,9 +26,6 @@ impl Dirs {
     pub fn current_json(&self) -> PathBuf {
         self.installs_dir().join("current.json")
     }
-    pub fn previous_json(&self) -> PathBuf {
-        self.installs_dir().join("previous.json")
-    }
     pub fn record_json(&self, name: &str) -> PathBuf {
         self.installs_dir().join(format!("{name}.json"))
     }

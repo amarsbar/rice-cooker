@@ -2,15 +2,12 @@
 //!
 //! Install = clone rice at pinned commit → paru installs deps via pkexec
 //! → ln -sfnT into the clone → write install record. Uninstall = remove
-//! deps → rcsave the whole clone → rm symlink → rm clone → retire record.
+//! deps → rm symlink → rm clone → delete record.
 
 use std::fs;
-use std::path::PathBuf;
 use std::process::Command;
 
 use anyhow::{Context, Result, anyhow};
-use time::OffsetDateTime;
-use time::format_description::well_known::Rfc3339;
 
 use crate::catalog::{Catalog, is_placeholder_commit};
 use crate::deps;
@@ -20,7 +17,7 @@ use crate::lock::ApplyLock;
 use super::env::{Dirs, expand_home};
 use super::record::{
     InstallRecord, PacmanDiff, SCHEMA_VERSION, clear_current, load_record, read_current,
-    retire_to_previous, save_record, write_current,
+    save_record, write_current,
 };
 use super::symlink as symlink_shape;
 
@@ -40,14 +37,12 @@ pub struct InstallOutcome {
 #[derive(Debug, Clone, PartialEq)]
 pub struct UninstallOutcome {
     pub name: String,
-    pub rcsave_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SwitchOutcome {
     pub from: String,
     pub to: String,
-    pub rcsave_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -193,10 +188,7 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
             "would remove packages: {}",
             record.pacman_diff.added_explicit.join(" ")
         );
-        return Ok(UninstallOutcome {
-            name,
-            rcsave_dir: None,
-        });
+        return Ok(UninstallOutcome { name });
     }
 
     // Remove packages. Pre-filter already-removed so pacman doesn't
@@ -214,38 +206,7 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
         }
     }
 
-    // Save user edits. Whole-clone copy, unconditional. Timestamp +
-    // PID avoids collisions on rapid switch cycles.
-    let rcsave = dirs.cache.join("rcsave").join(format!(
-        "{name}-{}-{}",
-        now_ts_compact(),
-        std::process::id(),
-    ));
     let clone = dirs.clone_dir(&name);
-    let rcsave_dir = if clone.exists() {
-        fs::create_dir_all(&rcsave).with_context(|| format!("creating {}", rcsave.display()))?;
-        // `-a` preserves mode, ownership, timestamps, symlinks — rice
-        // trees commonly ship executable scripts and internal symlinks,
-        // and `-r` alone loses both. `-T` prevents the copy-into-target
-        // footgun where target gets nested under itself.
-        let status = Command::new("cp")
-            .args(["-aT"])
-            .arg(&clone)
-            .arg(&rcsave)
-            .status()
-            .context("cp -aT")?;
-        if !status.success() {
-            return Err(anyhow!(
-                "cp -aT {} {} exited {:?}",
-                clone.display(),
-                rcsave.display(),
-                status.code()
-            ));
-        }
-        Some(rcsave)
-    } else {
-        None
-    };
 
     // Remove symlink — but only if it's still OUR symlink. User could
     // have replaced it with a regular file/dir since install; we don't
@@ -253,7 +214,7 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
     // target mismatch is skipped with a warning that includes both
     // paths for diagnostics; real IO errors bubble up.
     //
-    // If we skip (retargeted/replaced), the record is still retired +
+    // If we skip (retargeted/replaced), the record is still removed +
     // current.json cleared below, so the rice is "uninstalled" from the
     // tool's view even though the user-owned file at symlink_path stays.
     match fs::symlink_metadata(&record.symlink_path) {
@@ -286,21 +247,19 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
             return Err(anyhow!("reading {}: {e}", record.symlink_path.display()));
         }
     }
-    // Clone must actually be gone before we retire the record. The
-    // ordering below is retire_to_previous (renames record.json ->
-    // previous.json) then clear_current. If we retired first and
-    // clone-rm then failed, a retry would find current.json still
-    // pointing at the rice but load_record would error on the now-
-    // renamed record file — the user would be stuck with no tool
-    // path forward. Fail-stop here keeps record + current.json intact
-    // so retry walks the whole uninstall path again (safely: packages
-    // already removed means deps::installed() returns empty; symlink
-    // NotFound is idempotent-OK; rcsave gets a fresh ts+pid dir).
+    // Clone must actually be gone before we delete the record. If we
+    // deleted the record first and clone-rm then failed, a retry would
+    // find current.json still pointing at the rice but load_record
+    // would error on the missing record file — the user would be stuck
+    // with no tool path forward. Fail-stop here keeps record +
+    // current.json intact so retry walks the whole uninstall path
+    // again (safely: packages already removed means deps::installed()
+    // returns empty; symlink NotFound is idempotent-OK).
     //
     // `--force` skips the fail-stop: the clone is left on disk (with
-    // an eprintln advising manual rm), the record is retired, and
-    // the user regains tool control. Use for unremovable paths
-    // (root-owned files from a rice's own hook, fs corruption).
+    // an eprintln advising manual rm), the record is deleted, and the
+    // user regains tool control. Use for unremovable paths (root-owned
+    // files from a rice's own hook, fs corruption).
     if clone.exists()
         && let Err(e) = remove_dir_all_forceful(&clone)
     {
@@ -313,19 +272,29 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
             return Err(anyhow!(
                 "removing clone {}: {e}\n\
                  Packages + symlink are already removed. Clear the blocker and re-run \
-                 uninstall, or pass --force to orphan the clone and retire the record anyway.",
+                 uninstall, or pass --force to orphan the clone and delete the record anyway.",
                 clone.display()
             ));
         }
     }
-    retire_to_previous(dirs, &name)?;
+    // Delete the record. NotFound is idempotent-OK.
+    match fs::remove_file(dirs.record_json(&name)) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => {
+            return Err(anyhow!(
+                "removing record {}: {e}",
+                dirs.record_json(&name).display()
+            ));
+        }
+    }
     // clear_current is the last bookkeeping step — record is already
-    // retired to previous.json, packages+clone are gone. A stray
-    // current.json pointing at the retired name is a reportable glitch
-    // (next read_current returns Some(name), load_record errors), but
-    // it's not worth re-failing the whole uninstall after success on
-    // every other step. In force mode we've already accepted degraded
-    // state, so warn either way and let the user move on.
+    // gone, packages+clone are gone. A stray current.json pointing at
+    // the deleted name is a reportable glitch (next read_current
+    // returns Some(name), load_record errors), but it's not worth
+    // re-failing the whole uninstall after success on every other
+    // step. In force mode we've already accepted degraded state, so
+    // warn either way and let the user move on.
     if let Err(e) = clear_current(dirs) {
         eprintln!(
             "rice-cooker: warn: could not clear current.json: {e}. \
@@ -333,7 +302,7 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
         );
     }
 
-    Ok(UninstallOutcome { name, rcsave_dir })
+    Ok(UninstallOutcome { name })
 }
 
 pub fn switch(cat: &Catalog, dirs: &Dirs, to: &str, flags: Flags) -> Result<SwitchOutcome> {
@@ -382,7 +351,6 @@ pub fn switch(cat: &Catalog, dirs: &Dirs, to: &str, flags: Flags) -> Result<Swit
         return Ok(SwitchOutcome {
             from,
             to: to.to_string(),
-            rcsave_dir: None,
         });
     }
 
@@ -391,7 +359,6 @@ pub fn switch(cat: &Catalog, dirs: &Dirs, to: &str, flags: Flags) -> Result<Swit
     Ok(SwitchOutcome {
         from: uo.name,
         to: io.name,
-        rcsave_dir: uo.rcsave_dir,
     })
 }
 
@@ -491,13 +458,6 @@ fn remove_dir_all_forceful(path: &std::path::Path) -> Result<()> {
         ));
     }
     Ok(())
-}
-
-fn now_ts_compact() -> String {
-    OffsetDateTime::now_utc()
-        .format(&Rfc3339)
-        .expect("RFC3339 formatting of OffsetDateTime::now_utc cannot fail")
-        .replace(':', "")
 }
 
 #[cfg(test)]
