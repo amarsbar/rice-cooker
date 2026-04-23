@@ -22,11 +22,18 @@ const LOG_TAIL_LINES: usize = 20;
 // positives; `(^|/)` before handles the path prefix case.
 pub const QS_MATCH_PATTERN: &str = r"(^|/)(quickshell|qs)( |$)";
 
-/// True when `quickshell -c <name>` has a running process. Uses the same
-/// cmdline literal verify_by_name emits so the pattern stays in sync.
+/// True when `quickshell -c <name>` has a running process.
 pub fn rice_shell_alive(name: &str) -> Result<bool> {
-    let pat = format!("quickshell -c {}", regex::escape(name));
-    pgrep_matches(&["-xf", &pat])
+    pgrep_matches(&["-xf", &qs_cmdline_pattern(name)])
+}
+
+/// The exact cmdline `launch_detached_by_name` emits into /proc, used by
+/// both `rice_shell_alive` (pgrep) and `verify_by_name` (pgrep) so liveness,
+/// verify, and launch can't desync. `regex::escape` is load-bearing: catalog
+/// names can contain `.`, `+`, etc. that would otherwise match too broadly
+/// under pgrep's BRE interpretation.
+fn qs_cmdline_pattern(name: &str) -> String {
+    format!("quickshell -c {}", regex::escape(name))
 }
 
 pub fn kill_notif_daemons() -> Result<()> {
@@ -158,10 +165,7 @@ pub enum VerifyResult {
 /// Poll up to VERIFY_TIMEOUT_MS for `quickshell -c <name>` alive + log-clean
 /// + (on Hyprland) owning a layer-shell surface.
 pub fn verify_by_name(name: &str, log_file: &Path) -> Result<VerifyResult> {
-    // regex::escape: catalog allows '.', '+', etc. in names (e.g. `foo.1`);
-    // pgrep -f treats the pattern as a regex, so unescaped metas would match
-    // laxly (`foo.1` matches `fooX1`). `-x` anchors; escape handles the rest.
-    let pat = format!("quickshell -c {}", regex::escape(name));
+    let pat = qs_cmdline_pattern(name);
     let deadline = Instant::now() + Duration::from_millis(VERIFY_TIMEOUT_MS);
     let mut hypr_ever_said_no = false;
 

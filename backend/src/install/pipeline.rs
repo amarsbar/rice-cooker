@@ -132,13 +132,10 @@ pub fn run_try<W: Write>(
     if current.as_deref() == Some(name) {
         // Liveness check: current.json can be stale if the shell crashed or
         // was manually killed. Only short-circuit when the process is actually
-        // running; otherwise fall through and re-launch.
-        let alive = try_stage!(
-            events,
-            "preflight",
-            "liveness",
-            process::rice_shell_alive(name)
-        );
+        // running; otherwise fall through and re-launch. Tagged `liveness` (not
+        // `preflight`) so a Fail here doesn't appear to contradict the
+        // Step::Preflight Done already emitted above.
+        let alive = try_stage!(events, "liveness", process::rice_shell_alive(name));
         if alive {
             events.emit(&Event::Success {
                 active: Some(name.to_string()),
