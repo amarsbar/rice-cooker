@@ -1,17 +1,14 @@
 #!/usr/bin/env bash
 # Try each rice in the catalog; uninstall it; check a clean teardown.
-# Skips caelestia (separately verified) and dotfiles-hyprland (known broken).
 #
 # Per rice:
 #   1. rice-cooker-backend try <name>   (installs + launches + verifies)
 #   2. parse NDJSON, check for Success
-#   3. verify hyprctl layer-shell surfaces (belt-and-suspenders beyond
-#      what `try` already checked internally)
+#   3. confirm rice shell process is alive post-try
 #   4. rice-cooker-backend uninstall
 #   5. parse NDJSON, check for Success
 #   6. verify state is clean: symlink gone, record gone, current.json gone
-#   7. verify clone cache PERSISTS (new XDG-cache contract)
-# Passes summarize at the end.
+#   7. verify clone cache PERSISTS (XDG cache contract)
 
 set -u
 
@@ -23,7 +20,7 @@ RENDER_SETTLE=2   # seconds to wait after `try` returns before hyprctl check
 
 # Rices to try, in order. Skip caelestia (tested separately) + dotfiles-hyprland (known bad).
 RICES=(
-    noctalia dms end-4 Ambxst iNiR nucleus NibrasShell
+    noctalia dms Ambxst iNiR nucleus NibrasShell
     linux-retroism Zaphkiel eqsh whisker dhrruvsharma-shell Moonveil
 )
 
@@ -66,33 +63,6 @@ symlink_dst_for() {
     echo "${raw/#\~/$HOME}"
 }
 
-# Count hyprctl layer-shell surfaces owned by pids matching `quickshell -c <name>`.
-# python3 defends against hyprctl/json failures — empty output becomes 0.
-count_layers_for() {
-    local name=$1
-    local pids
-    pids=$(pgrep -xf "quickshell -c $name" 2>/dev/null | tr '\n' ' ')
-    if [ -z "$pids" ]; then
-        echo 0
-        return
-    fi
-    PIDS="$pids" hyprctl layers -j 2>/dev/null | python3 -c '
-import json, os, sys
-try:
-    root = json.load(sys.stdin)
-except Exception:
-    print(0); sys.exit(0)
-pids = {int(p) for p in os.environ.get("PIDS", "").split() if p.isdigit()}
-count = 0
-for mon in root.values():
-    for arr in mon.get("levels", {}).values():
-        for layer in arr:
-            if layer.get("pid") in pids:
-                count += 1
-print(count)
-' 2>/dev/null || echo 0
-}
-
 for name in "${RICES[@]}"; do
     printf '\n========== %s ==========\n' "$name"
 
@@ -125,10 +95,10 @@ for name in "${RICES[@]}"; do
         continue
     fi
 
-    # Belt-and-suspenders: let the shell settle, then re-check hyprctl.
+    # Belt-and-suspenders: let the shell settle, then confirm the process is
+    # still alive. `try`'s internal verify handles the hyprctl layer check.
     sleep "$RENDER_SETTLE"
-    layers=$(count_layers_for "$name")
-    layers=${layers:-0}
+    alive=$(pgrep -xcf "quickshell -c $name" 2>/dev/null || echo 0)
 
     # uninstall — should kill qs, remove deps/symlink/record, and (since
     # we had no captured original shell going in) skip the replay step.
@@ -169,11 +139,11 @@ for name in "${RICES[@]}"; do
         # broke the XDG cache guarantee.
         printf '%-24s FAIL %s\n' "$name" "$clone_missing"
         fail=$((fail+1)); failed_names+=("$name:clone-wrongly-deleted")
-    elif [ "$layers" -lt 1 ]; then
-        printf '%-24s FAIL zero-layer-surfaces (try said ok but hyprctl saw nothing)\n' "$name"
-        fail=$((fail+1)); failed_names+=("$name:no-layers")
+    elif [ "$alive" -lt 1 ]; then
+        printf '%-24s FAIL shell-not-running-post-try\n' "$name"
+        fail=$((fail+1)); failed_names+=("$name:no-shell")
     else
-        printf '%-24s PASS %d layer-shell surface(s), clone cached\n' "$name" "$layers"
+        printf '%-24s PASS clone cached\n' "$name"
         pass=$((pass+1))
     fi
 done

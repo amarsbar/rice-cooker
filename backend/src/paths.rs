@@ -316,7 +316,6 @@ mod tests {
         assert!(p.searched_catalog_paths().is_empty());
     }
 
-    // Pins the lock filename so a future re-split (install vs apply) fails loudly.
     #[test]
     fn lock_path_is_cache_home_slash_lock() {
         let p = Paths::at_roots(
