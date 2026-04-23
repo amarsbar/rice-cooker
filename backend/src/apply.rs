@@ -51,7 +51,6 @@ pub struct ApplyParams<'a> {
     /// Path to the rice's `shell.qml` relative to the repo root, as declared by the
     /// curated catalog. Defaults to `"shell.qml"` from the CLI.
     pub entry: &'a str,
-    pub dry_run: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -118,14 +117,6 @@ pub fn run_apply<W: Write>(
         }
     };
 
-    if params.dry_run {
-        events.emit(&Event::Success {
-            active: None,
-            dry_run: true,
-        })?;
-        return Ok(true);
-    }
-
     if !wet_pipeline(&rice_dir, &entry_rel, &log_file, events)? {
         return Ok(false);
     }
@@ -141,7 +132,6 @@ pub fn run_apply<W: Write>(
     );
     events.emit(&Event::Success {
         active: Some(params.name.to_string()),
-        dry_run: false,
     })?;
     Ok(true)
 }
@@ -197,10 +187,7 @@ pub fn run_exit<W: Write>(cache: &Cache, events: &mut EventWriter<W>) -> Result<
     // so on the next `apply`, preflight should re-capture whatever is currently
     // running rather than inheriting what we captured on the previous apply.
     try_stage!(events, "commit", "clear_original", cache.clear_original());
-    events.emit(&Event::Success {
-        active: None,
-        dry_run: false,
-    })?;
+    events.emit(&Event::Success { active: None })?;
     Ok(true)
 }
 

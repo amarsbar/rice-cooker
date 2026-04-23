@@ -23,21 +23,14 @@ struct Cli {
 #[derive(Subcommand)]
 enum Cmd {
     /// Install a rice from the catalog.
-    Install {
-        name: String,
-        /// Print planned actions without doing anything.
-        #[arg(long)]
-        dry_run: bool,
-    },
+    Install { name: String },
     /// Uninstall the currently-installed rice.
     ///
     /// Deletes the symlink, the clone directory at
     /// `~/.cache/rice-cooker/rices/<name>/`, and the install record.
     /// Any edits you made to files inside the clone are lost — copy
-    /// them out first. `--dry-run` prints the plan without acting.
+    /// them out first.
     Uninstall {
-        #[arg(long)]
-        dry_run: bool,
         #[arg(long)]
         force: bool,
     },
@@ -55,8 +48,6 @@ enum Cmd {
     Switch {
         name: String,
         #[arg(long)]
-        dry_run: bool,
-        #[arg(long)]
         force: bool,
     },
     /// List catalog entries; marks the installed one.
@@ -71,8 +62,6 @@ enum Cmd {
         repo: String,
         #[arg(long, default_value = "shell.qml")]
         entry: String,
-        #[arg(long)]
-        dry_run: bool,
     },
     /// v1 preview: kill the active rice; restore pre-apply shell.
     Exit,
@@ -90,20 +79,12 @@ fn main() -> ExitCode {
 
 fn run() -> Result<()> {
     let cli = Cli::parse();
-    let flags = Flags {
-        dry_run: false,
-        force: false,
-    };
+    let flags = Flags { force: false };
     match &cli.cmd {
-        Cmd::Install { name, dry_run } => {
+        Cmd::Install { name } => {
             let dirs = install::resolve_dirs()?;
             let cat = Catalog::from_file(&catalog_path(cli.catalog.as_deref())?)?;
-            let mut f = flags;
-            f.dry_run = *dry_run;
-            let out = install::install(&cat, &dirs, name, f)?;
-            if out.dry_run {
-                return Ok(());
-            }
+            let out = install::install(&cat, &dirs, name, flags)?;
             println!("installed: {}", out.name);
             if !out.pacman_diff.added_explicit.is_empty() {
                 println!(
@@ -113,31 +94,19 @@ fn run() -> Result<()> {
                 );
             }
         }
-        Cmd::Uninstall { dry_run, force } => {
+        Cmd::Uninstall { force } => {
             let dirs = install::resolve_dirs()?;
             let mut f = flags;
-            f.dry_run = *dry_run;
             f.force = *force;
             let out = install::uninstall(&dirs, f)?;
-            if f.dry_run {
-                return Ok(());
-            }
             println!("uninstalled: {}", out.name);
         }
-        Cmd::Switch {
-            name,
-            dry_run,
-            force,
-        } => {
+        Cmd::Switch { name, force } => {
             let dirs = install::resolve_dirs()?;
             let cat = Catalog::from_file(&catalog_path(cli.catalog.as_deref())?)?;
             let mut f = flags;
-            f.dry_run = *dry_run;
             f.force = *force;
             let out = install::switch(&cat, &dirs, name, f)?;
-            if f.dry_run {
-                return Ok(());
-            }
             println!("switched: {} -> {}", out.from, out.to);
         }
         Cmd::List => {
@@ -175,22 +144,12 @@ fn run() -> Result<()> {
                 None => println!("nothing installed"),
             }
         }
-        Cmd::Apply {
-            name,
-            repo,
-            entry,
-            dry_run,
-        } => {
+        Cmd::Apply { name, repo, entry } => {
             let cache = Cache::from_env()?;
             let stdout = std::io::stdout();
             let mut lock = stdout.lock();
             let mut events = EventWriter::new(&mut lock);
-            let params = ApplyParams {
-                name,
-                repo,
-                entry,
-                dry_run: *dry_run,
-            };
+            let params = ApplyParams { name, repo, entry };
             apply::run_apply(&cache, &params, &mut events)?;
         }
         Cmd::Exit => {

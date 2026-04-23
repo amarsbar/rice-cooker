@@ -23,7 +23,6 @@ use super::symlink as symlink_shape;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Flags {
-    pub dry_run: bool,
     pub force: bool,
 }
 
@@ -31,7 +30,6 @@ pub struct Flags {
 pub struct InstallOutcome {
     pub name: String,
     pub pacman_diff: PacmanDiff,
-    pub dry_run: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -59,13 +57,13 @@ pub struct StatusRow {
     pub installed: Option<InstallRecord>,
 }
 
-pub fn install(cat: &Catalog, dirs: &Dirs, name: &str, flags: Flags) -> Result<InstallOutcome> {
+pub fn install(cat: &Catalog, dirs: &Dirs, name: &str, _flags: Flags) -> Result<InstallOutcome> {
     dirs.ensure()?;
     let _lock = ApplyLock::try_acquire(&dirs.lock_file()).map_err(|e| anyhow!("lock: {e}"))?;
-    install_locked(cat, dirs, name, flags)
+    install_locked(cat, dirs, name)
 }
 
-fn install_locked(cat: &Catalog, dirs: &Dirs, name: &str, flags: Flags) -> Result<InstallOutcome> {
+fn install_locked(cat: &Catalog, dirs: &Dirs, name: &str) -> Result<InstallOutcome> {
     let entry = cat
         .get(name)
         .ok_or_else(|| anyhow!("{name}: not in catalog"))?;
@@ -81,24 +79,6 @@ fn install_locked(cat: &Catalog, dirs: &Dirs, name: &str, flags: Flags) -> Resul
         return Err(anyhow!(
             "{cur} is already installed — run uninstall or switch first"
         ));
-    }
-
-    if flags.dry_run {
-        let dst = expand_home(&entry.symlink_dst, &dirs.home);
-        let src = dirs.clone_dir(name).join(&entry.symlink_src);
-        println!("would symlink: {} -> {}", dst.display(), src.display());
-        let missing_deps =
-            deps::missing(&[entry.pacman_deps.clone(), entry.aur_deps.clone()].concat())?;
-        if !missing_deps.is_empty() {
-            println!("would install deps: {}", missing_deps.join(" "));
-        } else {
-            println!("deps already satisfied, zero polkit prompts");
-        }
-        return Ok(InstallOutcome {
-            name: name.to_string(),
-            pacman_diff: PacmanDiff::default(),
-            dry_run: true,
-        });
     }
 
     // Clone / re-clone.
@@ -168,7 +148,6 @@ fn install_locked(cat: &Catalog, dirs: &Dirs, name: &str, flags: Flags) -> Resul
     Ok(InstallOutcome {
         name: name.to_string(),
         pacman_diff: PacmanDiff { added_explicit },
-        dry_run: false,
     })
 }
 
@@ -181,20 +160,6 @@ pub fn uninstall(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
 fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
     let name = read_current(dirs)?.ok_or_else(|| anyhow!("no rice installed"))?;
     let record = load_record(&dirs.record_json(&name))?;
-
-    if flags.dry_run {
-        println!("would remove symlink {}", record.symlink_path.display());
-        let clone = dirs.clone_dir(&name);
-        println!(
-            "would remove clone {} (any edits to files inside will be lost — copy them out first)",
-            clone.display()
-        );
-        println!(
-            "would remove packages: {}",
-            record.pacman_diff.added_explicit.join(" ")
-        );
-        return Ok(UninstallOutcome { name });
-    }
 
     // Remove packages. Pre-filter already-removed so pacman doesn't
     // abort with "target not found" on retry. A pacman-query failure
@@ -313,54 +278,8 @@ fn uninstall_locked(dirs: &Dirs, flags: Flags) -> Result<UninstallOutcome> {
 pub fn switch(cat: &Catalog, dirs: &Dirs, to: &str, flags: Flags) -> Result<SwitchOutcome> {
     dirs.ensure()?;
     let _lock = ApplyLock::try_acquire(&dirs.lock_file()).map_err(|e| anyhow!("lock: {e}"))?;
-
-    // Dry-run needs its own path. If we called uninstall_locked+install_locked
-    // in dry-run mode, uninstall_locked prints "would remove" but leaves
-    // current.json set, then install_locked reads it as "already installed"
-    // and errors out — the combined plan never prints.
-    if flags.dry_run {
-        let from = read_current(dirs)?.unwrap_or_default();
-        let entry = cat.get(to).ok_or_else(|| anyhow!("{to}: not in catalog"))?;
-        if !from.is_empty() {
-            match load_record(&dirs.record_json(&from)) {
-                Ok(rec) => {
-                    println!("would remove symlink {}", rec.symlink_path.display());
-                    if !rec.pacman_diff.added_explicit.is_empty() {
-                        println!(
-                            "would remove packages: {}",
-                            rec.pacman_diff.added_explicit.join(" ")
-                        );
-                    }
-                }
-                Err(e) => {
-                    // Surface the read failure so dry-run doesn't silently
-                    // diverge from what wet `switch` would report. Wet
-                    // `uninstall_locked` would hit the same error and bail.
-                    eprintln!(
-                        "rice-cooker: warn: cannot read current install record for {from}: {e}; \
-                         dry-run omitting remove plan (wet switch would fail)"
-                    );
-                }
-            }
-        }
-        let dst = expand_home(&entry.symlink_dst, &dirs.home);
-        let src = dirs.clone_dir(to).join(&entry.symlink_src);
-        println!("would symlink: {} -> {}", dst.display(), src.display());
-        let missing_deps =
-            deps::missing(&[entry.pacman_deps.clone(), entry.aur_deps.clone()].concat())?;
-        if !missing_deps.is_empty() {
-            println!("would install deps: {}", missing_deps.join(" "));
-        } else {
-            println!("deps already satisfied, zero polkit prompts");
-        }
-        return Ok(SwitchOutcome {
-            from,
-            to: to.to_string(),
-        });
-    }
-
     let uo = uninstall_locked(dirs, flags)?;
-    let io = install_locked(cat, dirs, to, flags)?;
+    let io = install_locked(cat, dirs, to)?;
     Ok(SwitchOutcome {
         from: uo.name,
         to: io.name,

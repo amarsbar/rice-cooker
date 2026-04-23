@@ -35,8 +35,6 @@ pub enum Event {
     Success {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         active: Option<String>,
-        #[serde(default, skip_serializing_if = "is_false")]
-        dry_run: bool,
     },
     Fail {
         stage: String,
@@ -46,10 +44,6 @@ pub enum Event {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         log_tail: Option<String>,
     },
-}
-
-fn is_false(b: &bool) -> bool {
-    !*b
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -91,12 +85,11 @@ mod tests {
                 },
                 r#"{"type":"step","step":"clone","state":"start"}"#,
             ),
-            // Success omits None/false fields on serialize and reconstructs them on
-            // deserialize via #[serde(default)] — pins both halves of the contract.
+            // Success omits None on serialize and reconstructs it on deserialize
+            // via #[serde(default)] — pins both halves of the contract.
             (
                 Event::Success {
                     active: Some("x".into()),
-                    dry_run: false,
                 },
                 r#"{"type":"success","active":"x"}"#,
             ),
