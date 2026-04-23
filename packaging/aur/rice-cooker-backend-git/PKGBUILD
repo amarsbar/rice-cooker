@@ -1,0 +1,54 @@
+# Maintainer: amarsbar <ammarhossain10@gmail.com>
+pkgname=rice-cooker-backend-git
+_pkgname=rice-cooker
+pkgver=r0.0000000
+pkgrel=1
+pkgdesc="Quickshell rice install engine"
+arch=('x86_64')
+url="https://github.com/amarsbar/rice-cooker"
+license=('BSD-3-Clause')
+depends=('polkit' 'git')
+makedepends=('rust' 'cargo' 'git')
+optdepends=(
+    'paru: preferred AUR helper for installing rice dependencies'
+    'yay: alternative AUR helper for installing rice dependencies'
+    'hyprland: layer-shell verification via hyprctl during apply'
+    'hyprpolkitagent: polkit authentication agent (any polkit agent works)'
+)
+provides=('rice-cooker-backend')
+conflicts=('rice-cooker-backend')
+source=("$_pkgname::git+$url.git")
+sha256sums=('SKIP')
+
+pkgver() {
+    cd "$srcdir/$_pkgname"
+    printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+}
+
+prepare() {
+    cd "$srcdir/$_pkgname/backend"
+    cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+    cd "$srcdir/$_pkgname/backend"
+    export CARGO_TARGET_DIR=target
+    cargo build --frozen --release
+}
+
+check() {
+    cd "$srcdir/$_pkgname/backend"
+    cargo test --frozen --lib
+}
+
+package() {
+    cd "$srcdir/$_pkgname"
+    install -Dm755 "backend/target/release/rice-cooker-backend" \
+        "$pkgdir/usr/bin/rice-cooker-backend"
+    install -Dm644 "backend/catalog.toml" \
+        "$pkgdir/usr/share/rice-cooker/catalog.toml"
+    install -Dm644 "backend/polkit/so.butterfly.ricecooker.policy" \
+        "$pkgdir/usr/share/polkit-1/actions/so.butterfly.ricecooker.policy"
+    install -Dm644 "LICENSE" \
+        "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

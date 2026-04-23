@@ -1,0 +1,22 @@
+pkgbase = rice-cooker-backend-git
+	pkgdesc = Quickshell rice install engine
+	pkgver = r0.0000000
+	pkgrel = 1
+	url = https://github.com/amarsbar/rice-cooker
+	arch = x86_64
+	license = BSD-3-Clause
+	makedepends = rust
+	makedepends = cargo
+	makedepends = git
+	depends = polkit
+	depends = git
+	optdepends = paru: preferred AUR helper for installing rice dependencies
+	optdepends = yay: alternative AUR helper for installing rice dependencies
+	optdepends = hyprland: layer-shell verification via hyprctl during apply
+	optdepends = hyprpolkitagent: polkit authentication agent (any polkit agent works)
+	provides = rice-cooker-backend
+	conflicts = rice-cooker-backend
+	source = rice-cooker::git+https://github.com/amarsbar/rice-cooker.git
+	sha256sums = SKIP
+
+pkgname = rice-cooker-backend-git
