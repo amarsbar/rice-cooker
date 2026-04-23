@@ -1,20 +1,25 @@
-/* Outer frame (350:6513) — 453 × 263 at (25, 97.02), dark-grey bg. */
+/* Every child position here is Figma metadata minus the card's 9px border:
+   the main-preview group (350:6512) is a Figma `display: contents` wrapper,
+   so its children's metadata x/y are in outer-card coords and need the
+   border offset subtracted to land in the card's content box. */
+
+/* Outer frame (350:6513) — 453 × 263 at outer (25, 97.02). */
 .outer {
   position: absolute;
-  left: 25px;
-  top: 97.02px;
+  left: 16px;
+  top: 88.02px;
   width: 453px;
   height: 263px;
   background: var(--color-frame);
   border-radius: var(--preview-outer-radius);
 }
 
-/* Inner clipping container (350:6514) — 441 × 251 at (31, 103.02) sitting
-   6px inside the outer. Clips the theme screenshot to rounded corners. */
+/* Inner clipping container (350:6514) — 441 × 251 at outer (31, 103.02),
+   6px inside .outer. */
 .inner {
   position: absolute;
-  left: 31px;
-  top: 103.02px;
+  left: 22px;
+  top: 94.02px;
   width: 441px;
   height: 251px;
   background: var(--color-frame-inner);
@@ -22,8 +27,8 @@
   overflow: hidden;
 }
 
-/* Theme screenshot (350:6515) — 429 × 241, centered inside .inner (+1px
-   horizontal bias from Figma), top 5px. */
+/* Theme screenshot (350:6515) — 429 × 241 inside .inner, +1px horizontal
+   bias. Child of a framed parent, so no border offset here. */
 .image {
   position: absolute;
   left: calc(50% + 1px);
@@ -36,8 +41,8 @@
   pointer-events: none;
 }
 
-/* Frame-corner flourishes (350:6516/6519/6522/6525) — 31.951 × 22.411 each,
-   dark-grey paw/leaf sprites mirrored into the four corners. */
+/* Frame-corner flourishes (350:6516/6519/6522/6525) — 31.951 × 22.411 each
+   at outer (446 or 25, 81.16 or 353). */
 .corner {
   position: absolute;
   width: 31.951px;
@@ -46,30 +51,31 @@
 }
 
 .cornerTr {
-  left: 446px;
-  top: 81.16px;
+  left: 437px;
+  top: 72.16px;
 }
 
 .cornerTl {
-  left: 25px;
-  top: 81.16px;
+  left: 16px;
+  top: 72.16px;
   transform: scaleX(-1);
 }
 
 .cornerBr {
-  left: 446px;
-  top: 353px;
+  left: 437px;
+  top: 344px;
   transform: scaleY(-1);
 }
 
 .cornerBl {
-  left: 25px;
-  top: 353px;
+  left: 16px;
+  top: 344px;
   transform: scale(-1, -1);
 }
 
-/* Pills (350:6534 top / 350:6536 bottom) — centered horizontally with a
-   +1px bias, 30px tall, 12px horizontal padding, fully rounded. */
+/* Pills (350:6534 top at outer y=73 / 350:6536 bottom at outer y=354) —
+   centered horizontally with a +1px bias, 30px tall, 12px horizontal
+   padding, fully rounded. */
 .pill {
   position: absolute;
   left: calc(50% + 1px);
@@ -95,19 +101,19 @@
 }
 
 .pillTop {
-  top: 73px;
+  top: 64px;
 }
 
 .pillBottom {
-  top: 354px;
+  top: 345px;
 }
 
-/* Carousel arrow buttons (350:6528 right / 350:6531 left) — 24 × 24 dark
-   circles flanking the frame at vertical center. Left one is shifted a few
-   pixels off the frame for symmetry with the right. */
+/* Carousel arrow buttons (350:6528 right at outer (463, 216.02) / 350:6531
+   left at outer (38, 216.02)) — 24 × 24 dark circles straddling the frame
+   edge at vertical center. */
 .arrowButton {
   position: absolute;
-  top: 216.02px;
+  top: 207.02px;
   width: 24px;
   height: 24px;
   background: var(--color-frame);
@@ -123,11 +129,11 @@
 }
 
 .arrowButtonLeft {
-  left: 14px;
+  left: 29px;
 }
 
 .arrowButtonRight {
-  left: 463px;
+  left: 454px;
 }
 
 /* Arrow glyph — 8.2 × 5.64 mask of the eva:arrow-up icon, rotated to face
@@ -156,7 +162,7 @@
 }
 
 /* Page-indicator dots (350:6538-6541) — 10 × 10 dark circles flanking the
-   top and bottom pills. */
+   top and bottom pills (outer y=90 / y=356). */
 .dot {
   position: absolute;
   width: 10px;
@@ -166,21 +172,21 @@
 }
 
 .dotTl {
-  left: 189px;
-  top: 90px;
+  left: 180px;
+  top: 81px;
 }
 
 .dotTr {
-  left: 301px;
-  top: 90px;
+  left: 292px;
+  top: 81px;
 }
 
 .dotBl {
-  left: 180px;
-  top: 356px;
+  left: 171px;
+  top: 347px;
 }
 
 .dotBr {
-  left: 312px;
-  top: 356px;
+  left: 303px;
+  top: 347px;
 }

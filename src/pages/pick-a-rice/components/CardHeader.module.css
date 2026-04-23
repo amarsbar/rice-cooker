@@ -7,20 +7,26 @@
   height: 24px;
 }
 
-/* Menu dots (350:6543) — 20 × 20 at (459, 25). */
+/* Menu dots (350:6542 wrapper) — 20 × 20. Figma metadata gives (459, 25)
+   in outer-card coords; subtract the 9px border to land on (450, 16) in
+   the content box, which puts the dots at the same vertical center as the
+   logo and letter pills. */
 .menu {
   position: absolute;
-  left: 459px;
-  top: 25px;
+  left: 450px;
+  top: 16px;
   width: 19.999px;
   height: 19.999px;
 }
 
-/* "PICK A RICE" letter pills (350:6549) — flex row with three clusters. */
+/* "PICK A RICE" letter pills (350:6548 wrapper) — three flex clusters.
+   Uses the wrapper's border-subtracted (165, 13) so the cluster row is
+   horizontally centered in the card (left margin = right margin ≈ 165.5)
+   and vertically aligned with the logo + menu dots. */
 .letters {
   position: absolute;
-  left: 174px;
-  top: 22px;
+  left: 165px;
+  top: 13px;
   display: flex;
   gap: 4px;
   align-items: center;

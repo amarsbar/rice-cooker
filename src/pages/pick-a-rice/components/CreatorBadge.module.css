@@ -93,28 +93,34 @@
   pointer-events: none;
 }
 
+/* Halos are placed by their visible circle's top-left (derived from the
+   Figma wrapper bounding box minus the visible radius). The wrapper's
+   bounding box exceeds the circle because Figma stores a pre-rotation
+   bounding rect, so we can't just use `calc(50% + offset)` — that lands
+   the circle inside the wrapper instead of at the wrapper's center. */
+
+/* Ellipse 4175 — largest halo, bbox (110.28, 9), visible d=14.564. */
 .haloLg {
-  /* Ellipse 4175 — center (88 + 24.95, 18.9475), diameter 14.564. */
   width: 14.564px;
   height: 14.564px;
-  left: calc(50% + 24.95px - 7.282px);
-  top: calc(18.9475px - 7.282px);
+  left: 112.948px;
+  top: 11.665px;
 }
 
+/* Ellipse 4174 — medium halo, bbox (128.80, 18.30), visible d=9.612. */
 .haloMd {
-  /* Ellipse 4174 — center (88 + 40.8, 25.0965), diameter 9.612. */
   width: 9.612px;
   height: 9.612px;
-  left: calc(50% + 40.8px - 4.806px);
-  top: calc(25.0965px - 4.806px);
+  left: 130.790px;
+  top: 20.290px;
 }
 
+/* Ellipse 4173 — smallest halo, bbox (140.95, 27.51), visible d=6.873. */
 .haloSm {
-  /* Ellipse 4173 — center (88 + 51.69, 32.2045), diameter 6.873. */
   width: 6.873px;
   height: 6.873px;
-  left: calc(50% + 51.69px - 3.4365px);
-  top: calc(32.2045px - 3.4365px);
+  left: 142.209px;
+  top: 28.768px;
 }
 
 /* Tag text (350:6648-6650) — Madimi One 27.65px in the brown ink color. */
