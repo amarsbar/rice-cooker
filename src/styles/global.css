@@ -51,16 +51,16 @@ img {
 }
 
 .btnIcon {
-  fill: var(--color-creator-text);
-  stroke: var(--color-creator-text);
+  fill: var(--color-brown);
+  stroke: var(--color-brown);
   transition: fill 100ms ease-out, stroke 100ms ease-out;
 }
 
 .iconBtn:hover .btnShape {
-  fill: var(--color-btn-hover-bg);
+  fill: var(--color-green);
 }
 
 .iconBtn:hover .btnIcon {
-  fill: var(--color-btn-hover-icon);
-  stroke: var(--color-btn-hover-icon);
+  fill: var(--color-lime);
+  stroke: var(--color-lime);
 }

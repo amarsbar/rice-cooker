@@ -84,7 +84,7 @@
 .beadNum {
   font-family: var(--font-display);
   font-size: var(--fs-letter);
-  color: var(--color-creator-text);
+  color: var(--color-brown);
   line-height: 1;
   transition: opacity 0.2s ease-out;
 }
@@ -94,7 +94,7 @@
   font-family: var(--font-display);
   font-size: var(--fs-tag);
   font-weight: 400;
-  color: var(--color-creator-text);
+  color: var(--color-brown);
   line-height: normal;
   white-space: nowrap;
 }
