@@ -1,26 +1,81 @@
 :root {
-  /* Colors from Figma */
-  --color-card-bg: #000001;
-  --color-card-bg-shrunken: rgba(26, 20, 25, 0.8);
-  --color-mint: #dfecdb;
-  --color-mint-deep: #c7d8bf;
+  /* ----- Palette -----
+     Every hex the design uses, named by colour. These are the raw
+     inventory; reference them through the role tokens below (only
+     reach for the raw palette if the value is theme-invariant). */
   --color-yellow: #fade26;
   --color-brown: #3f3833;
   --color-lime: #e8ff76;
   --color-green: #73a94a;
   --color-light-blue: #d0ecfb;
   --color-light-pink: #fdb1e5;
+  --color-navy: #2e5b89;
+  --color-navy-deep: #293349;
+  --color-charcoal: #20212e;
+  --color-near-black: #0f0f15;
+  --color-mint: #dfecdb;
+  --color-mint-deep: #c7d8bf;
   --color-teal: #4b837d;
   --color-cream: #fdfdf1;
-  --color-creator-grid: #f0ede9;
+  --color-cream-soft: #f8feff;
+  --color-ice: #f3f6fd;
   --color-orange: #fe6a00;
+  --color-red: #ed3d3e;
+  --color-pink: #fc6984;
+  --color-rose: #f66ea2;
+  --color-rose-light: #ffafce;
+  --color-sky-soft: #7e92c4;
+  --color-blue-grey: #9eabc5;
+  --color-slate: #737d91;
+  --color-mute: #e0e1e1;
+  --color-yellow-deep: #ffc501;
+  --color-yellow-soft: #ffe57b;
   --color-drop-green: #b9f018;
-  --color-drop-dot: #6a9a79;
+  --color-drop-dot-t2: #6a9a79;
+  --color-grid-t1: #e9ebf0;
+  --color-grid-t2: #f0ede9;
+  --color-grid-t3: #a79595;
+
+  /* Static (theme-invariant) tokens kept from the old palette. */
+  --color-card-bg-shrunken: rgba(26, 20, 25, 0.8);
   --color-frame: #3b353b;
   --color-frame-inner: #1a1419;
   --color-peek: #d9d9d9;
   --color-pill-text: #f8feff;
   --color-counter-text: #000001;
+
+  /* ----- Role tokens (theme 2 defaults) -----
+     Every UI role whose colour changes between themes binds here. The
+     [data-theme='t1'] / [data-theme='t3'] blocks below redefine the
+     same names — components only reference role tokens, never raw
+     palette. */
+  --c-card-bg: #000001;                              /* opaque card bg in picking state */
+  --c-card-bg-shrunken: rgba(26, 20, 25, 0.8);       /* semi-transparent in preview/post-install */
+  --c-card-border: var(--color-mint);                /* card border + green tab + drop shape outline */
+  --c-sound-body: var(--color-teal);                 /* sound ring stroke + inner disc */
+  --c-sound-icon: var(--color-mint);                 /* speaker glyph */
+  --c-close-pin: var(--color-orange);
+  --c-primary: var(--color-yellow);                  /* letter pills, menu dots, logo fill, button default bg */
+  --c-primary-text: var(--color-counter-text);       /* letter pill text */
+  --c-logo-stroke: black;
+  --c-accent: var(--color-yellow);                   /* halo dots, WASD squares, step pill bg */
+  --c-step-text: var(--color-brown);                 /* step pill "1" glyph */
+  --c-cloud-outer: var(--color-mint-deep);
+  --c-cloud-inner: var(--color-cream);
+  --c-grid: var(--color-grid-t2);
+  --c-drop-dot: var(--color-drop-dot-t2);
+  --c-sprout-1: var(--color-drop-green);
+  --c-sprout-2: var(--color-lime);
+  --c-sprout-3: var(--color-orange);
+  --c-btn-default-icon: var(--color-brown);          /* back/github/delete default icon (fill + stroke) */
+  --c-btn-hover-bg: var(--color-green);
+  --c-btn-hover-icon: var(--color-lime);
+  --c-pill-bg: var(--color-green);                   /* APPLY/DONE default bg */
+  --c-pill-letter-bg: var(--color-lime);             /* letter circle default bg */
+  --c-pill-letter-text: var(--color-brown);          /* letter default text */
+  --c-pill-hover-bg: var(--color-yellow);
+  --c-pill-hover-letter-bg: var(--color-brown);
+  --c-pill-hover-letter-text: var(--color-lime);
 
   /* Card dimensions */
   --card-radius: 32px;

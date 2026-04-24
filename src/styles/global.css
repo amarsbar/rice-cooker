@@ -46,21 +46,21 @@ img {
 }
 
 .btnShape {
-  fill: var(--color-yellow);
+  fill: var(--c-primary);
   transition: fill 100ms ease-out;
 }
 
 .btnIcon {
-  fill: var(--color-brown);
-  stroke: var(--color-brown);
+  fill: var(--c-btn-default-icon);
+  stroke: var(--c-btn-default-icon);
   transition: fill 100ms ease-out, stroke 100ms ease-out;
 }
 
 .iconBtn:hover .btnShape {
-  fill: var(--color-green);
+  fill: var(--c-btn-hover-bg);
 }
 
 .iconBtn:hover .btnIcon {
-  fill: var(--color-lime);
-  stroke: var(--color-lime);
+  fill: var(--c-btn-hover-icon);
+  stroke: var(--c-btn-hover-icon);
 }

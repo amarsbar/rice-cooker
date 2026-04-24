@@ -8,8 +8,8 @@
   inset: 0;
 }
 
-/* "theme name" label (350:7360) — 15px yellow Madimi One, centered
-   horizontally, top 9.2px in the content box (= outer 18.2). */
+/* "theme name" label (350:7360) — 15px Madimi One in the primary theme
+   colour, centered horizontally, top 9.2px in the content box (= outer 18.2). */
 .themeName {
   position: absolute;
   left: 50%;
@@ -18,7 +18,7 @@
   font-family: var(--font-display);
   font-size: 15px;
   font-weight: 400;
-  color: var(--color-yellow);
+  color: var(--c-primary);
   line-height: normal;
   text-align: center;
   white-space: nowrap;
@@ -32,16 +32,17 @@
   top: 8.59px;
 }
 
-/* DONE button (350:7344) — dark-green pill centered on card. 10px padding
-   and 130px radius wrap a horizontal cluster of four overlapping circles
-   spelling D-O-N-E. */
+/* DONE button (350:7344) — pill centered on card. 10px padding and 130px
+   radius wrap a horizontal cluster of four overlapping circles spelling
+   D-O-N-E. Colours come from the per-theme pill role tokens; hover
+   inverts the palette (see Figma 350:7445). */
 .doneBtn {
   position: absolute;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
   padding: 10px;
-  background: var(--color-green);
+  background: var(--c-pill-bg);
   border: none;
   border-radius: 130px;
   display: flex;
@@ -51,10 +52,8 @@
   transition: background-color 100ms ease-out;
 }
 
-/* Hover inverts the palette: pill goes yellow, letter circles go brown,
-   letter glyphs go light-yellow-green. Matches Figma 350:7445. */
 .doneBtn:hover {
-  background: var(--color-yellow);
+  background: var(--c-pill-hover-bg);
 }
 
 .doneCluster {
@@ -64,13 +63,11 @@
   flex-shrink: 0;
 }
 
-/* Each letter: 52×52 light-yellow-green circle, -16px margin-right so
-   successive letters overlap. Capriola 28px brown text centered inside. */
 .doneLetter {
   width: 52px;
   height: 52px;
   margin-right: -16px;
-  background: var(--color-lime);
+  background: var(--c-pill-letter-bg);
   border-radius: 100px;
   flex-shrink: 0;
   display: flex;
@@ -79,13 +76,13 @@
   font-family: var(--font-pill);
   font-size: 28px;
   font-weight: 400;
-  color: var(--color-brown);
+  color: var(--c-pill-letter-text);
   line-height: normal;
   text-align: center;
   transition: background-color 100ms ease-out, color 100ms ease-out;
 }
 
 .doneBtn:hover .doneLetter {
-  background: var(--color-brown);
-  color: var(--color-lime);
+  background: var(--c-pill-hover-letter-bg);
+  color: var(--c-pill-hover-letter-text);
 }

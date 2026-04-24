@@ -48,7 +48,7 @@
   width: 18.565px;
   margin-right: -4px;
   padding: 2.561px;
-  background: var(--color-yellow);
+  background: var(--c-primary);
   border-radius: 237.773px;
   flex-shrink: 0;
   display: flex;
@@ -57,7 +57,7 @@
   font-family: var(--font-display);
   font-size: var(--fs-letter);
   font-weight: 400;
-  color: var(--color-counter-text);
+  color: var(--c-primary-text);
   line-height: normal;
   text-align: center;
 }
