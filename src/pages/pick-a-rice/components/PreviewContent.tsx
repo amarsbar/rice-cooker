@@ -1,7 +1,5 @@
 import { motion } from 'framer-motion';
 import styles from './PreviewContent.module.css';
-import backIcon from '@/assets/figma/back-icon.svg';
-import githubIcon from '@/assets/figma/github-icon.svg';
 import { SHRUNKEN_TEXT_VARIANTS, useView } from '../view';
 
 interface PreviewContentProps {
@@ -12,7 +10,14 @@ interface PreviewContentProps {
 /** Figma 350:7160 children — preview mode shown before the user commits.
  *  Back and GitHub buttons on the left, big central APPLY pill, theme
  *  name at top, "by creator name" at bottom. Fades in 150ms after the
- *  card morph completes. */
+ *  card morph completes.
+ *
+ *  The back/github circles pair with two decorative 12 × 12 yellow dots.
+ *  Default state (350:7955 / 350:7607) paints bg #fade26 + icon #3F3833
+ *  + sparkles #fade26; hover state (350:7613 / 350:7601) flips bg to
+ *  #73a94a + icon #E8FF76 + sparkles #73A94A. The dots are children of
+ *  the button so `:hover` on the button propagates CSS variables down to
+ *  both the icon mask and the sparkles. */
 export function PreviewContent({ themeName, creatorName }: PreviewContentProps) {
   const view = useView();
   return (
@@ -25,17 +30,17 @@ export function PreviewContent({ themeName, creatorName }: PreviewContentProps) 
       <p className={`${styles.label} ${styles.themeName}`}>{themeName}</p>
       <p className={`${styles.label} ${styles.creatorName}`}>{creatorName}</p>
 
-      <button type="button" className={styles.iconBtn} data-pos="back" aria-label="Back">
-        <img src={backIcon} alt="" className={styles.iconImg} />
+      <button type="button" className={`${styles.iconBtn} ${styles.iconBtnBack}`} aria-label="Back">
+        <span className={`${styles.iconMask} ${styles.iconMaskBack}`} />
+        <span className={`${styles.sparkle} ${styles.sparkleBackRight}`} />
+        <span className={`${styles.sparkle} ${styles.sparkleBackBottom}`} />
       </button>
-      <span className={`${styles.sparkle} ${styles.sparkleBackRight}`} />
-      <span className={`${styles.sparkle} ${styles.sparkleBackBottom}`} />
 
-      <button type="button" className={styles.iconBtn} data-pos="github" aria-label="View on GitHub">
-        <img src={githubIcon} alt="" className={styles.iconImg} />
+      <button type="button" className={`${styles.iconBtn} ${styles.iconBtnGithub}`} aria-label="View on GitHub">
+        <span className={`${styles.iconMask} ${styles.iconMaskGithub}`} />
+        <span className={`${styles.sparkle} ${styles.sparkleGhTop}`} />
+        <span className={`${styles.sparkle} ${styles.sparkleGhBottom}`} />
       </button>
-      <span className={`${styles.sparkle} ${styles.sparkleGhTop}`} />
-      <span className={`${styles.sparkle} ${styles.sparkleGhBottom}`} />
 
       <div className={styles.applyBtn}>
         <div className={styles.applyCluster}>

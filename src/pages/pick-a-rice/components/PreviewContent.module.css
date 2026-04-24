@@ -36,68 +36,112 @@
   top: 183px;
 }
 
-/* Shared button shell for BACK (top-left) and GITHUB (mid-left) circles. */
+/* Back (top-left, 350:7955) and GitHub (mid-left, 350:7607) buttons.
+   Default colors come from the base rule; the :hover rule flips all
+   three CSS vars in lockstep, matching the exact Figma hover palette:
+     bg       #fade26 → #73a94a
+     icon     #3F3833 → #E8FF76
+     sparkle  #fade26 → #73A94A
+   Sparkles live inside the button so :hover on the button cascades to
+   them via the CSS variable. overflow:visible keeps the sparkles, which
+   sit just outside the 40×40 circle, from being clipped. */
 .iconBtn {
   position: absolute;
   width: 40px;
   height: 40px;
   padding: 0;
-  background: var(--color-yellow);
   border: none;
   border-radius: 50%;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  overflow: visible;
+  --icon-btn-bg: var(--color-yellow);
+  --icon-color: var(--color-creator-text);
+  --sparkle-color: var(--color-yellow);
+  background: var(--icon-btn-bg);
+  transition: background-color 120ms ease-out;
 }
 
-.iconImg {
-  width: 20px;
-  height: 20px;
-  display: block;
+.iconBtn:hover {
+  --icon-btn-bg: #73a94a;
+  --icon-color: #e8ff76;
+  --sparkle-color: #73a94a;
 }
 
-.iconBtn[data-pos='back'] {
+.iconBtnBack {
   left: 9px;
   top: 10px;
 }
 
-.iconBtn[data-pos='github'] {
+.iconBtnGithub {
   left: 11px;
   top: 158px;
 }
 
-/* Yellow sparkle dots — 12 × 12 circles flanking each icon button. */
+/* Icon glyph — rendered via mask-image so `background-color` controls
+   the fill (plus stroke, for the back arrow) in one shot. Back and
+   GitHub both have fill == stroke at each state, so the single-color
+   mask reproduces the Figma output pixel-for-pixel. */
+.iconMask {
+  display: block;
+  width: 20px;
+  height: 20px;
+  background-color: var(--icon-color);
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  transition: background-color 120ms ease-out;
+}
+
+.iconMaskBack {
+  -webkit-mask-image: url('../../../assets/figma/back-icon.svg');
+  mask-image: url('../../../assets/figma/back-icon.svg');
+}
+
+.iconMaskGithub {
+  -webkit-mask-image: url('../../../assets/figma/github-icon.svg');
+  mask-image: url('../../../assets/figma/github-icon.svg');
+}
+
+/* Sparkle dots — 12×12 circles positioned relative to their parent
+   button so :hover on the button recolors them via the shared CSS var. */
 .sparkle {
   position: absolute;
   width: 12px;
   height: 12px;
-  background: var(--color-yellow);
+  background: var(--sparkle-color);
   border-radius: 50%;
   pointer-events: none;
+  transition: background-color 120ms ease-out;
 }
 
-/* Back-button sparkles: upper-right and directly below (350:7172/7173). */
+/* Back-button sparkles. Card-relative (39, 9) & (9, 41) minus the
+   button's (9, 10) origin. */
 .sparkleBackRight {
-  left: 39px;
-  top: 9px;
+  left: 30px;
+  top: -1px;
 }
 
 .sparkleBackBottom {
-  left: 9px;
-  top: 41px;
+  left: 0;
+  top: 31px;
 }
 
-/* GitHub-button sparkles: slightly-up-left and lower-right (350:7166/7167). */
+/* GitHub-button sparkles. Card-relative (9, 157) & (39, 189) minus the
+   button's (11, 158) origin. */
 .sparkleGhTop {
-  left: 9px;
-  top: 157px;
+  left: -2px;
+  top: -1px;
 }
 
 .sparkleGhBottom {
-  left: 39px;
-  top: 189px;
+  left: 28px;
+  top: 31px;
 }
 
 /* APPLY button (350:7174) — dark-green pill centered on card. Wraps a
