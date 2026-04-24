@@ -8,9 +8,7 @@ import dropShapePostSvg from '@/assets/figma/drop-shape-post.svg';
 import dropLeafPostSvg from '@/assets/figma/drop-leaf-post.svg';
 import { MORPH_TRANSITION, POSITIONS, SCREEN_FADE_TRANSITION, useView } from '../view';
 
-/** Angles take the head from its resting left-pointing position to each
- *  pip dot. Cycle is center → top → center → bottom, indexed by click %. */
-const HEAD_ROTATIONS = [0, 45, 0, -41] as const;
+const HEAD_ROTATIONS = [0, 38.5, 0, -38.5] as const;
 
 export function BottomDrop() {
   const view = useView();
@@ -42,9 +40,6 @@ export function BottomDrop() {
           animate={{ rotate }}
           transition={{ duration: 0.25, ease: 'easeOut' }}
         />
-        <span className={`${styles.dot} ${styles.dotTop}`} />
-        <span className={`${styles.dot} ${styles.dotBottom}`} />
-        <span className={`${styles.dot} ${styles.dotLeft}`} />
       </motion.div>
 
       <motion.div
