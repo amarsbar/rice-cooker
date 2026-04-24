@@ -27,11 +27,11 @@ const SLOTS: Record<number, { dx: number; dy: number; size: number }> = {
 };
 const PILL_SIZE = 25;
 const CREAM_CENTER = 88;
-/** Pill center y is fixed — beads only shift horizontally as the scroll
- *  index changes. (Figma shows the arc nudging down for later indexes;
- *  locking the y removes a distracting vertical drift while scrolling.
- *  Can re-enable with a STEP > 0 if we want the Figma-exact vertical
- *  offset back.) */
+/** The arc as a whole stays at a fixed y — individual beads still trace
+ *  the arc's vertical contour (SLOTS[slot].dy) as they change slots.
+ *  Figma nudges the whole arc down by 15px for indexes 4+; STEP = 0
+ *  locks that drift out because it read as distracting during scroll.
+ *  Re-enable with STEP > 0 to get the Figma-exact offset back. */
 const PILL_Y_BASE = 18.5;
 const PILL_Y_STEP = 0;
 const CLOUD_ROTATE_PER_PX = 0.5;
@@ -164,29 +164,41 @@ function KeyIndicator({ pressed }: { pressed: DirKey | null }) {
 }
 
 const KEY_MAP: Record<string, DirKey> = {
-  w: 'up', W: 'up', ArrowUp: 'up',
-  a: 'left', A: 'left', ArrowLeft: 'left',
-  s: 'down', S: 'down', ArrowDown: 'down',
-  d: 'right', D: 'right', ArrowRight: 'right',
+  w: 'up', ArrowUp: 'up',
+  a: 'left', ArrowLeft: 'left',
+  s: 'down', ArrowDown: 'down',
+  d: 'right', ArrowRight: 'right',
 };
 
+const keyToDir = (e: KeyboardEvent): DirKey | null =>
+  KEY_MAP[e.key] ?? KEY_MAP[e.key.toLowerCase()] ?? null;
+
+/** Tracks held WASD/arrow keys as a stack so the indicator reflects the
+ *  most recently pressed still-held key. Covers: releasing keys in
+ *  arbitrary order, rolling from one direction to another, and Alt-Tab
+ *  losing keyup events (window.blur clears the stack). */
 function usePressedDirection(): DirKey | null {
-  const [pressed, setPressed] = useState<DirKey | null>(null);
+  const [stack, setStack] = useState<DirKey[]>([]);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      const dir = KEY_MAP[e.key];
-      if (dir) setPressed(dir);
+      const dir = keyToDir(e);
+      if (!dir) return;
+      setStack((s) => (s[s.length - 1] === dir ? s : [...s.filter((k) => k !== dir), dir]));
     };
     const up = (e: KeyboardEvent) => {
-      const dir = KEY_MAP[e.key];
-      if (dir) setPressed((p) => (p === dir ? null : p));
+      const dir = keyToDir(e);
+      if (!dir) return;
+      setStack((s) => s.filter((k) => k !== dir));
     };
+    const clear = () => setStack([]);
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
+    window.addEventListener('blur', clear);
     return () => {
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', clear);
     };
   }, []);
-  return pressed;
+  return stack[stack.length - 1] ?? null;
 }

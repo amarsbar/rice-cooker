@@ -1,14 +1,11 @@
 /* Fading wrapper — covers the 405×229 post-install card's content box.
+   pointer-events is toggled inline on the motion.div so the hidden
+   variant doesn't absorb clicks meant for the underlying picking view.
    All children are positioned in content-area coords (outer-card coords
    minus the 9px mint border). */
 .wrap {
   position: absolute;
   inset: 0;
-  pointer-events: none;
-}
-
-.wrap > * {
-  pointer-events: auto;
 }
 
 /* "theme name" label (350:7360) — 15px yellow Madimi One, centered

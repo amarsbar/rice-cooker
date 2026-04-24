@@ -12,12 +12,14 @@ interface PostInstallContentProps {
  *  the card morph completes. */
 export function PostInstallContent({ themeName }: PostInstallContentProps) {
   const view = useView();
+  const active = view === 'post-install';
   return (
     <motion.div
       className={styles.wrap}
       initial={false}
-      animate={view === 'post-install' ? 'visible' : 'hidden'}
+      animate={active ? 'visible' : 'hidden'}
       variants={SHRUNKEN_TEXT_VARIANTS}
+      style={{ pointerEvents: active ? 'auto' : 'none' }}
     >
       <p className={styles.themeName}>{themeName}</p>
 

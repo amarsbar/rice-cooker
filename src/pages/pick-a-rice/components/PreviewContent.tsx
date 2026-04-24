@@ -15,12 +15,14 @@ interface PreviewContentProps {
  *  card morph completes. */
 export function PreviewContent({ themeName, creatorName }: PreviewContentProps) {
   const view = useView();
+  const active = view === 'preview';
   return (
     <motion.div
       className={styles.wrap}
       initial={false}
-      animate={view === 'preview' ? 'visible' : 'hidden'}
+      animate={active ? 'visible' : 'hidden'}
       variants={SHRUNKEN_TEXT_VARIANTS}
+      style={{ pointerEvents: active ? 'auto' : 'none' }}
     >
       <p className={`${styles.label} ${styles.themeName}`}>{themeName}</p>
       <p className={`${styles.label} ${styles.creatorName}`}>{creatorName}</p>
