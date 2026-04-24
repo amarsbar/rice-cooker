@@ -1,13 +1,10 @@
-/* Fading wrapper — all children are in the 405×229 card's content box
+/* Fading wrapper — pointer-events toggled inline on the motion.div so
+   the hidden variant doesn't absorb clicks meant for the underlying
+   picking view. Children are in the 405×229 card's content box
    (outer-card coords minus the 9px mint border). */
 .wrap {
   position: absolute;
   inset: 0;
-  pointer-events: none;
-}
-
-.wrap > * {
-  pointer-events: auto;
 }
 
 /* Theme name / creator name labels — Madimi One 15px yellow, centered
