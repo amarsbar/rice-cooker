@@ -21,3 +21,13 @@
   max-width: none;
   pointer-events: none;
 }
+
+/* Faint dot grid shown in preview + post-install. Radial-gradient tile
+   gives a Figma-style "graph paper" backdrop without an extra asset. */
+.grid {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(240, 237, 233, 0.12) 0.8px, transparent 0.9px);
+  background-size: 18px 18px;
+  pointer-events: none;
+}
