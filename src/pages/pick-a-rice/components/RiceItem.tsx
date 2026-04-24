@@ -1,17 +1,19 @@
-import styles from './MainPreview.module.css';
+import styles from './RiceItem.module.css';
 import themePreview from '@/assets/figma/theme-preview.png';
 import frameCorner from '@/assets/figma/frame-corner.svg';
 
-interface MainPreviewProps {
+interface RiceItemProps {
   themeName: string;
   creatorName: string;
 }
 
-/** Main dark-grey-framed theme preview. Picking-state only; visibility
- *  is managed by the parent <ScreenContent> fader. */
-export function MainPreview({ themeName, creatorName }: MainPreviewProps) {
+/** A single rice preview — dark-grey frame with the theme screenshot,
+ *  theme/creator pills, corner flourishes, pagination dots, and carousel
+ *  arrows. Flow-positioned (has intrinsic height), designed to stack
+ *  inside a scrollable <RiceList>. */
+export function RiceItem({ themeName, creatorName }: RiceItemProps) {
   return (
-    <>
+    <div className={styles.item}>
       <div className={styles.outer} />
       <div className={styles.inner}>
         <img src={themePreview} alt="" className={styles.image} />
@@ -36,7 +38,7 @@ export function MainPreview({ themeName, creatorName }: MainPreviewProps) {
       <span className={`${styles.dot} ${styles.dotTr}`} />
       <span className={`${styles.dot} ${styles.dotBl}`} />
       <span className={`${styles.dot} ${styles.dotBr}`} />
-    </>
+    </div>
   );
 }
 
