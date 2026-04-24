@@ -94,12 +94,6 @@ export function CreatorBadge() {
           animate={view === 'post-install' ? 'visible' : 'hidden'}
           variants={SHRUNKEN_TEXT_VARIANTS}
         >
-          <span className={`${styles.accent} ${styles.accentA}`} />
-          <span className={`${styles.accent} ${styles.accentB}`} />
-          <span className={`${styles.accent} ${styles.accentC}`} />
-          <span className={`${styles.accent} ${styles.accentD}`} />
-          <span className={`${styles.accent} ${styles.accentE}`} />
-
           <p className={`${styles.installText} ${styles.installRice}`}>rice</p>
           <p className={`${styles.installText} ${styles.installInstalled}`}>installed</p>
           <p className={`${styles.installText} ${styles.installBang}`}>!</p>
