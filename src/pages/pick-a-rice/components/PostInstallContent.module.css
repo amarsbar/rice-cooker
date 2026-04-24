@@ -24,18 +24,12 @@
   white-space: nowrap;
 }
 
-/* Delete button — 42×44 SVG with main circle, trash icon, and two
-   corner ellipses baked in. Position places the main circle's top-left
-   at content (8.98, 9.59). */
+/* Delete button — position places the SVG's main circle at content
+   (8.98, 9.59). */
 .deleteBtn {
   composes: iconBtn from global;
   left: 8.98px;
   top: 8.59px;
-  background-image: url('../../../assets/figma/btn-delete.svg');
-}
-
-.deleteBtn:hover {
-  background-image: url('../../../assets/figma/btn-delete-hover.svg');
 }
 
 /* DONE button (350:7344) — dark-green pill centered on card. 10px padding

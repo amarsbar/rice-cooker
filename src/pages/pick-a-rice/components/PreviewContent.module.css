@@ -30,18 +30,12 @@
   top: 183px;
 }
 
-/* Back (350:7160 button column top) — 42×44 SVG that includes the main
-   yellow circle, back arrow, and two corner ellipses. Position places
-   the main circle's top-left at card (9, 10). */
+/* Back (350:7160 button column top) — position places the SVG's main
+   circle (rendered at svg coord (0, 1)) at card (9, 10). */
 .backBtn {
   composes: iconBtn from global;
   left: 9px;
   top: 9px;
-  background-image: url('../../../assets/figma/btn-back.svg');
-}
-
-.backBtn:hover {
-  background-image: url('../../../assets/figma/btn-back-hover.svg');
 }
 
 /* GitHub (350:7160 button column bottom) — main circle at card (11, 158). */
@@ -49,11 +43,6 @@
   composes: iconBtn from global;
   left: 9px;
   top: 157px;
-  background-image: url('../../../assets/figma/btn-github.svg');
-}
-
-.githubBtn:hover {
-  background-image: url('../../../assets/figma/btn-github-hover.svg');
 }
 
 /* APPLY button (350:7174) — dark-green pill centered on card. Wraps a

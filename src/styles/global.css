@@ -31,19 +31,34 @@ img {
   -webkit-user-drag: none;
 }
 
-/* Shared icon button — each button is a 42 × 44 box whose full graphic
-   (main circle, icon, two corner ellipses) lives in one SVG. Default
-   and hover variants are separate SVG files; :hover just swaps the
-   background-image URL. Position and per-button images come from the
-   consuming module via `composes: iconBtn from global`. */
+/* Shared icon button — each button is a 42 × 44 box that inlines one
+   SVG (main circle + icon + two corner ellipses). Fills are driven by
+   two classes on the SVG children (.btnShape for the yellow parts,
+   .btnIcon for the dark icon); :hover on the button flips both. */
 .iconBtn {
   position: absolute;
   width: 42px;
   height: 44px;
   padding: 0;
   border: none;
-  background-color: transparent;
-  background-repeat: no-repeat;
-  background-position: center;
+  background: none;
   cursor: pointer;
+}
+
+.btnShape {
+  fill: var(--color-yellow);
+}
+
+.btnIcon {
+  fill: var(--color-creator-text);
+  stroke: var(--color-creator-text);
+}
+
+.iconBtn:hover .btnShape {
+  fill: var(--color-btn-hover-bg);
+}
+
+.iconBtn:hover .btnIcon {
+  fill: var(--color-btn-hover-icon);
+  stroke: var(--color-btn-hover-icon);
 }
