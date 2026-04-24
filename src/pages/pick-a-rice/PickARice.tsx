@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import styles from './PickARice.module.css';
-import { ViewProvider, ScrollProvider, type View, type ScrollState } from './view';
+import {
+  ViewProvider,
+  ScrollProvider,
+  ThemeProvider,
+  type View,
+  type ScrollState,
+  type Theme,
+} from './view';
 import { GreenTab } from './components/GreenTab';
 import { RiceCard } from './components/RiceCard';
 import { ScreenContent } from './components/ScreenContent';
@@ -16,6 +23,7 @@ const CYCLE: View[] = ['picking', 'preview', 'post-install'];
 export function PickARice() {
   const [view, setView] = useState<View>('picking');
   const [scroll, setScroll] = useState<ScrollState>({ offset: 0, index: 0, total: 10 });
+  const [theme, setTheme] = useState<Theme>('t2');
 
   const cycleOnBareStage = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target !== e.currentTarget) return;
@@ -23,21 +31,23 @@ export function PickARice() {
   };
 
   return (
-    <ViewProvider view={view}>
-      <ScrollProvider value={scroll}>
-        <div className={styles.stage} onClick={cycleOnBareStage}>
-          <GreenTab />
-          <RiceCard>
-            <ScreenContent onScroll={setScroll} />
-            <PreviewContent themeName="theme name" creatorName="by creator name" />
-            <PostInstallContent themeName="theme name" />
-          </RiceCard>
-          <ClosePin />
-          <SoundButton />
-          <BottomDrop />
-          <CreatorBadge />
-        </div>
-      </ScrollProvider>
-    </ViewProvider>
+    <ThemeProvider value={{ theme, setTheme }}>
+      <ViewProvider view={view}>
+        <ScrollProvider value={scroll}>
+          <div className={styles.stage} data-theme={theme} onClick={cycleOnBareStage}>
+            <GreenTab />
+            <RiceCard>
+              <ScreenContent onScroll={setScroll} />
+              <PreviewContent themeName="theme name" creatorName="by creator name" />
+              <PostInstallContent themeName="theme name" />
+            </RiceCard>
+            <ClosePin />
+            <SoundButton />
+            <BottomDrop />
+            <CreatorBadge />
+          </div>
+        </ScrollProvider>
+      </ViewProvider>
+    </ThemeProvider>
   );
 }

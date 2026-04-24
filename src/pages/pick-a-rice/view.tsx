@@ -31,6 +31,36 @@ export function ScrollProvider({ value, children }: { value: ScrollState; childr
   return <ScrollContext.Provider value={value}>{children}</ScrollContext.Provider>;
 }
 
+/** Palette / colour theme. Three fixed variants; the sprout knob (rendered
+ *  inside <BottomDrop>) is the picker. t2 is the default, centre-of-knob
+ *  theme — tokens defined in `:root` match it. t1 and t3 get applied via
+ *  `[data-theme='t1'|'t3']` override blocks on the stage element. */
+export type Theme = 't1' | 't2' | 't3';
+
+interface ThemeCtxValue {
+  theme: Theme;
+  setTheme: (update: Theme | ((prev: Theme) => Theme)) => void;
+}
+
+const ThemeContext = createContext<ThemeCtxValue>({
+  theme: 't2',
+  setTheme: () => {},
+});
+
+export function useTheme() {
+  return useContext(ThemeContext);
+}
+
+export function ThemeProvider({
+  value,
+  children,
+}: {
+  value: ThemeCtxValue;
+  children: ReactNode;
+}) {
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}
+
 /** Target position/size for every moving element in each view state. */
 const SHRUNKEN = {
   card: { left: 40.295, top: 105.295, width: 405, height: 229 },
