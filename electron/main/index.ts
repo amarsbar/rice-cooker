@@ -120,6 +120,34 @@ function createWindow(): void {
         }
       }
 
+      if (process.env['RICE_CAPTURE_THEMES']) {
+        // Cycle back to picking and click the theme knob (sprout) to
+        // advance through t2 → t1 → t3 → t2. Uses a transient dispatch
+        // via document.querySelector to find the knob click target.
+        const clickKnob = () =>
+          win.webContents.executeJavaScript(
+            `(() => {
+               const el = document.querySelector('[class*="BottomDrop"] [class*="variant"], [class*="group"] > div[style*="cursor"]');
+               if (!el) return false;
+               el.click();
+               return true;
+             })()`,
+          );
+        // Ensure we're back in the picking view.
+        for (let i = 0; i < 3; i++) await clickStage();
+        await new Promise((r) => setTimeout(r, MORPH_SETTLE_MS));
+        for (const name of ['t1', 't3'] as const) {
+          const clicked = await clickKnob();
+          if (!clicked) {
+            console.warn('[rice-cooker] capture: knob not found');
+            break;
+          }
+          await new Promise((r) => setTimeout(r, MORPH_SETTLE_MS));
+          const img = await win.webContents.capturePage();
+          await writeFile(`${base}-theme-${name}.png`, img.toPNG());
+        }
+      }
+
       app.exit(0);
     });
   }
