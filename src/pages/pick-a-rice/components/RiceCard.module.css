@@ -1,10 +1,11 @@
-/* Main card. Position + size are motion-driven (see view.tsx / POSITIONS). */
+/* Main card. Position + size are motion-driven (see view.tsx / POSITIONS).
+   Background is set inline per-view (solid in picking, 80% in shrunken). */
 .card {
   position: absolute;
-  background: var(--color-card-bg);
   border: var(--card-border-width) solid var(--color-mint);
   border-radius: var(--card-radius);
   overflow: hidden;
+  transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Image 4394 — 552 × 558 centered inside the card content box with a
