@@ -34,7 +34,7 @@ const CREAM_CENTER = 88;
  *  Re-enable with STEP > 0 to get the Figma-exact offset back. */
 const PILL_Y_BASE = 18.5;
 const PILL_Y_STEP = 0;
-const CLOUD_ROTATE_PER_PX = 0.5;
+const CLOUD_ROTATE_PER_PX = 0.2;
 
 export function CreatorBadge() {
   const view = useView();
