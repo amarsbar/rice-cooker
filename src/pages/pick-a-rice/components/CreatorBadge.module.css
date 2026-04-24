@@ -1,23 +1,26 @@
-/* Creator badge frame (350:6594) — 200 × 200 at (400, 337). */
+/* Creator badge frame (350:6594 / 350:7374) — 200 × 200. Position is
+   animated by the view state. */
 .badge {
   position: absolute;
-  left: 400px;
-  top: 337px;
   width: 199.999px;
   height: 200.001px;
+  transition: left 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              top 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Cloud outline (350:6595) — fills the full badge. */
+/* Cloud outline — two SVGs stacked so we can crossfade color (#C7D8BF
+   → #D0DACB) with the rest of the content. */
 .cloud {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
+  transition: opacity 0.3s ease-out;
 }
 
-/* Cream inner circle (350:6632) — 176 × 176 centered; clips everything
-   inside to the circle shape. */
+/* Cream inner circle (350:6632 / 350:7412) — 176 × 176 centered; clips
+   everything inside to the circle shape. */
 .inner {
   position: absolute;
   left: 50%;
@@ -30,10 +33,9 @@
   transform: translate(-50%, -50%);
 }
 
-/* Dotted grid background (350:6633) — 190 × 191.805 centered horizontally,
-   extended 8px above the circle's top so the grid bleeds past the top edge
-   before being clipped by the round inner. The bleed div then grows the
-   image another 0.39% on each side to avoid tiling seams. */
+/* Dotted grid background (350:6633 / 350:7413) — same asset in both
+   states. Extends 8px above the circle's top so the grid bleeds past the
+   top edge before being clipped by the round inner. */
 .decor {
   position: absolute;
   left: 50%;
@@ -56,8 +58,15 @@
   max-width: none;
 }
 
-/* Step/count pill (350:6636) — 25px wide, yellow, fully rounded,
-   centered horizontally (+0.5px), top 6. */
+/* View-specific content layers, stacked and crossfaded. */
+.content {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.3s ease-out;
+}
+
+/* ---- Picking content (niri dms + plus WASD indicator) ---- */
+
 .stepPill {
   position: absolute;
   left: calc(50% + 0.5px);
@@ -83,9 +92,8 @@
   width: 100%;
 }
 
-/* Halo dots (Ellipse 4173/4174/4175) — three yellow pips curving from the
-   top of the circle toward the "1" pill's right side. Rendered as simple
-   circles at the center-points derived from Figma's flex/rotate wrappers. */
+/* Halos placed by their visible circle's top-left (Figma wrapper bbox
+   minus the visible radius). */
 .halo {
   position: absolute;
   background: var(--color-yellow);
@@ -93,13 +101,6 @@
   pointer-events: none;
 }
 
-/* Halos are placed by their visible circle's top-left (derived from the
-   Figma wrapper bounding box minus the visible radius). The wrapper's
-   bounding box exceeds the circle because Figma stores a pre-rotation
-   bounding rect, so we can't just use `calc(50% + offset)` — that lands
-   the circle inside the wrapper instead of at the wrapper's center. */
-
-/* Ellipse 4175 — largest halo, bbox (110.28, 9), visible d=14.564. */
 .haloLg {
   width: 14.564px;
   height: 14.564px;
@@ -107,7 +108,6 @@
   top: 11.665px;
 }
 
-/* Ellipse 4174 — medium halo, bbox (128.80, 18.30), visible d=9.612. */
 .haloMd {
   width: 9.612px;
   height: 9.612px;
@@ -115,7 +115,6 @@
   top: 20.290px;
 }
 
-/* Ellipse 4173 — smallest halo, bbox (140.95, 27.51), visible d=6.873. */
 .haloSm {
   width: 6.873px;
   height: 6.873px;
@@ -123,7 +122,6 @@
   top: 28.768px;
 }
 
-/* Tag text (350:6648-6650) — Madimi One 27.65px in the brown ink color. */
 .tag {
   position: absolute;
   font-family: var(--font-display);
@@ -135,26 +133,20 @@
 }
 
 .tagTop {
-  /* "niri" */
   left: 70px;
   top: 59px;
 }
 
 .tagBottom {
-  /* "dms" */
   left: 52px;
   top: 81px;
 }
 
 .tagPlus {
-  /* "+" */
   left: 108px;
   top: 78px;
 }
 
-/* WASD/arrow key indicator (Group 2147208885) — four rounded 10px squares
-   forming a T shape (W on top; A/S/D across the bottom row). Pressing the
-   matching key turns that square orange; otherwise all four are yellow. */
 .key {
   position: absolute;
   width: 10px;
@@ -169,26 +161,116 @@
   background: var(--color-orange);
 }
 
-/* 350:6640 — top square (W / ArrowUp). */
 .key_up {
   left: 86.08px;
   top: 148px;
 }
 
-/* 350:6641 — center of the bottom row (S / ArrowDown). */
 .key_down {
   left: 86px;
   top: 159.92px;
 }
 
-/* 350:6642 — right of the bottom row (D / ArrowRight). */
 .key_right {
   left: 98px;
   top: 160px;
 }
 
-/* 350:6643 — left of the bottom row (A / ArrowLeft). */
 .key_left {
   left: 74px;
   top: 160px;
+}
+
+/* ---- Preview content ("previewing" label tilted -14.18°) ---- */
+
+/* 350:7243 — "previewing" Madimi One 28px dark ink, centered in the cream
+   circle and tilted. Figma wraps the text in a 141.889 × 69.424 flex box
+   at left=(50% - 71.39), top=(50% - 34.55); inside the box a rotated
+   flex-none container holds the text. Reproducing that visually: anchor
+   the text to the box center and apply the rotation on the text itself. */
+.previewing {
+  position: absolute;
+  left: calc(50% - 71.39px + 141.889px / 2);
+  top: calc(50% - 34.55px + 69.424px / 2);
+  transform: translate(-50%, -50%) rotate(-14.18deg);
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 400;
+  color: var(--color-frame-inner);
+  line-height: normal;
+  white-space: nowrap;
+  margin: 0;
+}
+
+/* ---- Post-install content (rice installed !) ---- */
+
+/* "rice installed !" lettering — Madimi One 31.392px, dark ink. */
+.installText {
+  position: absolute;
+  font-family: var(--font-display);
+  font-size: 31.392px;
+  font-weight: 400;
+  color: var(--color-frame-inner);
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.installRice {
+  left: 43.03px;
+  top: 53.2px;
+}
+
+.installInstalled {
+  left: 29.03px;
+  top: 81.2px;
+}
+
+/* "!" sits to the right of "rice", tilted slightly. The transform
+   rotates around the glyph's center for the hand-drawn feel. */
+.installBang {
+  left: 117.03px;
+  top: 55.2px;
+  transform-origin: center;
+  transform: rotate(-18.79deg);
+}
+
+/* Yellow paint-splat accents scattered around the text (350:7417-23). */
+.accent {
+  position: absolute;
+  background: var(--color-yellow);
+}
+
+.accentA {
+  left: 135.03px;
+  top: 97.2px;
+  width: 6px;
+  height: 11px;
+}
+
+.accentB {
+  left: 28.03px;
+  top: 86.2px;
+  width: 10px;
+  height: 8px;
+}
+
+.accentC {
+  left: 42.03px;
+  top: 67.2px;
+  width: 15px;
+  height: 28px;
+}
+
+.accentD {
+  left: 54.03px;
+  top: 58.2px;
+  width: 11px;
+  height: 37px;
+}
+
+.accentE {
+  left: 126.03px;
+  top: 83.2px;
+  width: 10px;
+  height: 6px;
 }

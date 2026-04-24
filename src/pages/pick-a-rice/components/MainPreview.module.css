@@ -1,3 +1,11 @@
+/* Fading wrapper so the whole preview crossfades during the post-install
+   morph. Covers the full card content box. */
+.wrap {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.3s ease-out;
+}
+
 /* Every child position here is Figma metadata minus the card's 9px border:
    the main-preview group (350:6512) is a Figma `display: contents` wrapper,
    so its children's metadata x/y are in outer-card coords and need the

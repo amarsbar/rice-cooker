@@ -1,8 +1,15 @@
 import styles from './GreenTab.module.css';
+import { POSITIONS, useView } from '../view';
 
-/** Figma node 350:6483 — mint rectangle that protrudes past the card's right
- *  edge, backing the close pin and sound button. Only the top-right corner
- *  is rounded so it visually tucks under the card's rounded-radius edge. */
+/** Mint tab that protrudes past the card's right edge. Shifts up + shrinks
+ *  slightly (90→81px tall) when the card morphs to post-install. */
 export function GreenTab() {
-  return <div className={styles.tab} />;
+  const view = useView();
+  const pos = POSITIONS[view].greenTab;
+  return (
+    <div
+      className={styles.tab}
+      style={{ left: `${pos.left}px`, top: `${pos.top}px`, height: `${pos.height}px` }}
+    />
+  );
 }

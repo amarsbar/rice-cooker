@@ -1,19 +1,24 @@
 import styles from './MainPreview.module.css';
 import themePreview from '@/assets/figma/theme-preview.png';
 import frameCorner from '@/assets/figma/frame-corner.svg';
+import { useView } from '../view';
 
 interface MainPreviewProps {
   themeName: string;
   creatorName: string;
 }
 
-/** Figma group 350:6512 — the large dark-grey-framed theme screenshot that
- *  sits at the vertical center of the card. Shows the current rice, the
- *  theme name pill above, the creator pill below, carousel arrows on each
- *  side, and four corner flourishes plus pagination dots. */
+/** Main dark-grey-framed theme preview. Picking-state only; fades out during
+ *  the post-install morph. */
 export function MainPreview({ themeName, creatorName }: MainPreviewProps) {
+  const view = useView();
+  const visible = view === 'picking';
+  // preview and post-install hide the main preview entirely.
   return (
-    <>
+    <div
+      className={styles.wrap}
+      style={{ opacity: visible ? 1 : 0, pointerEvents: visible ? 'auto' : 'none' }}
+    >
       <div className={styles.outer} />
       <div className={styles.inner}>
         <img src={themePreview} alt="" className={styles.image} />
@@ -38,7 +43,7 @@ export function MainPreview({ themeName, creatorName }: MainPreviewProps) {
       <span className={`${styles.dot} ${styles.dotTr}`} />
       <span className={`${styles.dot} ${styles.dotBl}`} />
       <span className={`${styles.dot} ${styles.dotBr}`} />
-    </>
+    </div>
   );
 }
 

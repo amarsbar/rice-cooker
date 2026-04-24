@@ -4,19 +4,23 @@ import peekCurveTr from '@/assets/figma/peek-curve-tr.svg';
 import peekCurveTl from '@/assets/figma/peek-curve-tl.svg';
 import peekCurveBr from '@/assets/figma/peek-curve-br.svg';
 import peekCurveBl from '@/assets/figma/peek-curve-bl.svg';
+import { useView } from '../view';
 
 interface PeekPreviewProps {
   themeName: string;
   creatorName: string;
 }
 
-/** Figma frame 350:6486 — the dimmed peek of the next rice below the main
- *  preview. Rendered at 30% opacity and clipped by the card so only the
- *  top of it shows through. Mirror of the main preview with lighter grey
- *  frame elements and curved flourishes instead of corner sprites. */
+/** Dimmed peek of the next rice, visible in the picking state only.
+ *  Rendered at 30% opacity; fades out during the post-install morph. */
 export function PeekPreview({ themeName, creatorName }: PeekPreviewProps) {
+  const view = useView();
   return (
-    <div className={styles.peek}>
+    <div
+      className={styles.peek}
+      style={{ opacity: view === 'picking' ? 0.3 : 0 }}
+      aria-hidden={view !== 'picking'}
+    >
       <div className={styles.imageWrap}>
         <img src={themePreview} alt="" className={styles.image} />
       </div>

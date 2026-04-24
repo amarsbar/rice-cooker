@@ -1,20 +1,42 @@
 import { useEffect, useState } from 'react';
 import styles from './CreatorBadge.module.css';
 import cloudSvg from '@/assets/figma/creator-cloud.svg';
+import cloudAltSvg from '@/assets/figma/creator-cloud-post.svg';
 import decorSvg from '@/assets/figma/creator-decor.svg';
+import { POSITIONS, useView } from '../view';
 
 type DirKey = 'up' | 'left' | 'down' | 'right';
 
-/** Figma frame 350:6594 — the creator bubble. An outer bumpy cloud wraps a
- *  cream circle containing: a "1" pill, three yellow halo dots, the rice's
- *  tag text (niri, dms, +), and a WASD/arrow key indicator at the bottom.
- *  The indicator's "up" square glows orange while the corresponding key is
- *  held — matching Figma's 350:6752 pressed-state mock. */
+/** Creator bubble. Position shifts with the card morph; the inner content
+ *  swaps between three layouts — the picking niri/dms tag with WASD key
+ *  indicator, a large tilted "previewing" label while a rice is being
+ *  previewed, and a "rice installed !" confirmation after apply. The cloud
+ *  outline sits a shade darker in picking (#C7D8BF) and nudges lighter
+ *  (#D0DACB) in the two shrunken states. */
 export function CreatorBadge() {
+  const view = useView();
+  const pos = POSITIONS[view].creatorBadge;
+  const isPicking = view === 'picking';
   const pressed = usePressedDirection();
+
   return (
-    <div className={styles.badge}>
-      <img src={cloudSvg} alt="" className={styles.cloud} />
+    <div
+      className={styles.badge}
+      style={{ left: `${pos.left}px`, top: `${pos.top}px` }}
+    >
+      <img
+        src={cloudSvg}
+        alt=""
+        className={styles.cloud}
+        style={{ opacity: isPicking ? 1 : 0 }}
+      />
+      <img
+        src={cloudAltSvg}
+        alt=""
+        className={styles.cloud}
+        style={{ opacity: isPicking ? 0 : 1 }}
+      />
+
       <div className={styles.inner}>
         <div className={styles.decor}>
           <div className={styles.decorBleed}>
@@ -22,19 +44,49 @@ export function CreatorBadge() {
           </div>
         </div>
 
-        <div className={styles.stepPill}>
-          <p>1</p>
+        {/* Picking-state content */}
+        <div
+          className={styles.content}
+          style={{ opacity: view === 'picking' ? 1 : 0, pointerEvents: view === 'picking' ? 'auto' : 'none' }}
+        >
+          <div className={styles.stepPill}>
+            <p>1</p>
+          </div>
+
+          <span className={`${styles.halo} ${styles.haloLg}`} />
+          <span className={`${styles.halo} ${styles.haloMd}`} />
+          <span className={`${styles.halo} ${styles.haloSm}`} />
+
+          <p className={`${styles.tag} ${styles.tagTop}`}>niri</p>
+          <p className={`${styles.tag} ${styles.tagBottom}`}>dms</p>
+          <p className={`${styles.tag} ${styles.tagPlus}`}>+</p>
+
+          <KeyIndicator pressed={pressed} />
         </div>
 
-        <span className={`${styles.halo} ${styles.haloLg}`} />
-        <span className={`${styles.halo} ${styles.haloMd}`} />
-        <span className={`${styles.halo} ${styles.haloSm}`} />
+        {/* Preview-state content */}
+        <div
+          className={styles.content}
+          style={{ opacity: view === 'preview' ? 1 : 0, pointerEvents: view === 'preview' ? 'auto' : 'none' }}
+        >
+          <p className={styles.previewing}>previewing</p>
+        </div>
 
-        <p className={`${styles.tag} ${styles.tagTop}`}>niri</p>
-        <p className={`${styles.tag} ${styles.tagBottom}`}>dms</p>
-        <p className={`${styles.tag} ${styles.tagPlus}`}>+</p>
+        {/* Post-install-state content */}
+        <div
+          className={styles.content}
+          style={{ opacity: view === 'post-install' ? 1 : 0, pointerEvents: view === 'post-install' ? 'auto' : 'none' }}
+        >
+          <span className={`${styles.accent} ${styles.accentA}`} />
+          <span className={`${styles.accent} ${styles.accentB}`} />
+          <span className={`${styles.accent} ${styles.accentC}`} />
+          <span className={`${styles.accent} ${styles.accentD}`} />
+          <span className={`${styles.accent} ${styles.accentE}`} />
 
-        <KeyIndicator pressed={pressed} />
+          <p className={`${styles.installText} ${styles.installRice}`}>rice</p>
+          <p className={`${styles.installText} ${styles.installInstalled}`}>installed</p>
+          <p className={`${styles.installText} ${styles.installBang}`}>!</p>
+        </div>
       </div>
     </div>
   );

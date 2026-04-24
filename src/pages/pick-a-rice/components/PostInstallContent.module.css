@@ -1,0 +1,113 @@
+/* Fading wrapper — covers the 405×229 post-install card's content box.
+   All children are positioned in content-area coords (outer-card coords
+   minus the 9px mint border). */
+.wrap {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.3s ease-out;
+}
+
+/* "theme name" label (350:7360) — 15px yellow Madimi One, centered
+   horizontally, top 9.2px in the content box (= outer 18.2). */
+.themeName {
+  position: absolute;
+  left: 50%;
+  top: 9.2px;
+  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--color-yellow);
+  line-height: normal;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Delete button (350:7355) — 40×40 yellow circle at content-area (8.98,
+   9.59). Trash icon inside, 24×24 centered. */
+.deleteBtn {
+  position: absolute;
+  left: 8.98px;
+  top: 9.59px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: var(--color-yellow);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.deleteIcon {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+
+/* Ellipse 4062/4063 — 12×12 yellow sparkle dots flanking the delete
+   button. Right of it and directly below it. */
+.sparkle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--color-yellow);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.sparkleRight {
+  left: 38.98px;
+  top: 8.59px;
+}
+
+.sparkleBottom {
+  left: 8.98px;
+  top: 40.59px;
+}
+
+/* DONE button (350:7344) — dark-green pill centered on card. 10px padding
+   and 130px radius wrap a horizontal cluster of four overlapping circles
+   spelling D-O-N-E. */
+.doneBtn {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 10px;
+  background: #73a94a;
+  border-radius: 130px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.doneCluster {
+  display: flex;
+  align-items: center;
+  padding-right: 16px;
+  flex-shrink: 0;
+}
+
+/* Each letter: 52×52 light-yellow-green circle, -16px margin-right so
+   successive letters overlap. Capriola 28px brown text centered inside. */
+.doneLetter {
+  width: 52px;
+  height: 52px;
+  margin-right: -16px;
+  background: #e8ff76;
+  border-radius: 100px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-pill);
+  font-size: 28px;
+  font-weight: 400;
+  color: var(--color-creator-text);
+  line-height: normal;
+  text-align: center;
+}

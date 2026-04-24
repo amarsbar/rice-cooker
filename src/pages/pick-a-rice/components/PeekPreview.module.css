@@ -9,9 +9,9 @@
   width: 473px;
   height: 311px;
   transform: translateX(-50%);
-  opacity: 0.3;
   overflow: hidden;
   pointer-events: none;
+  transition: opacity 0.3s ease-out;
 }
 
 /* Image wrapper (350:6487) — 413 × 231 at top 45, centered horizontally

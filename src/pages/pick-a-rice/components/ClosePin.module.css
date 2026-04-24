@@ -1,9 +1,9 @@
 .wrap {
   position: absolute;
-  left: 508px;
-  top: 214px;
   width: 41.803px;
   height: 56.666px;
+  transition: left 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              top 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .wrap > img {

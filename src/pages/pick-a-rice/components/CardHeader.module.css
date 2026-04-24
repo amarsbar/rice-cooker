@@ -1,3 +1,10 @@
+/* Fading wrapper so the whole header crossfades with the card morph. */
+.header {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.3s ease-out;
+}
+
 /* Logo (350:6545) — 37.78 × 24 at (17, 13). */
 .logo {
   position: absolute;
