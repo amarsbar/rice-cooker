@@ -1,9 +1,6 @@
+/* Main card. Position + size are motion-driven (see view.tsx / POSITIONS). */
 .card {
   position: absolute;
-  left: 0;
-  top: 0;
-  width: 500px;
-  height: 440px;
   background: var(--color-card-bg);
   border: var(--card-border-width) solid var(--color-mint);
   border-radius: var(--card-radius);
@@ -11,7 +8,8 @@
 }
 
 /* Image 4394 — 552 × 558 centered inside the card content box with a
-   +15px vertical offset so the focal point sits slightly below center. */
+   +15px vertical offset so the focal point sits slightly below center.
+   Fades away in the shrunken states. */
 .bg {
   position: absolute;
   left: 50%;

@@ -7,10 +7,8 @@ interface MainPreviewProps {
   creatorName: string;
 }
 
-/** Figma group 350:6512 — the large dark-grey-framed theme screenshot that
- *  sits at the vertical center of the card. Shows the current rice, the
- *  theme name pill above, the creator pill below, carousel arrows on each
- *  side, and four corner flourishes plus pagination dots. */
+/** Main dark-grey-framed theme preview. Picking-state only; visibility
+ *  is managed by the parent <ScreenContent> fader. */
 export function MainPreview({ themeName, creatorName }: MainPreviewProps) {
   return (
     <>

@@ -1,23 +1,32 @@
-/* Mint drop shape (350:6583 / Vector 668) — 104 × 48 at (317, 437). */
-.shape {
+/* Wrapper is positioned by framer-motion; variants overlay at 0,0. */
+.group {
   position: absolute;
-  left: 317px;
-  top: 437px;
   width: 104px;
   height: 48px;
   pointer-events: none;
 }
 
-/* Rotated sprout glyph (350:6586 → 350:6587) — natural 30.086 × 38.45 image
-   rotated -90°, centered inside the visual bounding box the Figma nested
-   flex container produces (352.41, 445.64 to 390.86, 475.73). */
+.variant {
+  position: absolute;
+  inset: 0;
+}
+
+/* ---- Picking variant ---- */
+
+.shapePick {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 104px;
+  height: 48px;
+}
+
 .leaf {
   position: absolute;
-  left: 352.41px;
-  top: 445.64px;
+  left: 35.41px;
+  top: 8.64px;
   width: 38.45px;
   height: 30.086px;
-  pointer-events: none;
 }
 
 .leafImg {
@@ -30,7 +39,6 @@
   transform: translate(-50%, -50%) rotate(-90deg);
 }
 
-/* Faint green pip-dots — 2.563 × 2.563, 40% opacity. */
 .dot {
   position: absolute;
   width: 2.563px;
@@ -38,20 +46,26 @@
   background: var(--color-drop-dot);
   border-radius: 50%;
   opacity: 0.4;
-  pointer-events: none;
 }
 
-.dotTop {
-  left: 354px;
-  top: 443px;
+.dotTop { left: 37px; top: 6px; }
+.dotBottom { left: 37px; top: 38.83px; }
+.dotLeft { left: 30px; top: 22.1px; }
+
+/* ---- Shrunken variant ---- */
+
+.shapePost {
+  position: absolute;
+  left: 1.466px;
+  top: 0;
+  width: 102.534px;
+  height: 48px;
 }
 
-.dotBottom {
-  left: 354px;
-  top: 475.83px;
-}
-
-.dotLeft {
-  left: 347px;
-  top: 459.1px;
+.decorPost {
+  position: absolute;
+  left: 32px;
+  top: 6px;
+  width: 44.86px;
+  height: 31.395px;
 }

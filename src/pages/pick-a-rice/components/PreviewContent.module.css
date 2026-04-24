@@ -1,0 +1,141 @@
+/* Fading wrapper — all children are in the 405×229 card's content box
+   (outer-card coords minus the 9px mint border). */
+.wrap {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.wrap > * {
+  pointer-events: auto;
+}
+
+/* Theme name / creator name labels — Madimi One 15px yellow, centered
+   horizontally. One sits above the APPLY pill, the other below it. */
+.label {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--color-yellow);
+  line-height: normal;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* 350:7187 — top "theme name": top=calc(50% - 96.5px) inside the 211-tall
+   content box. */
+.themeName {
+  top: 9px;
+}
+
+/* 350:7186 — bottom "by creator name": top=calc(50% + 77.5px) = 183. */
+.creatorName {
+  top: 183px;
+}
+
+/* Shared button shell for BACK (top-left) and GITHUB (mid-left) circles. */
+.iconBtn {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: var(--color-yellow);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.iconImg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.iconBtn[data-pos='back'] {
+  left: 9px;
+  top: 10px;
+}
+
+.iconBtn[data-pos='github'] {
+  left: 11px;
+  top: 158px;
+}
+
+/* Yellow sparkle dots — 12 × 12 circles flanking each icon button. */
+.sparkle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--color-yellow);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* Back-button sparkles: upper-right and directly below (350:7172/7173). */
+.sparkleBackRight {
+  left: 39px;
+  top: 9px;
+}
+
+.sparkleBackBottom {
+  left: 9px;
+  top: 41px;
+}
+
+/* GitHub-button sparkles: slightly-up-left and lower-right (350:7166/7167). */
+.sparkleGhTop {
+  left: 9px;
+  top: 157px;
+}
+
+.sparkleGhBottom {
+  left: 39px;
+  top: 189px;
+}
+
+/* APPLY button (350:7174) — dark-green pill centered on card. Wraps a
+   horizontal cluster of five overlapping 52px circles for A-P-P-L-Y. */
+.applyBtn {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 10px;
+  background: #73a94a;
+  border-radius: 130px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.applyCluster {
+  display: flex;
+  align-items: center;
+  padding-right: 16px;
+  flex-shrink: 0;
+}
+
+.applyLetter {
+  width: 52px;
+  height: 52px;
+  margin-right: -16px;
+  background: #e8ff76;
+  border-radius: 100px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-pill);
+  font-size: 28px;
+  font-weight: 400;
+  color: var(--color-creator-text);
+  line-height: normal;
+  text-align: center;
+}

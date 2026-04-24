@@ -84,12 +84,35 @@ function createWindow(): void {
   if (captureOut) {
     /** Time for fonts + large images to load and the initial layout to paint. */
     const INITIAL_SETTLE_MS = 1500;
+    /** Time for one card-morph + content-crossfade pass to finish. */
+    const MORPH_SETTLE_MS = 900;
+
+    const clickStage = () =>
+      win.webContents.executeJavaScript(
+        '(() => { const el = document.querySelector("[class*=stage]"); if (!el) return false; el.click(); return true; })()',
+      );
 
     win.webContents.once('did-finish-load', async () => {
       const { writeFile } = await import('node:fs/promises');
+      const base = captureOut.replace(/\.png$/, '');
       await new Promise((r) => setTimeout(r, INITIAL_SETTLE_MS));
-      const img = await win.webContents.capturePage();
-      await writeFile(captureOut, img.toPNG());
+
+      const pickingImg = await win.webContents.capturePage();
+      await writeFile(`${base}-picking.png`, pickingImg.toPNG());
+
+      if (process.env['RICE_CAPTURE_ALL']) {
+        for (const name of ['preview', 'post-install'] as const) {
+          const clicked = await clickStage();
+          if (!clicked) {
+            console.warn('[rice-cooker] capture: stage element not found');
+            break;
+          }
+          await new Promise((r) => setTimeout(r, MORPH_SETTLE_MS));
+          const img = await win.webContents.capturePage();
+          await writeFile(`${base}-${name}.png`, img.toPNG());
+        }
+      }
+
       app.exit(0);
     });
   }

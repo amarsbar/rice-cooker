@@ -2,8 +2,8 @@ import styles from './CardHeader.module.css';
 import logoSvg from '@/assets/figma/logo.svg';
 import menuDotsSvg from '@/assets/figma/menu-dots.svg';
 
-/** Figma nodes 350:6545 (logo), 350:6548 (PICK A RICE letter pills), and
- *  350:6542 (3-dot menu) — the card's top row. */
+/** Picking-state card header — logo + PICK A RICE letter pills + 3-dot menu.
+ *  Visibility is managed by the parent <ScreenContent> fader. */
 export function CardHeader() {
   return (
     <>

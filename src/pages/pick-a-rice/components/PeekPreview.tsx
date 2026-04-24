@@ -10,10 +10,9 @@ interface PeekPreviewProps {
   creatorName: string;
 }
 
-/** Figma frame 350:6486 — the dimmed peek of the next rice below the main
- *  preview. Rendered at 30% opacity and clipped by the card so only the
- *  top of it shows through. Mirror of the main preview with lighter grey
- *  frame elements and curved flourishes instead of corner sprites. */
+/** Dimmed peek of the next rice, visible in the picking state only.
+ *  Rendered at 30% opacity; visibility is managed by the parent
+ *  <ScreenContent> fader. */
 export function PeekPreview({ themeName, creatorName }: PeekPreviewProps) {
   return (
     <div className={styles.peek}>
