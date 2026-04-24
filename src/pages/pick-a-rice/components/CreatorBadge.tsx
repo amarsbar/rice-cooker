@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import styles from './CreatorBadge.module.css';
-import cloudSvg from '@/assets/figma/creator-cloud.svg';
-import cloudAltSvg from '@/assets/figma/creator-cloud-post.svg';
+import wheelSvg from '@/assets/figma/creator-cloud.svg';
 import decorSvg from '@/assets/figma/creator-decor.svg';
 import {
   MORPH_TRANSITION,
@@ -34,12 +33,11 @@ const CREAM_CENTER = 88;
  *  Re-enable with STEP > 0 to get the Figma-exact offset back. */
 const PILL_Y_BASE = 18.5;
 const PILL_Y_STEP = 0;
-const CLOUD_ROTATE_PER_PX = 0.2;
+const WHEEL_ROTATE_PER_PX = 0.2;
 
 export function CreatorBadge() {
   const view = useView();
   const scroll = useScroll();
-  const isPicking = view === 'picking';
   const pressed = usePressedDirections();
 
   return (
@@ -49,23 +47,11 @@ export function CreatorBadge() {
       animate={POSITIONS[view].creatorBadge}
       transition={MORPH_TRANSITION}
     >
-      {/* Both clouds carry the same rotation so the lighter base stays
-          perfectly hidden behind the picking cloud — otherwise its
-          bumps peek out as the top one spins. */}
       <motion.img
-        src={cloudAltSvg}
+        src={wheelSvg}
         alt=""
-        className={styles.cloud}
-        style={{ rotate: scroll.offset * CLOUD_ROTATE_PER_PX }}
-      />
-      <motion.img
-        src={cloudSvg}
-        alt=""
-        className={styles.cloud}
-        initial={false}
-        animate={{ opacity: isPicking ? 1 : 0 }}
-        style={{ rotate: scroll.offset * CLOUD_ROTATE_PER_PX }}
-        transition={SCREEN_FADE_TRANSITION}
+        className={styles.wheel}
+        style={{ rotate: scroll.offset * WHEEL_ROTATE_PER_PX }}
       />
 
       <div className={styles.inner}>
