@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import styles from './CreatorBadge.module.css';
-import wheelSvg from '@/assets/figma/creator-cloud.svg';
-import decorSvg from '@/assets/figma/creator-decor.svg';
+import WheelSvg from '@/assets/figma/creator-cloud.svg?react';
+import DecorSvg from '@/assets/figma/creator-decor.svg?react';
 import {
   MORPH_TRANSITION,
   POSITIONS,
@@ -11,6 +11,8 @@ import {
   useScroll,
   useView,
 } from '../view';
+
+const MotionWheel = motion.create(WheelSvg);
 
 type DirKey = 'up' | 'left' | 'down' | 'right';
 
@@ -47,9 +49,7 @@ export function CreatorBadge() {
       animate={POSITIONS[view].creatorBadge}
       transition={MORPH_TRANSITION}
     >
-      <motion.img
-        src={wheelSvg}
-        alt=""
+      <MotionWheel
         className={styles.wheel}
         style={{ rotate: scroll.offset * WHEEL_ROTATE_PER_PX }}
       />
@@ -57,7 +57,7 @@ export function CreatorBadge() {
       <div className={styles.inner}>
         <div className={styles.decor}>
           <div className={styles.decorBleed}>
-            <img src={decorSvg} alt="" />
+            <DecorSvg />
           </div>
         </div>
 

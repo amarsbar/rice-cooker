@@ -1,19 +1,13 @@
 import { motion } from 'framer-motion';
 import styles from './ClosePin.module.css';
-import closePinSvg from '@/assets/figma/close-pin.svg';
+import ClosePinSvg from '@/assets/figma/close-pin.svg?react';
 import { MORPH_TRANSITION, POSITIONS, useView } from '../view';
 
-/** Orange pin with the X-in-circle head and a shaft that tucks behind the
- *  green tab. Moves between picking (right of card) and the shrunken view
- *  (above the smaller card). */
+/** Close-window pin — pin-shaped close icon that sits to the right of
+ *  the green tab. The hitbox is clipped to the circular head so clicks
+ *  on the pin's shaft don't fire. Position animates with the card morph. */
 export function ClosePin() {
   const view = useView();
-
-  const handleClose: React.MouseEventHandler<HTMLButtonElement> = (e) => {
-    e.stopPropagation();
-    window.rice.closeWindow();
-  };
-
   return (
     <motion.div
       className={styles.wrap}
@@ -21,12 +15,15 @@ export function ClosePin() {
       animate={POSITIONS[view].closePin}
       transition={MORPH_TRANSITION}
     >
-      <img src={closePinSvg} alt="" />
+      <ClosePinSvg className={styles.svg} />
       <button
         type="button"
         className={styles.hitbox}
         aria-label="Close window"
-        onClick={handleClose}
+        onClick={(e) => {
+          e.stopPropagation();
+          window.rice.closeWindow();
+        }}
       />
     </motion.div>
   );

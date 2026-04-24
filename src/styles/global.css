@@ -64,3 +64,22 @@ img {
   fill: var(--c-btn-hover-icon);
   stroke: var(--c-btn-hover-icon);
 }
+
+/* Theme-driven SVG fill/stroke classes — applied to <path>/<rect>/<circle>
+   inside svgr-imported SVGs so colour flows from the role tokens. The
+   consuming component imports the .svg via `?react` (not as a URL) so
+   the DOM nodes actually receive these classes. */
+.fillPrimary { fill: var(--c-primary); }
+.strokeLogo { stroke: var(--c-logo-stroke); }
+.fillCardBorder { fill: var(--c-card-border); }
+.fillCloudOuter { fill: var(--c-cloud-outer); }
+.strokeGrid { stroke: var(--c-grid); }
+.fillClosePin { fill: var(--c-close-pin); }
+.strokeClosePin { stroke: var(--c-close-pin); }
+.fillSoundBody { fill: var(--c-sound-body); }
+.strokeSoundBody { stroke: var(--c-sound-body); }
+.fillSoundIcon { fill: var(--c-sound-icon); }
+.fillDropDot { fill: var(--c-drop-dot); }
+.fillSprout1 { fill: var(--c-sprout-1); }
+.fillSprout2 { fill: var(--c-sprout-2); }
+.fillSprout3 { fill: var(--c-sprout-3); }
