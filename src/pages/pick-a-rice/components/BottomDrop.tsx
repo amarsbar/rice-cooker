@@ -1,10 +1,10 @@
 import { motion } from 'framer-motion';
 import styles from './BottomDrop.module.css';
-import dropShapeSvg from '@/assets/figma/drop-shape.svg';
-import dropBodySvg from '@/assets/figma/drop-body.svg';
-import dropHeadSvg from '@/assets/figma/drop-head.svg';
-import dropShapePostSvg from '@/assets/figma/drop-shape-post.svg';
-import dropLeafPostSvg from '@/assets/figma/drop-leaf-post.svg';
+import DropShapeSvg from '@/assets/figma/drop-shape.svg?react';
+import DropBodySvg from '@/assets/figma/drop-body.svg?react';
+import DropHeadSvg from '@/assets/figma/drop-head.svg?react';
+import DropShapePostSvg from '@/assets/figma/drop-shape-post.svg?react';
+import DropLeafPostSvg from '@/assets/figma/drop-leaf-post.svg?react';
 import {
   MORPH_TRANSITION,
   POSITIONS,
@@ -13,6 +13,8 @@ import {
   useView,
   type Theme,
 } from '../view';
+
+const MotionDropHead = motion.create(DropHeadSvg);
 
 /** Sprout head rotation per theme. Values come from Figma: t1 = +40.15°
  *  (knob up, points toward t1), t2 = 0° (centre), t3 = -36.87° (knob
@@ -49,11 +51,9 @@ export function BottomDrop() {
         style={{ pointerEvents: isPicking ? 'auto' : 'none', cursor: 'pointer' }}
         onClick={advance}
       >
-        <img src={dropShapeSvg} alt="" className={styles.shapePick} />
-        <img src={dropBodySvg} alt="" className={styles.body} />
-        <motion.img
-          src={dropHeadSvg}
-          alt=""
+        <DropShapeSvg className={styles.shapePick} />
+        <DropBodySvg className={styles.body} />
+        <MotionDropHead
           className={styles.head}
           initial={false}
           animate={{ rotate }}
@@ -67,8 +67,8 @@ export function BottomDrop() {
         animate={{ opacity: isPicking ? 0 : 1 }}
         transition={SCREEN_FADE_TRANSITION}
       >
-        <img src={dropShapePostSvg} alt="" className={styles.shapePost} />
-        <img src={dropLeafPostSvg} alt="" className={styles.decorPost} />
+        <DropShapePostSvg className={styles.shapePost} />
+        <DropLeafPostSvg className={styles.decorPost} />
       </motion.div>
     </motion.div>
   );

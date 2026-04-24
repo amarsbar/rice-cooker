@@ -1,7 +1,7 @@
 <svg width="44" height="36" viewBox="0 0 44 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-<circle opacity="0.4" cx="8.28146" cy="1.28146" r="1.28146" fill="#6A9A79"/>
-<circle cx="28.8167" cy="17.6833" r="15.0432" fill="#B9F018"/>
-<circle cx="28.8083" cy="17.6839" r="1.2536" fill="#FE6A00"/>
-<circle opacity="0.4" cx="8.28146" cy="34.1135" r="1.28146" fill="#6A9A79"/>
-<circle opacity="0.4" cx="1.28146" cy="17.3791" r="1.28146" fill="#6A9A79"/>
+<circle opacity="0.4" cx="8.28146" cy="1.28146" r="1.28146" class="fillDropDot"/>
+<circle cx="28.8167" cy="17.6833" r="15.0432" class="fillSprout1"/>
+<circle cx="28.8083" cy="17.6839" r="1.2536" class="fillSprout3"/>
+<circle opacity="0.4" cx="8.28146" cy="34.1135" r="1.28146" class="fillDropDot"/>
+<circle opacity="0.4" cx="1.28146" cy="17.3791" r="1.28146" class="fillDropDot"/>
 </svg>
