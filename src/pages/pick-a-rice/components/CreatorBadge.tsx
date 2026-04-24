@@ -129,7 +129,7 @@ function Bead({ num, slot, pillY }: { num: number; slot: number; pillY: number }
   const s = SLOTS[clamped]!;
   const active = slot === 0;
   const visible = Math.abs(slot) <= 3;
-  const size = active ? PILL_SIZE : s.size;
+  const targetScale = visible ? (active ? 1 : s.size / PILL_SIZE) : 0;
   const cx = CREAM_CENTER + s.dx;
   const cy = pillY + s.dy;
   return (
@@ -137,11 +137,9 @@ function Bead({ num, slot, pillY }: { num: number; slot: number; pillY: number }
       className={styles.bead}
       initial={false}
       animate={{
-        left: cx - size / 2,
-        top: cy - size / 2,
-        width: size,
-        height: size,
-        scale: visible ? 1 : 0,
+        left: cx - PILL_SIZE / 2,
+        top: cy - PILL_SIZE / 2,
+        scale: targetScale,
       }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
     >

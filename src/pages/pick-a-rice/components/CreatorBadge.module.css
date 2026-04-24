@@ -63,16 +63,21 @@
 
 /* ---- Picking content (bead indicator + niri/dms + WASD) ---- */
 
-/* Bead: morphs between pill (active, 25 × 23.12 with number) and circle
-   (inactive, size per slot). Framer-motion drives left/top/width/height
-   and scale; border-radius stays large so both shapes are fully rounded. */
+/* Bead: always a 25 × 25 circle. Framer-motion animates `scale` to resize
+   between pill (scale 1, active, shows number) and the smaller halo
+   diameters (scale 0.58 / 0.38 / 0.27 for LG/MD/SM); outside the arc,
+   scale 0. Keeping width === height === 25 means transform scale just
+   shrinks the circle uniformly, no width/height interpolation. */
 .bead {
   position: absolute;
+  width: 25px;
+  height: 25px;
   background: var(--color-yellow);
-  border-radius: 9999px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
+  transform-origin: center;
   pointer-events: none;
 }
 
