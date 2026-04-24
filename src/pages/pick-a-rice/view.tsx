@@ -54,10 +54,10 @@ export const POSITIONS = {
   'post-install': SHRUNKEN,
 } as const;
 
-export const MORPH_TRANSITION = { duration: 0.5, ease: [0.4, 0.0, 0.2, 1] as const } as const;
-export const SCREEN_FADE_TRANSITION = { duration: 0.5 } as const;
+export const MORPH_TRANSITION = { duration: 0.3, ease: [0.4, 0.0, 0.2, 1] as const } as const;
+export const SCREEN_FADE_TRANSITION = { duration: 0.2 } as const;
 
 export const SHRUNKEN_TEXT_VARIANTS = {
-  visible: { opacity: 1, transition: { duration: 0.15, delay: 0.5 } },
-  hidden: { opacity: 0, transition: { duration: 0.15 } },
+  visible: { opacity: 1, transition: { duration: 0.12 } },
+  hidden: { opacity: 0, transition: { duration: 0.1 } },
 } as const;
