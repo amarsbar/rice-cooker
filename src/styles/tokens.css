@@ -94,3 +94,65 @@
   --fs-pill: 14px;
   --fs-tag: 27.65px;
 }
+
+/* ----- Theme 1 (knob top, pink/blue) ----- */
+[data-theme='t1'] {
+  --c-card-bg: var(--color-near-black);
+  --c-card-bg-shrunken: rgba(15, 15, 21, 0.8);
+  --c-card-border: var(--color-ice);
+  --c-sound-body: var(--color-navy);
+  --c-sound-icon: var(--color-ice);
+  --c-close-pin: var(--color-pink);
+  --c-primary: var(--color-light-blue);
+  --c-primary-text: var(--color-near-black);
+  --c-logo-stroke: var(--color-near-black);
+  --c-accent: var(--color-light-pink);
+  --c-step-text: var(--color-counter-text);
+  --c-cloud-outer: var(--color-light-blue);
+  --c-cloud-inner: var(--color-cream-soft);
+  --c-grid: var(--color-grid-t1);
+  --c-drop-dot: var(--color-yellow-deep);
+  --c-sprout-1: var(--color-ice);
+  --c-sprout-2: var(--color-yellow-deep);
+  --c-sprout-3: var(--color-yellow-soft);
+  --c-btn-default-icon: var(--color-navy);
+  --c-btn-hover-bg: var(--color-light-pink);
+  --c-btn-hover-icon: var(--color-lime);
+  --c-pill-bg: var(--color-navy);
+  --c-pill-letter-bg: var(--color-light-blue);
+  --c-pill-letter-text: var(--color-brown);
+  --c-pill-hover-bg: var(--color-light-pink);
+  --c-pill-hover-letter-bg: var(--color-navy);
+  --c-pill-hover-letter-text: var(--color-light-blue);
+}
+
+/* ----- Theme 3 (knob bottom, dark-blue/lime) ----- */
+[data-theme='t3'] {
+  --c-card-bg: var(--color-near-black);
+  --c-card-bg-shrunken: rgba(15, 15, 21, 0.8);
+  --c-card-border: var(--color-navy-deep);
+  --c-sound-body: var(--color-slate);
+  --c-sound-icon: var(--color-mute);
+  --c-close-pin: var(--color-red);
+  --c-primary: var(--color-lime);
+  --c-primary-text: var(--color-brown);
+  --c-logo-stroke: black;
+  --c-accent: var(--color-lime);
+  --c-step-text: var(--color-counter-text);
+  --c-cloud-outer: var(--color-sky-soft);
+  --c-cloud-inner: var(--color-charcoal);
+  --c-grid: var(--color-grid-t3);
+  --c-drop-dot: var(--color-blue-grey);
+  --c-sprout-1: var(--color-navy-deep);
+  --c-sprout-2: var(--color-rose);
+  --c-sprout-3: var(--color-rose-light);
+  --c-btn-default-icon: var(--color-brown);
+  --c-btn-hover-bg: var(--color-light-blue);
+  --c-btn-hover-icon: var(--color-navy);
+  --c-pill-bg: var(--color-lime);
+  --c-pill-letter-bg: var(--color-green);
+  --c-pill-letter-text: var(--color-lime);
+  --c-pill-hover-bg: var(--color-light-blue);
+  --c-pill-hover-letter-bg: var(--color-charcoal);
+  --c-pill-hover-letter-text: var(--color-light-blue);
+}
