@@ -41,7 +41,7 @@
   top: 50%;
   transform: translate(-50%, -50%);
   padding: 10px;
-  background: var(--color-btn-hover-bg);
+  background: var(--color-green);
   border: none;
   border-radius: 130px;
   display: flex;
@@ -70,7 +70,7 @@
   width: 52px;
   height: 52px;
   margin-right: -16px;
-  background: var(--color-btn-hover-icon);
+  background: var(--color-lime);
   border-radius: 100px;
   flex-shrink: 0;
   display: flex;
@@ -79,13 +79,13 @@
   font-family: var(--font-pill);
   font-size: 28px;
   font-weight: 400;
-  color: var(--color-creator-text);
+  color: var(--color-brown);
   line-height: normal;
   text-align: center;
   transition: background-color 100ms ease-out, color 100ms ease-out;
 }
 
 .doneBtn:hover .doneLetter {
-  background: var(--color-creator-text);
-  color: var(--color-btn-hover-icon);
+  background: var(--color-brown);
+  color: var(--color-lime);
 }
