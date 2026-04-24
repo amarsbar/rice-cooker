@@ -174,24 +174,22 @@ const keyToDir = (e: KeyboardEvent): DirKey | null =>
  *  once (e.g. W + A for an up-left diagonal). window.blur clears the
  *  set so Alt-Tab with a key held doesn't pin a bead on. */
 function usePressedDirections(): Set<DirKey> {
-  const [pressed, setPressed] = useState<Set<DirKey>>(new Set());
+  const [held, setHeld] = useState<Set<DirKey>>(new Set());
   useEffect(() => {
-    const onDown = (e: KeyboardEvent) => {
+    const mut = (add: boolean) => (e: KeyboardEvent) => {
       const dir = keyToDir(e);
       if (!dir) return;
-      setPressed((p) => (p.has(dir) ? p : new Set(p).add(dir)));
-    };
-    const onUp = (e: KeyboardEvent) => {
-      const dir = keyToDir(e);
-      if (!dir) return;
-      setPressed((p) => {
-        if (!p.has(dir)) return p;
-        const next = new Set(p);
-        next.delete(dir);
+      setHeld((s) => {
+        if (s.has(dir) === add) return s;
+        const next = new Set(s);
+        if (add) next.add(dir);
+        else next.delete(dir);
         return next;
       });
     };
-    const clear = () => setPressed(new Set());
+    const onDown = mut(true);
+    const onUp = mut(false);
+    const clear = () => setHeld((s) => (s.size ? new Set() : s));
     window.addEventListener('keydown', onDown);
     window.addEventListener('keyup', onUp);
     window.addEventListener('blur', clear);
@@ -201,5 +199,5 @@ function usePressedDirections(): Set<DirKey> {
       window.removeEventListener('blur', clear);
     };
   }, []);
-  return pressed;
+  return held;
 }
