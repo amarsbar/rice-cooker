@@ -6,10 +6,9 @@ interface PostInstallContentProps {
   themeName: string;
 }
 
-/** Figma 350:7342 children — theme name label, delete button + sparkle
- *  dots in the top-left corner, and the big central DONE pill. Fades in
- *  150ms after the card morph completes. Delete button reuses the shared
- *  icon-button hover tokens from tokens.css. */
+/** Figma 350:7342 children — theme name label, delete button in the
+ *  top-left corner, and the big central DONE pill. Fades in 150ms after
+ *  the card morph completes. */
 export function PostInstallContent({ themeName }: PostInstallContentProps) {
   const view = useView();
   return (
@@ -21,11 +20,7 @@ export function PostInstallContent({ themeName }: PostInstallContentProps) {
     >
       <p className={styles.themeName}>{themeName}</p>
 
-      <button type="button" className={styles.deleteBtn} aria-label="Delete rice">
-        <span className={styles.deleteIcon} />
-      </button>
-      <span className={`${styles.sparkle} ${styles.sparkleRight}`} />
-      <span className={`${styles.sparkle} ${styles.sparkleBottom}`} />
+      <button type="button" className={styles.deleteBtn} aria-label="Delete rice" />
 
       <div className={styles.doneBtn}>
         <div className={styles.doneCluster}>

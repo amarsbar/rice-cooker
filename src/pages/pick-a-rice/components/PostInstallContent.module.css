@@ -27,40 +27,18 @@
   white-space: nowrap;
 }
 
-/* Delete button (350:7355) at content-area (8.98, 9.59). Shape, hover
-   palette and icon-fill handling come from the shared global iconBtn
-   rules. */
+/* Delete button — 42×44 SVG with main circle, trash icon, and two
+   corner ellipses baked in. Position places the main circle's top-left
+   at content (8.98, 9.59). */
 .deleteBtn {
   composes: iconBtn from global;
   left: 8.98px;
-  top: 9.59px;
-}
-
-.deleteIcon {
-  composes: iconBtnIcon from global;
-  -webkit-mask-image: url('../../../assets/figma/delete-icon.svg');
-  mask-image: url('../../../assets/figma/delete-icon.svg');
-}
-
-/* Ellipse 4062/4063 — 12×12 yellow sparkle dots flanking the delete
-   button. Right of it and directly below it. */
-.sparkle {
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  background: var(--color-yellow);
-  border-radius: 50%;
-  pointer-events: none;
-}
-
-.sparkleRight {
-  left: 38.98px;
   top: 8.59px;
+  background-image: url('../../../assets/figma/btn-delete.svg');
 }
 
-.sparkleBottom {
-  left: 8.98px;
-  top: 40.59px;
+.deleteBtn:hover {
+  background-image: url('../../../assets/figma/btn-delete-hover.svg');
 }
 
 /* DONE button (350:7344) — dark-green pill centered on card. 10px padding

@@ -33,64 +33,30 @@
   top: 183px;
 }
 
-.iconBtn {
+/* Back (350:7160 button column top) — 42×44 SVG that includes the main
+   yellow circle, back arrow, and two corner ellipses. Position places
+   the main circle's top-left at card (9, 10). */
+.backBtn {
   composes: iconBtn from global;
-}
-
-.iconBtnBack {
   left: 9px;
-  top: 10px;
-}
-
-.iconBtnGithub {
-  left: 11px;
-  top: 158px;
-}
-
-.icon {
-  composes: iconBtnIcon from global;
-}
-
-.iconBack {
-  -webkit-mask-image: url('../../../assets/figma/back-icon.svg');
-  mask-image: url('../../../assets/figma/back-icon.svg');
-}
-
-.iconGithub {
-  -webkit-mask-image: url('../../../assets/figma/github-icon.svg');
-  mask-image: url('../../../assets/figma/github-icon.svg');
-}
-
-/* Sparkle dots — 12×12 yellow circles flanking each icon button. Kept
-   as siblings (not nested in the button) since they don't need to
-   recolor on hover per the user's spec. */
-.sparkle {
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  background: var(--color-yellow);
-  border-radius: 50%;
-  pointer-events: none;
-}
-
-.sparkleBackRight {
-  left: 39px;
   top: 9px;
+  background-image: url('../../../assets/figma/btn-back.svg');
 }
 
-.sparkleBackBottom {
-  left: 9px;
-  top: 41px;
+.backBtn:hover {
+  background-image: url('../../../assets/figma/btn-back-hover.svg');
 }
 
-.sparkleGhTop {
+/* GitHub (350:7160 button column bottom) — main circle at card (11, 158). */
+.githubBtn {
+  composes: iconBtn from global;
   left: 9px;
   top: 157px;
+  background-image: url('../../../assets/figma/btn-github.svg');
 }
 
-.sparkleGhBottom {
-  left: 39px;
-  top: 189px;
+.githubBtn:hover {
+  background-image: url('../../../assets/figma/btn-github-hover.svg');
 }
 
 /* APPLY button (350:7174) — dark-green pill centered on card. Wraps a
