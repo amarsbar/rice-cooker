@@ -25,10 +25,12 @@ const SLOTS: Record<number, { dx: number; dy: number; size: number }> = {
   [2]: { dx: 40.29, dy: 7.54, size: 9.612 },
   [3]: { dx: 51.19, dy: 14.64, size: 6.873 },
 };
-const PILL_W = 25;
-const PILL_H = 23.12;
+const PILL_SIZE = 25;
 const CREAM_CENTER = 88;
-const PILL_Y_BASE = 17.56; // pill center y when leftCount = 0 (matches Figma rice 1)
+/** Pill center y when leftCount = 0. Figma rice 1 has pill top=6, size=25
+ *  so center = 18.5. Each additional left-side bead pushes the arc down
+ *  5px, capped at 3 (rice 4+ → center 33.5, top 21). */
+const PILL_Y_BASE = 18.5;
 const PILL_Y_STEP = 5;
 const CLOUD_ROTATE_PER_PX = 0.5;
 
@@ -125,8 +127,7 @@ function Bead({ num, slot, pillY }: { num: number; slot: number; pillY: number }
   const s = SLOTS[clamped]!;
   const active = slot === 0;
   const visible = Math.abs(slot) <= 3;
-  const w = active ? PILL_W : s.size;
-  const h = active ? PILL_H : s.size;
+  const size = active ? PILL_SIZE : s.size;
   const cx = CREAM_CENTER + s.dx;
   const cy = pillY + s.dy;
   return (
@@ -134,10 +135,10 @@ function Bead({ num, slot, pillY }: { num: number; slot: number; pillY: number }
       className={styles.bead}
       initial={false}
       animate={{
-        left: cx - w / 2,
-        top: cy - h / 2,
-        width: w,
-        height: h,
+        left: cx - size / 2,
+        top: cy - size / 2,
+        width: size,
+        height: size,
         scale: visible ? 1 : 0,
       }}
       transition={{ duration: 0.3, ease: 'easeOut' }}

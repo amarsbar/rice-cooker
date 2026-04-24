@@ -2,7 +2,7 @@ import styles from './RiceList.module.css';
 import { RiceItem } from './RiceItem';
 import type { ScrollState } from '../view';
 
-const PLACEHOLDERS = Array.from({ length: 6 }, (_, i) => ({
+const PLACEHOLDERS = Array.from({ length: 10 }, (_, i) => ({
   themeName: `Theme ${i + 1}`,
   creatorName: 'by creatorname',
 }));

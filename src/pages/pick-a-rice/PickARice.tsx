@@ -15,7 +15,7 @@ const CYCLE: View[] = ['picking', 'preview', 'post-install'];
 
 export function PickARice() {
   const [view, setView] = useState<View>('picking');
-  const [scroll, setScroll] = useState<ScrollState>({ offset: 0, index: 0, total: 6 });
+  const [scroll, setScroll] = useState<ScrollState>({ offset: 0, index: 0, total: 10 });
 
   const cycleOnBareStage = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target !== e.currentTarget) return;
