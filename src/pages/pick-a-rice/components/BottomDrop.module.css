@@ -1,4 +1,3 @@
-/* Wrapper is positioned by framer-motion; variants overlay at 0,0. */
 .group {
   position: absolute;
   width: 104px;
@@ -21,38 +20,27 @@
   height: 48px;
 }
 
-/* Body (green circle + center dot) centered at group (54.635, 23.683). */
+/* Body composite (green circle + center dot + 3 pips), 44×36 centered in
+   the 104×48 drop. All pixel geometry below is derived from this origin. */
 .body {
   position: absolute;
-  left: 39.595px;
-  top: 8.643px;
-  width: 30.086px;
-  height: 30.086px;
+  left: 30px;
+  top: 6px;
+  width: 44px;
+  height: 36px;
 }
 
-/* Head sits with its right edge at the body center and rotates around that
-   point, so the tip swivels to any of the three pip dots. */
+/* Head anchored so its attach point (rect's right-middle) sits at the
+   body's center (58.82, 23.68) in group coords, and rotation pivots
+   around that point (23.41, 5.43) in head-local coords. */
 .head {
   position: absolute;
-  left: 33.635px;
-  top: 17.683px;
+  left: 35.41px;
+  top: 18.25px;
   width: 21px;
   height: 12px;
-  transform-origin: 21px 6px;
+  transform-origin: 23.41px 5.43px;
 }
-
-.dot {
-  position: absolute;
-  width: 2.563px;
-  height: 2.563px;
-  background: var(--color-drop-dot);
-  border-radius: 50%;
-  opacity: 0.4;
-}
-
-.dotTop { left: 37px; top: 6px; }
-.dotBottom { left: 37px; top: 38.83px; }
-.dotLeft { left: 30px; top: 22.1px; }
 
 /* ---- Shrunken variant ---- */
 
