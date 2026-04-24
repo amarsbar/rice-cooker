@@ -21,22 +21,24 @@
   height: 48px;
 }
 
-.leaf {
+/* Body (green circle + center dot) centered at group (54.635, 23.683). */
+.body {
   position: absolute;
-  left: 35.41px;
-  top: 8.64px;
-  width: 38.45px;
+  left: 39.595px;
+  top: 8.643px;
+  width: 30.086px;
   height: 30.086px;
 }
 
-.leafImg {
+/* Head sits with its right edge at the body center and rotates around that
+   point, so the tip swivels to any of the three pip dots. */
+.head {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 30.086px;
-  height: 38.45px;
-  max-width: none;
-  transform: translate(-50%, -50%) rotate(-90deg);
+  left: 33.635px;
+  top: 17.683px;
+  width: 21px;
+  height: 12px;
+  transform-origin: 21px 6px;
 }
 
 .dot {

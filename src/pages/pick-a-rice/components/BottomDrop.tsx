@@ -1,19 +1,22 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import styles from './BottomDrop.module.css';
 import dropShapeSvg from '@/assets/figma/drop-shape.svg';
-import dropLeafSvg from '@/assets/figma/drop-leaf.svg';
+import dropBodySvg from '@/assets/figma/drop-body.svg';
+import dropHeadSvg from '@/assets/figma/drop-head.svg';
 import dropShapePostSvg from '@/assets/figma/drop-shape-post.svg';
 import dropLeafPostSvg from '@/assets/figma/drop-leaf-post.svg';
 import { MORPH_TRANSITION, POSITIONS, SCREEN_FADE_TRANSITION, useView } from '../view';
 
-/** Mint drop shape with sprout decoration. Picking and shrunken use
- *  different Figma assets (shape's left tail is slightly longer in the
- *  shrunken one; the decoration in shrunken is a single consolidated SVG
- *  versus picking's separate leaf + three pip dots) so both variants are
- *  rendered inside a motion wrapper and crossfaded on view change. */
+/** Angles take the head from its resting left-pointing position to each
+ *  pip dot. Cycle is center → top → center → bottom, indexed by click %. */
+const HEAD_ROTATIONS = [0, 45, 0, -41] as const;
+
 export function BottomDrop() {
   const view = useView();
   const isPicking = view === 'picking';
+  const [clicks, setClicks] = useState(0);
+  const rotate = HEAD_ROTATIONS[clicks % HEAD_ROTATIONS.length];
   return (
     <motion.div
       className={styles.group}
@@ -26,11 +29,19 @@ export function BottomDrop() {
         initial={false}
         animate={{ opacity: isPicking ? 1 : 0 }}
         transition={SCREEN_FADE_TRANSITION}
+        style={{ pointerEvents: isPicking ? 'auto' : 'none', cursor: 'pointer' }}
+        onClick={() => setClicks((c) => c + 1)}
       >
         <img src={dropShapeSvg} alt="" className={styles.shapePick} />
-        <div className={styles.leaf}>
-          <img src={dropLeafSvg} alt="" className={styles.leafImg} />
-        </div>
+        <img src={dropBodySvg} alt="" className={styles.body} />
+        <motion.img
+          src={dropHeadSvg}
+          alt=""
+          className={styles.head}
+          initial={false}
+          animate={{ rotate }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
+        />
         <span className={`${styles.dot} ${styles.dotTop}`} />
         <span className={`${styles.dot} ${styles.dotBottom}`} />
         <span className={`${styles.dot} ${styles.dotLeft}`} />
