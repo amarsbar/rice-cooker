@@ -61,61 +61,27 @@
   inset: 0;
 }
 
-/* ---- Picking content (niri dms + plus WASD indicator) ---- */
+/* ---- Picking content (bead indicator + niri/dms + WASD) ---- */
 
-.stepPill {
+/* Bead: morphs between pill (active, 25 × 23.12 with number) and circle
+   (inactive, size per slot). Framer-motion drives left/top/width/height
+   and scale; border-radius stays large so both shapes are fully rounded. */
+.bead {
   position: absolute;
-  left: calc(50% + 0.5px);
-  top: 6px;
-  width: 25px;
-  padding: 2.561px;
   background: var(--color-yellow);
-  border-radius: 237.773px;
-  transform: translateX(-50%);
+  border-radius: 9999px;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-}
-
-.stepPill > p {
-  font-family: var(--font-display);
-  font-size: var(--fs-letter);
-  font-weight: 400;
-  color: var(--color-creator-text);
-  line-height: normal;
-  text-align: center;
-  width: 100%;
-}
-
-/* Halos placed by their visible circle's top-left (Figma wrapper bbox
-   minus the visible radius). */
-.halo {
-  position: absolute;
-  background: var(--color-yellow);
-  border-radius: 50%;
   pointer-events: none;
 }
 
-.haloLg {
-  width: 14.564px;
-  height: 14.564px;
-  left: 112.948px;
-  top: 11.665px;
-}
-
-.haloMd {
-  width: 9.612px;
-  height: 9.612px;
-  left: 130.790px;
-  top: 20.290px;
-}
-
-.haloSm {
-  width: 6.873px;
-  height: 6.873px;
-  left: 142.209px;
-  top: 28.768px;
+.beadNum {
+  font-family: var(--font-display);
+  font-size: var(--fs-letter);
+  color: var(--color-creator-text);
+  line-height: 1;
+  transition: opacity 0.2s ease-out;
 }
 
 .tag {

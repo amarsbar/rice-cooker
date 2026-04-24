@@ -12,10 +12,26 @@ export function ViewProvider({ view, children }: { view: View; children: ReactNo
   return <ViewContext.Provider value={view}>{children}</ViewContext.Provider>;
 }
 
-/** Target position/size for every moving element in each view state. All
- *  coordinates are pixel offsets in the 600 × 537 stage. Preview and
- *  post-install share the "shrunken" layout — the card morphs once from
- *  picking → preview and stays put going preview → post-install. */
+/** Scroll state for the rice list — consumed by <CreatorBadge> to drive the
+ *  bead indicator and cloud rotation. RiceList owns the scroll events;
+ *  PickARice stores the state and provides it here. */
+export interface ScrollState {
+  offset: number;
+  index: number;
+  total: number;
+}
+
+const ScrollContext = createContext<ScrollState>({ offset: 0, index: 0, total: 1 });
+
+export function useScroll() {
+  return useContext(ScrollContext);
+}
+
+export function ScrollProvider({ value, children }: { value: ScrollState; children: ReactNode }) {
+  return <ScrollContext.Provider value={value}>{children}</ScrollContext.Provider>;
+}
+
+/** Target position/size for every moving element in each view state. */
 const SHRUNKEN = {
   card: { left: 40.295, top: 105.295, width: 405, height: 229 },
   greenTab: { left: 445.295, top: 162.295, height: 81 },
@@ -38,23 +54,10 @@ export const POSITIONS = {
   'post-install': SHRUNKEN,
 } as const;
 
-/** Eased transition for the window morph (card size + position, external elements). */
 export const MORPH_TRANSITION = { duration: 0.5, ease: [0.4, 0.0, 0.2, 1] as const } as const;
-
-/** Screen-content crossfade. Same duration as morph so they finish together. */
 export const SCREEN_FADE_TRANSITION = { duration: 0.5 } as const;
 
-/** Delayed text-fade variants — used for preview/post-install content that
- *  should pop in AFTER the card morph finishes (picking → preview/post).
- *  Going the other way (preview/post → picking), text fades out fast. */
 export const SHRUNKEN_TEXT_VARIANTS = {
   visible: { opacity: 1, transition: { duration: 0.15, delay: 0.5 } },
   hidden: { opacity: 0, transition: { duration: 0.15 } },
-} as const;
-
-/** Same timing as above but without the delay, for content that should
- *  crossfade together with the morph (e.g. the CreatorBadge cloud shade). */
-export const CONTENT_FADE_VARIANTS = {
-  visible: { opacity: 1, transition: { duration: 0.3 } },
-  hidden: { opacity: 0, transition: { duration: 0.3 } },
 } as const;

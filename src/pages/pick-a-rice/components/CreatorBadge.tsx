@@ -9,19 +9,33 @@ import {
   POSITIONS,
   SCREEN_FADE_TRANSITION,
   SHRUNKEN_TEXT_VARIANTS,
+  useScroll,
   useView,
 } from '../view';
 
 type DirKey = 'up' | 'left' | 'down' | 'right';
 
-/** Creator bubble. Position animates with the card morph; inner content
- *  swaps between picking (niri/dms tag + WASD indicator), preview
- *  (tilted "previewing" label), and post-install ("rice installed !"
- *  with paint-splat accents). Cloud outline sits a shade darker in
- *  picking (#C7D8BF) and nudges lighter (#D0DACB) in the shrunken
- *  states — rendered as two stacked images that crossfade. */
+/** Bead slot geometry — offset from active-pill center + visible size. */
+const SLOTS: Record<number, { dx: number; dy: number; size: number }> = {
+  [-3]: { dx: -51.19, dy: 14.64, size: 6.873 },
+  [-2]: { dx: -40.29, dy: 7.54, size: 9.612 },
+  [-1]: { dx: -24.45, dy: 1.4, size: 14.564 },
+  [0]: { dx: 0, dy: 0, size: 14.564 },
+  [1]: { dx: 24.45, dy: 1.4, size: 14.564 },
+  [2]: { dx: 40.29, dy: 7.54, size: 9.612 },
+  [3]: { dx: 51.19, dy: 14.64, size: 6.873 },
+};
+const PILL_W = 25;
+const PILL_H = 23.12;
+const CREAM_CENTER = 88;
+const PILL_Y_BASE = 17.56; // pill center y when leftCount = 0 (matches Figma rice 1)
+const PILL_Y_STEP = 5;
+const CLOUD_ROTATE_PER_PX = 0.5;
+
 export function CreatorBadge() {
   const view = useView();
+  const scroll = useScroll();
+  const isPicking = view === 'picking';
   const pressed = usePressedDirection();
 
   return (
@@ -36,7 +50,8 @@ export function CreatorBadge() {
         alt=""
         className={styles.cloud}
         initial={false}
-        animate={{ opacity: view === 'picking' ? 1 : 0 }}
+        animate={{ opacity: isPicking ? 1 : 0 }}
+        style={{ rotate: scroll.offset * CLOUD_ROTATE_PER_PX }}
         transition={SCREEN_FADE_TRANSITION}
       />
       <motion.img
@@ -44,7 +59,7 @@ export function CreatorBadge() {
         alt=""
         className={styles.cloud}
         initial={false}
-        animate={{ opacity: view === 'picking' ? 0 : 1 }}
+        animate={{ opacity: isPicking ? 0 : 1 }}
         transition={SCREEN_FADE_TRANSITION}
       />
 
@@ -55,29 +70,19 @@ export function CreatorBadge() {
           </div>
         </div>
 
-        {/* Picking content — fades with the main morph. */}
         <motion.div
           className={styles.content}
           initial={false}
           animate={{ opacity: view === 'picking' ? 1 : 0 }}
           transition={SCREEN_FADE_TRANSITION}
         >
-          <div className={styles.stepPill}>
-            <p>1</p>
-          </div>
-
-          <span className={`${styles.halo} ${styles.haloLg}`} />
-          <span className={`${styles.halo} ${styles.haloMd}`} />
-          <span className={`${styles.halo} ${styles.haloSm}`} />
-
+          <BeadIndicator />
           <p className={`${styles.tag} ${styles.tagTop}`}>niri</p>
           <p className={`${styles.tag} ${styles.tagBottom}`}>dms</p>
           <p className={`${styles.tag} ${styles.tagPlus}`}>+</p>
-
           <KeyIndicator pressed={pressed} />
         </motion.div>
 
-        {/* Preview content — fades in after the morph. */}
         <motion.div
           className={styles.content}
           initial={false}
@@ -87,7 +92,6 @@ export function CreatorBadge() {
           <p className={styles.previewing}>previewing</p>
         </motion.div>
 
-        {/* Post-install content — fades in after the morph. */}
         <motion.div
           className={styles.content}
           initial={false}
@@ -99,6 +103,48 @@ export function CreatorBadge() {
           <p className={`${styles.installText} ${styles.installBang}`}>!</p>
         </motion.div>
       </div>
+    </motion.div>
+  );
+}
+
+function BeadIndicator() {
+  const { index, total } = useScroll();
+  const leftCount = Math.min(index, 3);
+  const pillY = PILL_Y_BASE + leftCount * PILL_Y_STEP;
+  return (
+    <>
+      {Array.from({ length: total }, (_, i) => (
+        <Bead key={i} num={i + 1} slot={i - index} pillY={pillY} />
+      ))}
+    </>
+  );
+}
+
+function Bead({ num, slot, pillY }: { num: number; slot: number; pillY: number }) {
+  const clamped = Math.max(-3, Math.min(3, slot));
+  const s = SLOTS[clamped]!;
+  const active = slot === 0;
+  const visible = Math.abs(slot) <= 3;
+  const w = active ? PILL_W : s.size;
+  const h = active ? PILL_H : s.size;
+  const cx = CREAM_CENTER + s.dx;
+  const cy = pillY + s.dy;
+  return (
+    <motion.div
+      className={styles.bead}
+      initial={false}
+      animate={{
+        left: cx - w / 2,
+        top: cy - h / 2,
+        width: w,
+        height: h,
+        scale: visible ? 1 : 0,
+      }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
+    >
+      <span className={styles.beadNum} style={{ opacity: active ? 1 : 0 }}>
+        {num}
+      </span>
     </motion.div>
   );
 }
@@ -117,36 +163,28 @@ function KeyIndicator({ pressed }: { pressed: DirKey | null }) {
 }
 
 const KEY_MAP: Record<string, DirKey> = {
-  w: 'up',
-  W: 'up',
-  ArrowUp: 'up',
-  a: 'left',
-  A: 'left',
-  ArrowLeft: 'left',
-  s: 'down',
-  S: 'down',
-  ArrowDown: 'down',
-  d: 'right',
-  D: 'right',
-  ArrowRight: 'right',
+  w: 'up', W: 'up', ArrowUp: 'up',
+  a: 'left', A: 'left', ArrowLeft: 'left',
+  s: 'down', S: 'down', ArrowDown: 'down',
+  d: 'right', D: 'right', ArrowRight: 'right',
 };
 
 function usePressedDirection(): DirKey | null {
   const [pressed, setPressed] = useState<DirKey | null>(null);
   useEffect(() => {
-    const onDown = (e: KeyboardEvent) => {
+    const down = (e: KeyboardEvent) => {
       const dir = KEY_MAP[e.key];
       if (dir) setPressed(dir);
     };
-    const onUp = (e: KeyboardEvent) => {
+    const up = (e: KeyboardEvent) => {
       const dir = KEY_MAP[e.key];
-      if (dir) setPressed((prev) => (prev === dir ? null : prev));
+      if (dir) setPressed((p) => (p === dir ? null : p));
     };
-    window.addEventListener('keydown', onDown);
-    window.addEventListener('keyup', onUp);
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
     return () => {
-      window.removeEventListener('keydown', onDown);
-      window.removeEventListener('keyup', onUp);
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
     };
   }, []);
   return pressed;
