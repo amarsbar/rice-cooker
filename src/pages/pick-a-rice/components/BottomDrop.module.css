@@ -1,14 +1,17 @@
-/* Wrapper at the drop-shape's stage position; inner elements use
-   shape-local coords so the same group works for either view. */
+/* Wrapper is positioned by framer-motion; variants overlay at 0,0. */
 .group {
   position: absolute;
   width: 104px;
   height: 48px;
   pointer-events: none;
-  transition: opacity 0.3s ease-out;
 }
 
-/* ---- Picking variant (350:6583 + 350:6584) ---- */
+.variant {
+  position: absolute;
+  inset: 0;
+}
+
+/* ---- Picking variant ---- */
 
 .shapePick {
   position: absolute;
@@ -45,22 +48,11 @@
   opacity: 0.4;
 }
 
-.dotTop {
-  left: 37px;
-  top: 6px;
-}
+.dotTop { left: 37px; top: 6px; }
+.dotBottom { left: 37px; top: 38.83px; }
+.dotLeft { left: 30px; top: 22.1px; }
 
-.dotBottom {
-  left: 37px;
-  top: 38.83px;
-}
-
-.dotLeft {
-  left: 30px;
-  top: 22.1px;
-}
-
-/* ---- Post-install variant (350:7373 + 350:7425) ---- */
+/* ---- Shrunken variant ---- */
 
 .shapePost {
   position: absolute;
@@ -70,7 +62,6 @@
   height: 48px;
 }
 
-/* Consolidated leaf + 3 gray dots, baked into one 44.86 × 31.395 SVG. */
 .decorPost {
   position: absolute;
   left: 32px;

@@ -1,29 +1,31 @@
+import { motion } from 'framer-motion';
 import styles from './BottomDrop.module.css';
 import dropShapeSvg from '@/assets/figma/drop-shape.svg';
 import dropLeafSvg from '@/assets/figma/drop-leaf.svg';
 import dropShapePostSvg from '@/assets/figma/drop-shape-post.svg';
 import dropLeafPostSvg from '@/assets/figma/drop-leaf-post.svg';
-import { POSITIONS, useView } from '../view';
+import { MORPH_TRANSITION, POSITIONS, SCREEN_FADE_TRANSITION, useView } from '../view';
 
-/** Mint drop shape with its sprout decoration. Picking and post-install use
- *  different Figma assets (the shape's left tail is slightly longer in the
- *  post-install one; the decoration is a single consolidated SVG versus
- *  the picking version's separate leaf + three dots) so both groups are
- *  rendered at their own positions and crossfaded on view change. */
+/** Mint drop shape with sprout decoration. Picking and shrunken use
+ *  different Figma assets (shape's left tail is slightly longer in the
+ *  shrunken one; the decoration in shrunken is a single consolidated SVG
+ *  versus picking's separate leaf + three pip dots) so both variants are
+ *  rendered inside a motion wrapper and crossfaded on view change. */
 export function BottomDrop() {
   const view = useView();
   const isPicking = view === 'picking';
-  const pickingPos = POSITIONS.picking.dropShape;
-  const postPos = POSITIONS['post-install'].dropShape;
   return (
-    <>
-      <div
-        className={styles.group}
-        style={{
-          left: `${pickingPos.left}px`,
-          top: `${pickingPos.top}px`,
-          opacity: isPicking ? 1 : 0,
-        }}
+    <motion.div
+      className={styles.group}
+      initial={false}
+      animate={POSITIONS[view].dropShape}
+      transition={MORPH_TRANSITION}
+    >
+      <motion.div
+        className={styles.variant}
+        initial={false}
+        animate={{ opacity: isPicking ? 1 : 0 }}
+        transition={SCREEN_FADE_TRANSITION}
       >
         <img src={dropShapeSvg} alt="" className={styles.shapePick} />
         <div className={styles.leaf}>
@@ -32,19 +34,17 @@ export function BottomDrop() {
         <span className={`${styles.dot} ${styles.dotTop}`} />
         <span className={`${styles.dot} ${styles.dotBottom}`} />
         <span className={`${styles.dot} ${styles.dotLeft}`} />
-      </div>
+      </motion.div>
 
-      <div
-        className={styles.group}
-        style={{
-          left: `${postPos.left}px`,
-          top: `${postPos.top}px`,
-          opacity: isPicking ? 0 : 1,
-        }}
+      <motion.div
+        className={styles.variant}
+        initial={false}
+        animate={{ opacity: isPicking ? 0 : 1 }}
+        transition={SCREEN_FADE_TRANSITION}
       >
         <img src={dropShapePostSvg} alt="" className={styles.shapePost} />
         <img src={dropLeafPostSvg} alt="" className={styles.decorPost} />
-      </div>
-    </>
+      </motion.div>
+    </motion.div>
   );
 }

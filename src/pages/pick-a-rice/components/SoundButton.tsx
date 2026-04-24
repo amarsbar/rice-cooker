@@ -1,18 +1,21 @@
+import { motion } from 'framer-motion';
 import styles from './SoundButton.module.css';
 import soundButtonSvg from '@/assets/figma/sound-button.svg';
-import { POSITIONS, useView } from '../view';
+import { MORPH_TRANSITION, POSITIONS, useView } from '../view';
 
-/** Teal speaker sitting inside the green tab. Position shifts with the
- *  card morph. */
+/** Teal speaker (single consolidated SVG — outline ring + filled disc +
+ *  glyph baked in) sitting inside the green tab. Position morphs with
+ *  the card. */
 export function SoundButton() {
   const view = useView();
-  const pos = POSITIONS[view].soundButton;
   return (
-    <img
+    <motion.img
       src={soundButtonSvg}
       alt=""
       className={styles.button}
-      style={{ left: `${pos.left}px`, top: `${pos.top}px` }}
+      initial={false}
+      animate={POSITIONS[view].soundButton}
+      transition={MORPH_TRANSITION}
     />
   );
 }

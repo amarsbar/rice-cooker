@@ -1,7 +1,8 @@
+import { motion } from 'framer-motion';
 import styles from './PreviewContent.module.css';
 import backIcon from '@/assets/figma/back-icon.svg';
 import githubIcon from '@/assets/figma/github-icon.svg';
-import { useView } from '../view';
+import { SHRUNKEN_TEXT_VARIANTS, useView } from '../view';
 
 interface PreviewContentProps {
   themeName: string;
@@ -10,15 +11,16 @@ interface PreviewContentProps {
 
 /** Figma 350:7160 children — preview mode shown before the user commits.
  *  Back and GitHub buttons on the left, big central APPLY pill, theme
- *  name at top, "by creator name" at bottom. Shown only in the preview
- *  state. */
+ *  name at top, "by creator name" at bottom. Fades in 150ms after the
+ *  card morph completes. */
 export function PreviewContent({ themeName, creatorName }: PreviewContentProps) {
   const view = useView();
-  const visible = view === 'preview';
   return (
-    <div
+    <motion.div
       className={styles.wrap}
-      style={{ opacity: visible ? 1 : 0, pointerEvents: visible ? 'auto' : 'none' }}
+      initial={false}
+      animate={view === 'preview' ? 'visible' : 'hidden'}
+      variants={SHRUNKEN_TEXT_VARIANTS}
     >
       <p className={`${styles.label} ${styles.themeName}`}>{themeName}</p>
       <p className={`${styles.label} ${styles.creatorName}`}>{creatorName}</p>
@@ -44,6 +46,6 @@ export function PreviewContent({ themeName, creatorName }: PreviewContentProps) 
           ))}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

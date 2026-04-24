@@ -1,40 +1,51 @@
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import styles from './CreatorBadge.module.css';
 import cloudSvg from '@/assets/figma/creator-cloud.svg';
 import cloudAltSvg from '@/assets/figma/creator-cloud-post.svg';
 import decorSvg from '@/assets/figma/creator-decor.svg';
-import { POSITIONS, useView } from '../view';
+import {
+  MORPH_TRANSITION,
+  POSITIONS,
+  SCREEN_FADE_TRANSITION,
+  SHRUNKEN_TEXT_VARIANTS,
+  useView,
+} from '../view';
 
 type DirKey = 'up' | 'left' | 'down' | 'right';
 
-/** Creator bubble. Position shifts with the card morph; the inner content
- *  swaps between three layouts — the picking niri/dms tag with WASD key
- *  indicator, a large tilted "previewing" label while a rice is being
- *  previewed, and a "rice installed !" confirmation after apply. The cloud
- *  outline sits a shade darker in picking (#C7D8BF) and nudges lighter
- *  (#D0DACB) in the two shrunken states. */
+/** Creator bubble. Position animates with the card morph; inner content
+ *  swaps between picking (niri/dms tag + WASD indicator), preview
+ *  (tilted "previewing" label), and post-install ("rice installed !"
+ *  with paint-splat accents). Cloud outline sits a shade darker in
+ *  picking (#C7D8BF) and nudges lighter (#D0DACB) in the shrunken
+ *  states — rendered as two stacked images that crossfade. */
 export function CreatorBadge() {
   const view = useView();
-  const pos = POSITIONS[view].creatorBadge;
-  const isPicking = view === 'picking';
   const pressed = usePressedDirection();
 
   return (
-    <div
+    <motion.div
       className={styles.badge}
-      style={{ left: `${pos.left}px`, top: `${pos.top}px` }}
+      initial={false}
+      animate={POSITIONS[view].creatorBadge}
+      transition={MORPH_TRANSITION}
     >
-      <img
+      <motion.img
         src={cloudSvg}
         alt=""
         className={styles.cloud}
-        style={{ opacity: isPicking ? 1 : 0 }}
+        initial={false}
+        animate={{ opacity: view === 'picking' ? 1 : 0 }}
+        transition={SCREEN_FADE_TRANSITION}
       />
-      <img
+      <motion.img
         src={cloudAltSvg}
         alt=""
         className={styles.cloud}
-        style={{ opacity: isPicking ? 0 : 1 }}
+        initial={false}
+        animate={{ opacity: view === 'picking' ? 0 : 1 }}
+        transition={SCREEN_FADE_TRANSITION}
       />
 
       <div className={styles.inner}>
@@ -44,10 +55,12 @@ export function CreatorBadge() {
           </div>
         </div>
 
-        {/* Picking-state content */}
-        <div
+        {/* Picking content — fades with the main morph. */}
+        <motion.div
           className={styles.content}
-          style={{ opacity: view === 'picking' ? 1 : 0, pointerEvents: view === 'picking' ? 'auto' : 'none' }}
+          initial={false}
+          animate={{ opacity: view === 'picking' ? 1 : 0 }}
+          transition={SCREEN_FADE_TRANSITION}
         >
           <div className={styles.stepPill}>
             <p>1</p>
@@ -62,20 +75,24 @@ export function CreatorBadge() {
           <p className={`${styles.tag} ${styles.tagPlus}`}>+</p>
 
           <KeyIndicator pressed={pressed} />
-        </div>
+        </motion.div>
 
-        {/* Preview-state content */}
-        <div
+        {/* Preview content — fades in after the morph. */}
+        <motion.div
           className={styles.content}
-          style={{ opacity: view === 'preview' ? 1 : 0, pointerEvents: view === 'preview' ? 'auto' : 'none' }}
+          initial={false}
+          animate={view === 'preview' ? 'visible' : 'hidden'}
+          variants={SHRUNKEN_TEXT_VARIANTS}
         >
           <p className={styles.previewing}>previewing</p>
-        </div>
+        </motion.div>
 
-        {/* Post-install-state content */}
-        <div
+        {/* Post-install content — fades in after the morph. */}
+        <motion.div
           className={styles.content}
-          style={{ opacity: view === 'post-install' ? 1 : 0, pointerEvents: view === 'post-install' ? 'auto' : 'none' }}
+          initial={false}
+          animate={view === 'post-install' ? 'visible' : 'hidden'}
+          variants={SHRUNKEN_TEXT_VARIANTS}
         >
           <span className={`${styles.accent} ${styles.accentA}`} />
           <span className={`${styles.accent} ${styles.accentB}`} />
@@ -86,9 +103,9 @@ export function CreatorBadge() {
           <p className={`${styles.installText} ${styles.installRice}`}>rice</p>
           <p className={`${styles.installText} ${styles.installInstalled}`}>installed</p>
           <p className={`${styles.installText} ${styles.installBang}`}>!</p>
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 

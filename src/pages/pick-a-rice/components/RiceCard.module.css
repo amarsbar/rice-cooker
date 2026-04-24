@@ -1,18 +1,15 @@
+/* Main card. Position + size are motion-driven (see view.tsx / POSITIONS). */
 .card {
   position: absolute;
   background: var(--color-card-bg);
   border: var(--card-border-width) solid var(--color-mint);
   border-radius: var(--card-radius);
   overflow: hidden;
-  transition: left 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-              top 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-              width 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-              height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Image 4394 — 552 × 558 centered inside the card content box with a
    +15px vertical offset so the focal point sits slightly below center.
-   Faded out in post-install. */
+   Fades away in the shrunken states. */
 .bg {
   position: absolute;
   left: 50%;
@@ -23,5 +20,4 @@
   object-fit: cover;
   max-width: none;
   pointer-events: none;
-  transition: opacity 0.25s ease-out;
 }

@@ -4,7 +4,11 @@
 .wrap {
   position: absolute;
   inset: 0;
-  transition: opacity 0.3s ease-out;
+  pointer-events: none;
+}
+
+.wrap > * {
+  pointer-events: auto;
 }
 
 /* "theme name" label (350:7360) — 15px yellow Madimi One, centered

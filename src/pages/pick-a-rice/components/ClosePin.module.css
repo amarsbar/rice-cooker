@@ -2,8 +2,6 @@
   position: absolute;
   width: 41.803px;
   height: 56.666px;
-  transition: left 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-              top 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .wrap > img {
@@ -15,9 +13,6 @@
   pointer-events: none;
 }
 
-/* Circular hitbox over the pin's head (41.803 × 41.803). clip-path keeps
-   clicks in the bounding-box corners from firing, matching the visible
-   circle shape. */
 .hitbox {
   position: absolute;
   left: 0;

@@ -1,6 +1,5 @@
-.button {
+.screen {
   position: absolute;
-  width: 40px;
-  height: 40px;
+  inset: 0;
   pointer-events: none;
 }

@@ -3,7 +3,4 @@
   width: 59px;
   background: var(--color-mint);
   border-top-right-radius: 16px;
-  transition: left 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-              top 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-              height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }

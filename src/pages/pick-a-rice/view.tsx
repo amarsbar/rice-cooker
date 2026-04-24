@@ -12,12 +12,10 @@ export function ViewProvider({ view, children }: { view: View; children: ReactNo
   return <ViewContext.Provider value={view}>{children}</ViewContext.Provider>;
 }
 
-/** Target coords (stage-relative) for every element that moves. Preview and
+/** Target position/size for every moving element in each view state. All
+ *  coordinates are pixel offsets in the 600 × 537 stage. Preview and
  *  post-install share the "shrunken" layout — the card morphs once from
- *  picking → preview and stays put going preview → post-install. Shrunken
- *  values were derived by centering Figma node 350:7158 (the content box,
- *  519.41 × 326.41) inside the 600 × 537 stage and adding each element's
- *  offset from its Figma parent. */
+ *  picking → preview and stays put going preview → post-install. */
 const SHRUNKEN = {
   card: { left: 40.295, top: 105.295, width: 405, height: 229 },
   greenTab: { left: 445.295, top: 162.295, height: 81 },
@@ -40,11 +38,23 @@ export const POSITIONS = {
   'post-install': SHRUNKEN,
 } as const;
 
-/** Shared morph timing — card + external elements + creator badge all use
- *  these so the transition stays visually synchronized. */
-export const MORPH_TRANSITION = 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+/** Eased transition for the window morph (card size + position, external elements). */
+export const MORPH_TRANSITION = { duration: 0.5, ease: [0.4, 0.0, 0.2, 1] as const } as const;
 
-/** Content inside the card (picking header/preview vs preview vs
- *  post-install content) crossfades at half the morph duration to keep the
- *  two layers from overlapping for long. */
-export const CONTENT_FADE_TRANSITION = 'opacity 0.25s ease-out';
+/** Screen-content crossfade. Same duration as morph so they finish together. */
+export const SCREEN_FADE_TRANSITION = { duration: 0.5 } as const;
+
+/** Delayed text-fade variants — used for preview/post-install content that
+ *  should pop in AFTER the card morph finishes (picking → preview/post).
+ *  Going the other way (preview/post → picking), text fades out fast. */
+export const SHRUNKEN_TEXT_VARIANTS = {
+  visible: { opacity: 1, transition: { duration: 0.15, delay: 0.5 } },
+  hidden: { opacity: 0, transition: { duration: 0.15 } },
+} as const;
+
+/** Same timing as above but without the delay, for content that should
+ *  crossfade together with the morph (e.g. the CreatorBadge cloud shade). */
+export const CONTENT_FADE_VARIANTS = {
+  visible: { opacity: 1, transition: { duration: 0.3 } },
+  hidden: { opacity: 0, transition: { duration: 0.3 } },
+} as const;
