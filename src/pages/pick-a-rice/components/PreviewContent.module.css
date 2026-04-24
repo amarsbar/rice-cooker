@@ -60,6 +60,7 @@
   flex-direction: column;
   align-items: flex-start;
   cursor: pointer;
+  transition: background-color 100ms ease-out;
 }
 
 /* Hover inverts the palette: pill goes yellow, letter circles go brown,
@@ -91,6 +92,7 @@
   color: var(--color-creator-text);
   line-height: normal;
   text-align: center;
+  transition: background-color 100ms ease-out, color 100ms ease-out;
 }
 
 .applyBtn:hover .applyLetter {

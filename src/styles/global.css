@@ -47,11 +47,13 @@ img {
 
 .btnShape {
   fill: var(--color-yellow);
+  transition: fill 100ms ease-out;
 }
 
 .btnIcon {
   fill: var(--color-creator-text);
   stroke: var(--color-creator-text);
+  transition: fill 100ms ease-out, stroke 100ms ease-out;
 }
 
 .iconBtn:hover .btnShape {
