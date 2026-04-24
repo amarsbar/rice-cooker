@@ -98,10 +98,6 @@
   overflow: hidden;
 }
 
-/* Left arrow sits a hair outside the frame's left edge; right arrow sits
-   a hair inside the right. Asymmetric by design — Figma flips the left
-   arrow's wrapper, and the post-flip visible left edge is 14 (content
-   area), not the pre-flip metadata x of 38. */
 .arrowButtonLeft { left: 14px; }
 .arrowButtonRight { left: 454px; }
 
