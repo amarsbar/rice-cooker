@@ -143,7 +143,10 @@
   --c-step-text: var(--color-counter-text);
   --c-cloud-outer: var(--color-sky-soft);
   --c-cloud-inner: var(--color-charcoal);
-  --c-grid: var(--color-grid-t2);                  /* grid stays the same as t2 per design */
+  /* t2's light grid on the dark t3 cloud reads as bright white, not as
+     the subtle pattern the grid is supposed to be. Use the t3-specific
+     grey so the grid has the same visual weight across themes. */
+  --c-grid: var(--color-grid-t3);
   --c-drop-dot: var(--color-blue-grey);
   --c-sprout-1: var(--color-rose);                 /* body big circle */
   --c-sprout-2: var(--color-rose-light);           /* head rect */
