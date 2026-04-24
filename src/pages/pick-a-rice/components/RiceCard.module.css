@@ -8,8 +8,7 @@
 }
 
 /* Image 4394 — 552 × 558 centered inside the card content box with a
-   +15px vertical offset so the focal point sits slightly below center.
-   Fades away in the shrunken states. */
+   +15px vertical offset so the focal point sits slightly below center. */
 .bg {
   position: absolute;
   left: 50%;
@@ -19,15 +18,5 @@
   transform: translate(-50%, -50%);
   object-fit: cover;
   max-width: none;
-  pointer-events: none;
-}
-
-/* Faint dot grid shown in preview + post-install. Radial-gradient tile
-   gives a Figma-style "graph paper" backdrop without an extra asset. */
-.grid {
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(circle, rgba(240, 237, 233, 0.12) 0.8px, transparent 0.9px);
-  background-size: 18px 18px;
   pointer-events: none;
 }
