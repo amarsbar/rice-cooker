@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import styles from './CreatorBadge.module.css';
+import { OutlinedText } from './OutlinedText';
 import WheelSvg from '@/assets/figma/creator-cloud.svg?react';
 import DecorSvg from '@/assets/figma/creator-decor.svg?react';
 import {
@@ -68,9 +69,9 @@ export function CreatorBadge() {
           transition={SCREEN_FADE_TRANSITION}
         >
           <BeadIndicator />
-          <p className={`${styles.tag} ${styles.tagTop}`}>niri</p>
-          <p className={`${styles.tag} ${styles.tagBottom}`}>dms</p>
-          <p className={`${styles.tag} ${styles.tagPlus}`}>+</p>
+          <OutlinedText className={`${styles.tag} ${styles.tagTop}`}>niri</OutlinedText>
+          <OutlinedText className={`${styles.tag} ${styles.tagBottom}`}>dms</OutlinedText>
+          <OutlinedText className={`${styles.tag} ${styles.tagPlus}`}>+</OutlinedText>
           <KeyIndicator pressed={pressed} />
         </motion.div>
 
