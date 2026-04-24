@@ -30,3 +30,42 @@ img {
   display: block;
   -webkit-user-drag: none;
 }
+
+/* Shared icon button — 40 × 40 yellow circle with a 20 × 20 masked icon
+   inside. Hover swaps the token palette (bg and icon) to green. Used by
+   back / github / delete via `composes: iconBtn from global`. Positioning
+   and the mask-image URL come from the consuming module. */
+.iconBtn {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: var(--color-yellow);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iconBtn:hover {
+  background: var(--color-btn-hover-bg);
+}
+
+.iconBtnIcon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  background: var(--color-creator-text);
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+}
+
+.iconBtn:hover .iconBtnIcon {
+  background: var(--color-btn-hover-icon);
+}
