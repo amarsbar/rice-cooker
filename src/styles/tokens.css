@@ -34,7 +34,6 @@
   --color-drop-dot-t2: #6a9a79;
   --color-grid-t1: #e9ebf0;
   --color-grid-t2: #f0ede9;
-  --color-grid-t3: #a79595;
 
   /* Static (theme-invariant) tokens kept from the old palette. */
   --color-card-bg-shrunken: rgba(26, 20, 25, 0.8);
@@ -143,10 +142,9 @@
   --c-step-text: var(--color-counter-text);
   --c-cloud-outer: var(--color-sky-soft);
   --c-cloud-inner: var(--color-charcoal);
-  /* t2's light grid on the dark t3 cloud reads as bright white, not as
-     the subtle pattern the grid is supposed to be. Use the t3-specific
-     grey so the grid has the same visual weight across themes. */
-  --c-grid: var(--color-grid-t3);
+  /* Same grid as t2, knocked down to 10% alpha so it reads as a subtle
+     pattern on the dark t3 cloud rather than bright white lines. */
+  --c-grid: rgba(240, 237, 233, 0.1);
   --c-drop-dot: var(--color-blue-grey);
   --c-sprout-1: var(--color-rose);                 /* body big circle */
   --c-sprout-2: var(--color-rose-light);           /* head rect */
