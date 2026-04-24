@@ -16,7 +16,7 @@
   font-family: var(--font-display);
   font-size: 15px;
   font-weight: 400;
-  color: var(--color-yellow);
+  color: var(--c-primary);
   line-height: normal;
   text-align: center;
   white-space: nowrap;
@@ -53,7 +53,7 @@
   top: 50%;
   transform: translate(-50%, -50%);
   padding: 10px;
-  background: var(--color-green);
+  background: var(--c-pill-bg);
   border: none;
   border-radius: 130px;
   display: flex;
@@ -66,7 +66,7 @@
 /* Hover inverts the palette: pill goes yellow, letter circles go brown,
    letter glyphs go light-yellow-green. Matches Figma 350:7589. */
 .applyBtn:hover {
-  background: var(--color-yellow);
+  background: var(--c-pill-hover-bg);
 }
 
 .applyCluster {
@@ -80,7 +80,7 @@
   width: 52px;
   height: 52px;
   margin-right: -16px;
-  background: var(--color-lime);
+  background: var(--c-pill-letter-bg);
   border-radius: 100px;
   flex-shrink: 0;
   display: flex;
@@ -89,13 +89,13 @@
   font-family: var(--font-pill);
   font-size: 28px;
   font-weight: 400;
-  color: var(--color-brown);
+  color: var(--c-pill-letter-text);
   line-height: normal;
   text-align: center;
   transition: background-color 100ms ease-out, color 100ms ease-out;
 }
 
 .applyBtn:hover .applyLetter {
-  background: var(--color-brown);
-  color: var(--color-lime);
+  background: var(--c-pill-hover-letter-bg);
+  color: var(--c-pill-hover-letter-text);
 }

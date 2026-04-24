@@ -1,6 +1,6 @@
 .tab {
   position: absolute;
   width: 59px;
-  background: var(--color-mint);
+  background: var(--c-card-border);
   border-top-right-radius: 16px;
 }

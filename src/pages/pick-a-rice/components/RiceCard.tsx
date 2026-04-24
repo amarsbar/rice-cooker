@@ -19,8 +19,8 @@ export function RiceCard({ children }: { children: ReactNode }) {
       transition={MORPH_TRANSITION}
       style={{
         background: isPicking
-          ? 'var(--color-card-bg)'
-          : 'var(--color-card-bg-shrunken)',
+          ? 'var(--c-card-bg)'
+          : 'var(--c-card-bg-shrunken)',
       }}
     >
       <img src={cardBg} alt="" className={styles.bg} />

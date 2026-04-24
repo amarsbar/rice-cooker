@@ -22,7 +22,7 @@
   top: 50%;
   width: 176px;
   height: 176px;
-  background: var(--color-cream);
+  background: var(--c-cloud-inner);
   border-radius: 50%;
   overflow: hidden;
   transform: translate(-50%, -50%);
@@ -70,7 +70,7 @@
   position: absolute;
   width: 25px;
   height: 25px;
-  background: var(--color-yellow);
+  background: var(--c-accent);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -82,7 +82,7 @@
 .beadNum {
   font-family: var(--font-display);
   font-size: var(--fs-letter);
-  color: var(--color-brown);
+  color: var(--c-step-text);
   line-height: 1;
   transition: opacity 0.2s ease-out;
 }
@@ -117,7 +117,7 @@
   width: 10px;
   height: 10px;
   border-radius: 4px;
-  background: var(--color-yellow);
+  background: var(--c-accent);
   pointer-events: none;
   transition: background-color 80ms ease-out;
 }
