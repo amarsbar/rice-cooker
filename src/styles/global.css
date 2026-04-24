@@ -31,41 +31,34 @@ img {
   -webkit-user-drag: none;
 }
 
-/* Shared icon button — 40 × 40 yellow circle with a 20 × 20 masked icon
-   inside. Hover swaps the token palette (bg and icon) to green. Used by
-   back / github / delete via `composes: iconBtn from global`. Positioning
-   and the mask-image URL come from the consuming module. */
+/* Shared icon button — each button is a 42 × 44 box that inlines one
+   SVG (main circle + icon + two corner ellipses). Fills are driven by
+   two classes on the SVG children (.btnShape for the yellow parts,
+   .btnIcon for the dark icon); :hover on the button flips both. */
 .iconBtn {
   position: absolute;
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 44px;
   padding: 0;
-  background: var(--color-yellow);
   border: none;
-  border-radius: 50%;
+  background: none;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
-.iconBtn:hover {
-  background: var(--color-btn-hover-bg);
+.btnShape {
+  fill: var(--color-yellow);
 }
 
-.iconBtnIcon {
-  display: block;
-  width: 20px;
-  height: 20px;
-  background: var(--color-creator-text);
-  -webkit-mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-size: contain;
-  mask-repeat: no-repeat;
-  mask-position: center;
+.btnIcon {
+  fill: var(--color-creator-text);
+  stroke: var(--color-creator-text);
 }
 
-.iconBtn:hover .iconBtnIcon {
-  background: var(--color-btn-hover-icon);
+.iconBtn:hover .btnShape {
+  fill: var(--color-btn-hover-bg);
+}
+
+.iconBtn:hover .btnIcon {
+  fill: var(--color-btn-hover-icon);
+  stroke: var(--color-btn-hover-icon);
 }

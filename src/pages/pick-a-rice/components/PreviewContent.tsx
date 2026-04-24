@@ -1,5 +1,7 @@
 import { motion } from 'framer-motion';
 import styles from './PreviewContent.module.css';
+import BackBtnSvg from '@/assets/figma/btn-back.svg?react';
+import GithubBtnSvg from '@/assets/figma/btn-github.svg?react';
 import { SHRUNKEN_TEXT_VARIANTS, useView } from '../view';
 
 interface PreviewContentProps {
@@ -10,8 +12,7 @@ interface PreviewContentProps {
 /** Figma 350:7160 children — preview mode shown before the user commits.
  *  Back and GitHub buttons on the left, big central APPLY pill, theme
  *  name at top, "by creator name" at bottom. Fades in 150ms after the
- *  card morph completes. Buttons reuse the shared icon-button hover
- *  tokens from tokens.css. */
+ *  card morph completes. */
 export function PreviewContent({ themeName, creatorName }: PreviewContentProps) {
   const view = useView();
   return (
@@ -24,21 +25,12 @@ export function PreviewContent({ themeName, creatorName }: PreviewContentProps) 
       <p className={`${styles.label} ${styles.themeName}`}>{themeName}</p>
       <p className={`${styles.label} ${styles.creatorName}`}>{creatorName}</p>
 
-      <button type="button" className={`${styles.iconBtn} ${styles.iconBtnBack}`} aria-label="Back">
-        <span className={`${styles.icon} ${styles.iconBack}`} />
+      <button type="button" className={styles.backBtn} aria-label="Back">
+        <BackBtnSvg />
       </button>
-      <span className={`${styles.sparkle} ${styles.sparkleBackRight}`} />
-      <span className={`${styles.sparkle} ${styles.sparkleBackBottom}`} />
-
-      <button
-        type="button"
-        className={`${styles.iconBtn} ${styles.iconBtnGithub}`}
-        aria-label="View on GitHub"
-      >
-        <span className={`${styles.icon} ${styles.iconGithub}`} />
+      <button type="button" className={styles.githubBtn} aria-label="View on GitHub">
+        <GithubBtnSvg />
       </button>
-      <span className={`${styles.sparkle} ${styles.sparkleGhTop}`} />
-      <span className={`${styles.sparkle} ${styles.sparkleGhBottom}`} />
 
       <div className={styles.applyBtn}>
         <div className={styles.applyCluster}>
