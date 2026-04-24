@@ -40,7 +40,7 @@ export function CreatorBadge() {
   const view = useView();
   const scroll = useScroll();
   const isPicking = view === 'picking';
-  const pressed = usePressedDirection();
+  const pressed = usePressedDirections();
 
   return (
     <motion.div
@@ -147,9 +147,9 @@ function Bead({ num, slot, pillY }: { num: number; slot: number; pillY: number }
   );
 }
 
-function KeyIndicator({ pressed }: { pressed: DirKey | null }) {
+function KeyIndicator({ pressed }: { pressed: Set<DirKey> }) {
   const cls = (dir: DirKey) =>
-    `${styles.key} ${styles[`key_${dir}`]} ${pressed === dir ? styles.keyPressed : ''}`;
+    `${styles.key} ${styles[`key_${dir}`]} ${pressed.has(dir) ? styles.keyPressed : ''}`;
   return (
     <>
       <span className={cls('up')} />
@@ -170,32 +170,36 @@ const KEY_MAP: Record<string, DirKey> = {
 const keyToDir = (e: KeyboardEvent): DirKey | null =>
   KEY_MAP[e.key] ?? KEY_MAP[e.key.toLowerCase()] ?? null;
 
-/** Tracks held WASD/arrow keys as a stack so the indicator reflects the
- *  most recently pressed still-held key. Covers: releasing keys in
- *  arbitrary order, rolling from one direction to another, and Alt-Tab
- *  losing keyup events (window.blur clears the stack). */
-function usePressedDirection(): DirKey | null {
-  const [stack, setStack] = useState<DirKey[]>([]);
+/** Tracks all held WASD/arrow keys so multiple beads can light up at
+ *  once (e.g. W + A for an up-left diagonal). window.blur clears the
+ *  set so Alt-Tab with a key held doesn't pin a bead on. */
+function usePressedDirections(): Set<DirKey> {
+  const [pressed, setPressed] = useState<Set<DirKey>>(new Set());
   useEffect(() => {
-    const down = (e: KeyboardEvent) => {
+    const onDown = (e: KeyboardEvent) => {
       const dir = keyToDir(e);
       if (!dir) return;
-      setStack((s) => (s[s.length - 1] === dir ? s : [...s.filter((k) => k !== dir), dir]));
+      setPressed((p) => (p.has(dir) ? p : new Set(p).add(dir)));
     };
-    const up = (e: KeyboardEvent) => {
+    const onUp = (e: KeyboardEvent) => {
       const dir = keyToDir(e);
       if (!dir) return;
-      setStack((s) => s.filter((k) => k !== dir));
+      setPressed((p) => {
+        if (!p.has(dir)) return p;
+        const next = new Set(p);
+        next.delete(dir);
+        return next;
+      });
     };
-    const clear = () => setStack([]);
-    window.addEventListener('keydown', down);
-    window.addEventListener('keyup', up);
+    const clear = () => setPressed(new Set());
+    window.addEventListener('keydown', onDown);
+    window.addEventListener('keyup', onUp);
     window.addEventListener('blur', clear);
     return () => {
-      window.removeEventListener('keydown', down);
-      window.removeEventListener('keyup', up);
+      window.removeEventListener('keydown', onDown);
+      window.removeEventListener('keyup', onUp);
       window.removeEventListener('blur', clear);
     };
   }, []);
-  return stack[stack.length - 1] ?? null;
+  return pressed;
 }
