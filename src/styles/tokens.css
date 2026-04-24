@@ -12,6 +12,11 @@
   --color-drop-green: #b9f018;
   --color-drop-yellow-green: #e8ff76;
   --color-drop-dot: #6a9a79;
+
+  /* Green pair used by APPLY / DONE pills and by icon-button hover
+     (back / github / delete). Button bg = -bg; icon fill = -icon. */
+  --color-btn-hover-bg: #73a94a;
+  --color-btn-hover-icon: #e8ff76;
   --color-frame: #3b353b;
   --color-frame-inner: #1a1419;
   --color-peek: #d9d9d9;

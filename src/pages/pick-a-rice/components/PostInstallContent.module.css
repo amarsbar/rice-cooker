@@ -27,29 +27,19 @@
   white-space: nowrap;
 }
 
-/* Delete button (350:7355) — 40×40 yellow circle at content-area (8.98,
-   9.59). Trash icon inside, 24×24 centered. */
+/* Delete button (350:7355) at content-area (8.98, 9.59). Shape, hover
+   palette and icon-fill handling come from the shared global iconBtn
+   rules. */
 .deleteBtn {
-  position: absolute;
+  composes: iconBtn from global;
   left: 8.98px;
   top: 9.59px;
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  background: var(--color-yellow);
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
 }
 
 .deleteIcon {
-  width: 24px;
-  height: 24px;
-  display: block;
+  composes: iconBtnIcon from global;
+  -webkit-mask-image: url('../../../assets/figma/delete-icon.svg');
+  mask-image: url('../../../assets/figma/delete-icon.svg');
 }
 
 /* Ellipse 4062/4063 — 12×12 yellow sparkle dots flanking the delete
@@ -82,7 +72,7 @@
   top: 50%;
   transform: translate(-50%, -50%);
   padding: 10px;
-  background: #73a94a;
+  background: var(--color-btn-hover-bg);
   border-radius: 130px;
   display: flex;
   flex-direction: column;
@@ -102,7 +92,7 @@
   width: 52px;
   height: 52px;
   margin-right: -16px;
-  background: #e8ff76;
+  background: var(--color-btn-hover-icon);
   border-radius: 100px;
   flex-shrink: 0;
   display: flex;

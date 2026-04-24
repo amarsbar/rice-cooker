@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion';
 import styles from './PostInstallContent.module.css';
-import deleteIcon from '@/assets/figma/delete-icon.svg';
 import { SHRUNKEN_TEXT_VARIANTS, useView } from '../view';
 
 interface PostInstallContentProps {
@@ -9,7 +8,8 @@ interface PostInstallContentProps {
 
 /** Figma 350:7342 children — theme name label, delete button + sparkle
  *  dots in the top-left corner, and the big central DONE pill. Fades in
- *  150ms after the card morph completes. */
+ *  150ms after the card morph completes. Delete button reuses the shared
+ *  icon-button hover tokens from tokens.css. */
 export function PostInstallContent({ themeName }: PostInstallContentProps) {
   const view = useView();
   return (
@@ -22,7 +22,7 @@ export function PostInstallContent({ themeName }: PostInstallContentProps) {
       <p className={styles.themeName}>{themeName}</p>
 
       <button type="button" className={styles.deleteBtn} aria-label="Delete rice">
-        <img src={deleteIcon} alt="" className={styles.deleteIcon} />
+        <span className={styles.deleteIcon} />
       </button>
       <span className={`${styles.sparkle} ${styles.sparkleRight}`} />
       <span className={`${styles.sparkle} ${styles.sparkleBottom}`} />
