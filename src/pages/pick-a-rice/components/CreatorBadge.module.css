@@ -6,9 +6,7 @@
   height: 200.001px;
 }
 
-/* Cloud outline — two SVGs stacked so we can crossfade color (#C7D8BF
-   → #D0DACB) with the rest of the content. */
-.cloud {
+.wheel {
   position: absolute;
   inset: 0;
   width: 100%;
