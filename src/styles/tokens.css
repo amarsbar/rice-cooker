@@ -1,6 +1,7 @@
 :root {
   /* Colors from Figma */
   --color-card-bg: #000001;
+  --color-card-bg-shrunken: rgba(26, 20, 25, 0.8);
   --color-mint: #dfecdb;
   --color-mint-deep: #c7d8bf;
   --color-yellow: #fade26;
