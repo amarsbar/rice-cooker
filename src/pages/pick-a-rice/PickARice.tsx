@@ -4,9 +4,9 @@ import {
   ViewProvider,
   ScrollProvider,
   ThemeProvider,
+  THEME_CYCLE,
   type View,
   type ScrollState,
-  type Theme,
 } from './view';
 import { GreenTab } from './components/GreenTab';
 import { RiceCard } from './components/RiceCard';
@@ -23,7 +23,9 @@ const CYCLE: View[] = ['picking', 'preview', 'post-install'];
 export function PickARice() {
   const [view, setView] = useState<View>('picking');
   const [scroll, setScroll] = useState<ScrollState>({ offset: 0, index: 0, total: 10 });
-  const [theme, setTheme] = useState<Theme>('t2');
+  const [cycleIdx, setCycleIdx] = useState(0);
+  const theme = THEME_CYCLE[cycleIdx]!;
+  const advance = () => setCycleIdx((i) => (i + 1) % THEME_CYCLE.length);
 
   const cycleOnBareStage = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target !== e.currentTarget) return;
@@ -31,7 +33,7 @@ export function PickARice() {
   };
 
   return (
-    <ThemeProvider value={{ theme, setTheme }}>
+    <ThemeProvider value={{ theme, advance }}>
       <ViewProvider view={view}>
         <ScrollProvider value={scroll}>
           <div className={styles.stage} data-theme={theme} onClick={cycleOnBareStage}>

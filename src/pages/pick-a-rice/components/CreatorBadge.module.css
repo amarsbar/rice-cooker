@@ -95,6 +95,8 @@
   color: var(--color-brown);
   line-height: normal;
   white-space: nowrap;
+  --outline-color: var(--c-accent);
+  --outline-width: 5.58px;
 }
 
 .tagTop {

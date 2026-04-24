@@ -127,7 +127,7 @@ function createWindow(): void {
         const clickKnob = () =>
           win.webContents.executeJavaScript(
             `(() => {
-               const el = document.querySelector('[class*="BottomDrop"] [class*="variant"], [class*="group"] > div[style*="cursor"]');
+               const el = document.querySelector('[style*="cursor"][style*="pointer"]');
                if (!el) return false;
                el.click();
                return true;
@@ -136,15 +136,24 @@ function createWindow(): void {
         // Ensure we're back in the picking view.
         for (let i = 0; i < 3; i++) await clickStage();
         await new Promise((r) => setTimeout(r, MORPH_SETTLE_MS));
-        for (const name of ['t1', 't3'] as const) {
-          const clicked = await clickKnob();
-          if (!clicked) {
-            console.warn('[rice-cooker] capture: knob not found');
-            break;
+        // The cycle is t2 (0) → t1 (1) → t2 (2) → t3 (3). Walk
+        // sequentially from the initial t2, capturing t1 after 1 click
+        // and t3 after 2 further clicks.
+        const steps: { label: 't1' | 't3'; advance: number }[] = [
+          { label: 't1', advance: 1 },
+          { label: 't3', advance: 2 },
+        ];
+        for (const { label, advance } of steps) {
+          for (let i = 0; i < advance; i++) {
+            const clicked = await clickKnob();
+            if (!clicked) {
+              console.warn('[rice-cooker] capture: knob not found');
+              return;
+            }
+            await new Promise((r) => setTimeout(r, MORPH_SETTLE_MS));
           }
-          await new Promise((r) => setTimeout(r, MORPH_SETTLE_MS));
           const img = await win.webContents.capturePage();
-          await writeFile(`${base}-theme-${name}.png`, img.toPNG());
+          await writeFile(`${base}-theme-${label}.png`, img.toPNG());
         }
       }
 

@@ -2,15 +2,7 @@
   position: absolute;
   width: 104px;
   height: 48px;
-  pointer-events: none;
 }
-
-.variant {
-  position: absolute;
-  inset: 0;
-}
-
-/* ---- Picking variant ---- */
 
 .shapePick {
   position: absolute;
@@ -20,7 +12,7 @@
   height: 48px;
 }
 
-/* Body composite (green circle + center dot + 3 pips), 44×36 centered in
+/* Body composite (green circle + centre dot + 3 pips), 44×36 centered in
    the 104×48 drop. All pixel geometry below is derived from this origin. */
 .body {
   position: absolute;
@@ -31,7 +23,7 @@
 }
 
 /* Head anchored so its attach point (rect's right-middle) sits at the
-   body's center (58.82, 23.68) in group coords, and rotation pivots
+   body's centre (58.82, 23.68) in group coords, and rotation pivots
    around that point (23.41, 5.43) in head-local coords. */
 .head {
   position: absolute;
@@ -40,22 +32,4 @@
   width: 21px;
   height: 12px;
   transform-origin: 23.41px 5.43px;
-}
-
-/* ---- Shrunken variant ---- */
-
-.shapePost {
-  position: absolute;
-  left: 1.466px;
-  top: 0;
-  width: 102.534px;
-  height: 48px;
-}
-
-.decorPost {
-  position: absolute;
-  left: 32px;
-  top: 6px;
-  width: 44.86px;
-  height: 31.395px;
 }

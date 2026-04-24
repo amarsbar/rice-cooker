@@ -64,9 +64,10 @@
   --c-cloud-inner: var(--color-cream);
   --c-grid: var(--color-grid-t2);
   --c-drop-dot: var(--color-drop-dot-t2);
-  --c-sprout-1: var(--color-drop-green);
-  --c-sprout-2: var(--color-lime);
-  --c-sprout-3: var(--color-orange);
+  --c-sprout-1: var(--color-drop-green);           /* body big circle */
+  --c-sprout-2: var(--color-lime);                 /* head rect */
+  --c-sprout-3: var(--color-orange);               /* head top small circle */
+  --c-sprout-4: var(--color-orange);               /* body centre dot (same as head top in t2/t3, differs in t1) */
   --c-btn-default-icon: var(--color-brown);          /* back/github/delete default icon (fill + stroke) */
   --c-btn-hover-bg: var(--color-green);
   --c-btn-hover-icon: var(--color-lime);
@@ -112,12 +113,13 @@
   --c-cloud-inner: var(--color-cream-soft);
   --c-grid: var(--color-grid-t1);
   --c-drop-dot: var(--color-yellow-deep);
-  --c-sprout-1: var(--color-ice);
-  --c-sprout-2: var(--color-yellow-deep);
-  --c-sprout-3: var(--color-yellow-soft);
+  --c-sprout-1: var(--color-yellow-deep);          /* body big circle */
+  --c-sprout-2: var(--color-yellow-soft);          /* head rect */
+  --c-sprout-3: var(--color-ice);                  /* head top small circle */
+  --c-sprout-4: var(--color-yellow-soft);          /* body centre dot — differs from head-top in t1 */
   --c-btn-default-icon: var(--color-navy);
   --c-btn-hover-bg: var(--color-light-pink);
-  --c-btn-hover-icon: var(--color-lime);
+  --c-btn-hover-icon: var(--color-brown);          /* t1 hover arrow is brown, not lime */
   --c-pill-bg: var(--color-navy);
   --c-pill-letter-bg: var(--color-light-blue);
   --c-pill-letter-text: var(--color-brown);
@@ -141,11 +143,12 @@
   --c-step-text: var(--color-counter-text);
   --c-cloud-outer: var(--color-sky-soft);
   --c-cloud-inner: var(--color-charcoal);
-  --c-grid: var(--color-grid-t3);
+  --c-grid: var(--color-grid-t2);                  /* grid stays the same as t2 per design */
   --c-drop-dot: var(--color-blue-grey);
-  --c-sprout-1: var(--color-navy-deep);
-  --c-sprout-2: var(--color-rose);
-  --c-sprout-3: var(--color-rose-light);
+  --c-sprout-1: var(--color-rose);                 /* body big circle */
+  --c-sprout-2: var(--color-rose-light);           /* head rect */
+  --c-sprout-3: var(--color-navy-deep);            /* head top small circle */
+  --c-sprout-4: var(--color-navy-deep);            /* body centre dot (same as head top in t3) */
   --c-btn-default-icon: var(--color-brown);
   --c-btn-hover-bg: var(--color-light-blue);
   --c-btn-hover-icon: var(--color-navy);

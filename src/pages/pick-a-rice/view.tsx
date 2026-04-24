@@ -34,17 +34,25 @@ export function ScrollProvider({ value, children }: { value: ScrollState; childr
 /** Palette / colour theme. Three fixed variants; the sprout knob (rendered
  *  inside <BottomDrop>) is the picker. t2 is the default, centre-of-knob
  *  theme — tokens defined in `:root` match it. t1 and t3 get applied via
- *  `[data-theme='t1'|'t3']` override blocks on the stage element. */
+ *  `[data-theme='t1'|'t3']` override blocks on the stage element.
+ *
+ *  The cycle goes centre → top → centre → bottom → centre → …, so t2 is
+ *  visited between every non-default theme. That requires tracking a
+ *  4-step cycle index rather than the theme alone (otherwise t2 can't
+ *  remember which direction it came from). Consumers see the derived
+ *  `theme` + an `advance()` that bumps the index. */
 export type Theme = 't1' | 't2' | 't3';
+
+export const THEME_CYCLE: readonly Theme[] = ['t2', 't1', 't2', 't3'] as const;
 
 interface ThemeCtxValue {
   theme: Theme;
-  setTheme: (update: Theme | ((prev: Theme) => Theme)) => void;
+  advance: () => void;
 }
 
 const ThemeContext = createContext<ThemeCtxValue>({
   theme: 't2',
-  setTheme: () => {},
+  advance: () => {},
 });
 
 export function useTheme() {
