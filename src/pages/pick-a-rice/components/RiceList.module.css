@@ -10,6 +10,7 @@
   width: 482px;
   height: 358px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 23px;

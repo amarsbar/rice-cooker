@@ -27,11 +27,13 @@ const SLOTS: Record<number, { dx: number; dy: number; size: number }> = {
 };
 const PILL_SIZE = 25;
 const CREAM_CENTER = 88;
-/** Pill center y when leftCount = 0. Figma rice 1 has pill top=6, size=25
- *  so center = 18.5. Each additional left-side bead pushes the arc down
- *  5px, capped at 3 (rice 4+ → center 33.5, top 21). */
+/** Pill center y is fixed — beads only shift horizontally as the scroll
+ *  index changes. (Figma shows the arc nudging down for later indexes;
+ *  locking the y removes a distracting vertical drift while scrolling.
+ *  Can re-enable with a STEP > 0 if we want the Figma-exact vertical
+ *  offset back.) */
 const PILL_Y_BASE = 18.5;
-const PILL_Y_STEP = 5;
+const PILL_Y_STEP = 0;
 const CLOUD_ROTATE_PER_PX = 0.5;
 
 export function CreatorBadge() {
