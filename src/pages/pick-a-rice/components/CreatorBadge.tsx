@@ -49,6 +49,11 @@ export function CreatorBadge() {
       animate={POSITIONS[view].creatorBadge}
       transition={MORPH_TRANSITION}
     >
+      {/* Shrunken-state cloud stays fully opaque beneath the picking cloud;
+          the picking one fades out to reveal it. Stacking a solid base
+          behind the fading top avoids the mid-transition translucency
+          that a two-way opacity crossfade produces. */}
+      <img src={cloudAltSvg} alt="" className={styles.cloud} />
       <motion.img
         src={cloudSvg}
         alt=""
@@ -56,14 +61,6 @@ export function CreatorBadge() {
         initial={false}
         animate={{ opacity: isPicking ? 1 : 0 }}
         style={{ rotate: scroll.offset * CLOUD_ROTATE_PER_PX }}
-        transition={SCREEN_FADE_TRANSITION}
-      />
-      <motion.img
-        src={cloudAltSvg}
-        alt=""
-        className={styles.cloud}
-        initial={false}
-        animate={{ opacity: isPicking ? 0 : 1 }}
         transition={SCREEN_FADE_TRANSITION}
       />
 
