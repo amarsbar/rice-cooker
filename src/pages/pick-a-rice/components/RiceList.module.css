@@ -1,0 +1,24 @@
+/* Sits in the card's content box below the header (48px reserved). Starts
+   at top=64 so the first RiceItem's "Theme name" pill lands where the
+   design places it; 358px tall fills the rest of the 422-tall content
+   box. Scrollbar is hidden — the card's rounded border already provides
+   the visual crop. */
+.list {
+  position: absolute;
+  left: 0;
+  top: 64px;
+  width: 482px;
+  height: 358px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 23px;
+  padding-bottom: 23px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  pointer-events: auto;
+}
+
+.list::-webkit-scrollbar {
+  display: none;
+}

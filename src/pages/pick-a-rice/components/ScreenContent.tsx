@@ -2,8 +2,7 @@ import { motion } from 'framer-motion';
 import styles from './ScreenContent.module.css';
 import { POSITIONS, SCREEN_FADE_TRANSITION, useView } from '../view';
 import { CardHeader } from './CardHeader';
-import { MainPreview } from './MainPreview';
-import { PeekPreview } from './PeekPreview';
+import { RiceList } from './RiceList';
 
 /** Half of the card's shrink delta between picking and the shrunken view.
  *  Translating the screen content by this amount keeps it visually
@@ -13,10 +12,9 @@ const CENTER_OFFSET_X =
 const CENTER_OFFSET_Y =
   -(POSITIONS.picking.card.height - POSITIONS['post-install'].card.height) / 2;
 
-/** Picking-state card content — header + main preview + peek preview.
- *  Fades to 0 when the card morphs to preview/post-install and
- *  simultaneously translates up/left so the content stays centered in the
- *  card as the card shrinks around it. */
+/** Picking-state card content — header on top, scrollable rice list below.
+ *  Fades to 0 when the card morphs to preview/post-install and translates
+ *  up/left so the visible region stays centered in the shrinking card. */
 export function ScreenContent() {
   const view = useView();
   const shrunken = view !== 'picking';
@@ -32,8 +30,7 @@ export function ScreenContent() {
       transition={SCREEN_FADE_TRANSITION}
     >
       <CardHeader />
-      <MainPreview themeName="Theme name" creatorName="by creatorname" />
-      <PeekPreview themeName="Theme name" creatorName="Creatorname" />
+      <RiceList />
     </motion.div>
   );
 }
