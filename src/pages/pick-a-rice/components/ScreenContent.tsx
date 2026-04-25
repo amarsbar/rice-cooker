@@ -12,11 +12,13 @@ const CENTER_OFFSET_Y =
 /** Picking-state card content: header on top, focused rice preview below.
  *  Fades + translates to stay centered while the card shrinks. */
 interface ScreenContentProps {
+  holdDirection: -1 | 0 | 1;
   navRequest: RiceNavRequest;
   onScrollOffsetChange: (offset: number) => void;
 }
 
 export function ScreenContent({
+  holdDirection,
   navRequest,
   onScrollOffsetChange,
 }: ScreenContentProps) {
@@ -37,6 +39,7 @@ export function ScreenContent({
       <CardHeader />
       <RiceList
         active={!shrunken}
+        holdDirection={holdDirection}
         navRequest={navRequest}
         onScrollOffsetChange={onScrollOffsetChange}
       />
