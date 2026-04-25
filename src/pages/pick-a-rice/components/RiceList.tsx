@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react';
+import createScrollSnap from 'scroll-snap';
 import styles from './RiceList.module.css';
 import { RiceItem } from './RiceItem';
 import type { ScrollState } from '../view';
@@ -12,6 +14,20 @@ const PLACEHOLDERS = Array.from({ length: 10 }, (_, i) => ({
 const PITCH = 334;
 
 export function RiceList({ onScroll }: { onScroll: (s: ScrollState) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    const { unbind } = createScrollSnap(ref.current, {
+      snapDestinationY: `${PITCH}px`,
+      threshold: 0.1,
+      duration: 250,
+      timeout: 100,
+      enableKeyboard: false,
+    });
+    return unbind;
+  }, []);
+
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const offset = e.currentTarget.scrollTop;
     onScroll({
@@ -20,8 +36,9 @@ export function RiceList({ onScroll }: { onScroll: (s: ScrollState) => void }) {
       total: PLACEHOLDERS.length,
     });
   };
+
   return (
-    <div className={styles.list} onScroll={handleScroll}>
+    <div ref={ref} className={styles.list} onScroll={handleScroll}>
       {PLACEHOLDERS.map((r, i) => (
         <RiceItem key={i} themeName={r.themeName} creatorName={r.creatorName} />
       ))}
