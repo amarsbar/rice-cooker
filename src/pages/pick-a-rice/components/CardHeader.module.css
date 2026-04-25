@@ -1,63 +1,71 @@
-/* Logo (350:6545) — 37.78 × 24 at (17, 13). */
-.logo {
+.menuIcon {
   position: absolute;
-  left: 17px;
+  left: 21px;
   top: 13px;
-  width: 37.78px;
-  height: 24px;
-}
-
-/* Menu dots (350:6542 wrapper) — 20 × 20. Figma metadata gives (459, 25)
-   in outer-card coords; subtract the 9px border to land on (450, 16) in
-   the content box, which puts the dots at the same vertical center as the
-   logo and letter pills. */
-.menu {
-  position: absolute;
-  left: 450px;
-  top: 16px;
   width: 19.999px;
   height: 19.999px;
+  --c-primary: var(--color-lime);
 }
 
-/* "PICK A RICE" letter pills (350:6548 wrapper) — three flex clusters.
-   Uses the wrapper's border-subtracted (165, 13) so the cluster row is
-   horizontally centered in the card (left margin = right margin ≈ 165.5)
-   and vertically aligned with the logo + menu dots. */
-.letters {
+.label {
   position: absolute;
-  left: 165px;
-  top: 13px;
-  display: flex;
-  gap: 4px;
-  align-items: center;
+  top: 18px;
+  font-family: var(--font-pill);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--color-lime);
+  line-height: normal;
+  white-space: nowrap;
 }
 
-/* Each cluster offsets its right edge by the 4px letters overlap so groups
-   sit flush. See 350:6550/6559/6562 (content-stretch + pr-[4px]). */
-.cluster {
-  display: flex;
-  align-items: center;
-  padding-right: 4px;
-  flex-shrink: 0;
+.menuLabel {
+  left: 50px;
 }
 
-/* Individual letter pill (350:6551 et al.) — 18.565px wide, 2.561px padding,
-   yellow bg, fully rounded, 15px Madimi One black text. -4px right margin
-   creates the intra-cluster overlap. */
-.letter {
-  width: 18.565px;
-  margin-right: -4px;
-  padding: 2.561px;
-  background: var(--c-primary);
-  border-radius: 237.773px;
-  flex-shrink: 0;
+.nextLabel {
+  left: 298.5px;
+  width: 34px;
+  text-align: center;
+}
+
+.prevLabel {
+  left: 351px;
+  width: 31px;
+  text-align: center;
+}
+
+.applyCluster {
+  position: absolute;
+  left: 398px;
+  top: 9px;
+  display: flex;
+  align-items: center;
+  padding-right: 9.333px;
+}
+
+.applyLetter {
+  width: 30.333px;
+  height: 30.333px;
+  margin-right: -9.333px;
+  border-radius: 58.333px;
+  background: var(--color-lime);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-display);
-  font-size: var(--fs-letter);
+  flex-shrink: 0;
+  font-family: var(--font-pill);
+  font-size: 16.333px;
   font-weight: 400;
-  color: var(--c-primary-text);
-  line-height: normal;
+  color: var(--color-brown);
+  line-height: 1;
   text-align: center;
+}
+
+.divider {
+  position: absolute;
+  left: 20px;
+  top: 45px;
+  width: 494px;
+  height: 4px;
+  pointer-events: none;
 }

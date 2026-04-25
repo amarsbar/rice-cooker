@@ -17,6 +17,7 @@ import { ClosePin } from './components/ClosePin';
 import { SoundButton } from './components/SoundButton';
 import { BottomDrop } from './components/BottomDrop';
 import { CreatorBadge } from './components/CreatorBadge';
+import { PhysicalControls } from './components/PhysicalControls';
 
 const CYCLE: View[] = ['picking', 'preview', 'post-install'];
 
@@ -37,6 +38,7 @@ export function PickARice() {
       <ViewProvider view={view}>
         <ScrollProvider value={scroll}>
           <div className={styles.stage} data-theme={theme} onClick={cycleOnBareStage}>
+            <PhysicalControls />
             <GreenTab />
             <RiceCard>
               <ScreenContent onScroll={setScroll} />

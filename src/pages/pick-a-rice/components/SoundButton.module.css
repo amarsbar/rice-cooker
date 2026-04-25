@@ -1,5 +1,6 @@
 .button {
   position: absolute;
+  z-index: 3;
   width: 40px;
   height: 40px;
   pointer-events: none;

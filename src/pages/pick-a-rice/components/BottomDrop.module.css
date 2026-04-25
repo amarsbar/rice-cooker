@@ -1,5 +1,6 @@
 .group {
   position: absolute;
+  z-index: 3;
   width: 104px;
   height: 48px;
 }

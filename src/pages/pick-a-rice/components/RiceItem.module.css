@@ -1,141 +1,48 @@
-/* 482 × 311 flow-positioned rice preview. The 311 spans from the top edge
-   of the "Theme name" pill (y=0) to the bottom edge of the "by creator name"
-   pill (y=311). Children use this item as their positioning context, so
-   the numbers are the Figma outer-card y minus 73 (pill-top's outer-y). */
 .item {
   position: relative;
-  width: 482px;
-  height: 311px;
+  width: 532px;
+  height: 292px;
   flex-shrink: 0;
-  animation: riceFade linear;
-  animation-timeline: view();
-  animation-range: entry;
 }
 
-@keyframes riceFade {
-  from { opacity: 0.45; }
-  to { opacity: 1; }
-}
-
-.outer {
+.preview {
   position: absolute;
-  left: 16px;
-  top: 24px;
-  width: 453px;
-  height: 263px;
-  background: var(--color-frame);
-  border-radius: var(--preview-outer-radius);
-}
-
-.inner {
-  position: absolute;
-  left: 22px;
-  top: 30px;
-  width: 441px;
-  height: 251px;
-  background: var(--color-frame-inner);
-  border-radius: var(--preview-inner-radius);
   overflow: hidden;
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+.primary {
+  left: 20px;
+  top: 60px;
+  width: 498px;
+  height: 278px;
+}
+
+.trailing {
+  left: 31px;
+  top: 60px;
+  width: 476px;
+  height: 267px;
 }
 
 .image {
   position: absolute;
-  left: calc(50% + 1px);
-  top: 5px;
-  width: 429px;
-  height: 241px;
-  transform: translateX(-50%);
-  border-radius: var(--preview-image-radius);
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  border-radius: 12px;
   object-fit: cover;
   pointer-events: none;
 }
 
-.corner {
+.trailingOverlay {
   position: absolute;
-  width: 31.951px;
-  height: 22.411px;
+  left: -0.4%;
+  top: -9.81%;
+  width: 100.79%;
+  height: 119.61%;
+  max-width: none;
   pointer-events: none;
 }
-
-.cornerTr { left: 437px; top: 8px; }
-.cornerTl { left: 16px; top: 8px; transform: scaleX(-1); }
-.cornerBr { left: 437px; top: 280px; transform: scaleY(-1); }
-.cornerBl { left: 16px; top: 280px; transform: scale(-1, -1); }
-
-.pill {
-  position: absolute;
-  left: calc(50% + 1px);
-  transform: translateX(-50%);
-  height: 30px;
-  padding: 0 12px;
-  background: var(--color-frame);
-  border-radius: 55.556px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.pill > p {
-  font-family: var(--font-pill);
-  font-size: var(--fs-pill);
-  font-weight: 400;
-  color: var(--color-pill-text);
-  line-height: normal;
-  text-align: center;
-  white-space: nowrap;
-  letter-spacing: -0.02em;
-}
-
-.pillTop { top: 0; }
-.pillBottom { top: 281px; }
-
-.arrowButton {
-  position: absolute;
-  top: 143px;
-  width: 24px;
-  height: 24px;
-  background: var(--color-frame);
-  border: none;
-  border-radius: 50%;
-  padding: 0;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-pill-text);
-  overflow: hidden;
-}
-
-.arrowButtonLeft { left: 7px; }
-.arrowButtonRight { left: 454px; }
-
-.arrow {
-  display: block;
-  width: 8.205px;
-  height: 5.641px;
-  background-color: currentColor;
-  -webkit-mask-image: url('../../../assets/figma/arrow.svg');
-  -webkit-mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-image: url('../../../assets/figma/arrow.svg');
-  mask-size: contain;
-  mask-repeat: no-repeat;
-  mask-position: center;
-}
-
-.arrowLeft { transform: rotate(-90deg); }
-.arrowRight { transform: rotate(90deg); }
-
-.dot {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  background: var(--color-frame);
-  border-radius: 50%;
-}
-
-.dotTl { left: 180px; top: 17px; }
-.dotTr { left: 292px; top: 17px; }
-.dotBl { left: 171px; top: 283px; }
-.dotBr { left: 303px; top: 283px; }

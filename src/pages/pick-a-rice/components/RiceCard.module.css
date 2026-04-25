@@ -2,22 +2,22 @@
    Background is set inline per-view (solid in picking, 80% in shrunken). */
 .card {
   position: absolute;
+  z-index: 2;
   border: var(--card-border-width) solid var(--c-card-border);
   border-radius: var(--card-radius);
   overflow: hidden;
   transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Image 4394 — 552 × 558 centered inside the card content box with a
-   +15px vertical offset so the focal point sits slightly below center. */
+/* Figma 509:34645: 552 x 558 at inner-frame (15, -109), 50% opacity. */
 .bg {
   position: absolute;
-  left: 50%;
-  top: calc(50% + 15px);
+  left: 15px;
+  top: -109px;
   width: 552px;
   height: 558px;
-  transform: translate(-50%, -50%);
   object-fit: cover;
+  opacity: 0.5;
   max-width: none;
   pointer-events: none;
 }

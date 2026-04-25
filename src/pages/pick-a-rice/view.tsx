@@ -71,22 +71,22 @@ export function ThemeProvider({
 
 /** Target position/size for every moving element in each view state. */
 const SHRUNKEN = {
-  card: { left: 40.295, top: 105.295, width: 405, height: 229 },
-  greenTab: { left: 445.295, top: 162.295, height: 81 },
-  closePin: { left: 454.295, top: 105.295 },
-  soundButton: { left: 454.295, top: 179.295 },
-  dropShape: { left: 272.295, top: 332.295 },
-  creatorBadge: { left: 359.705, top: 231.705 },
+  card: { left: 88.5, top: 118, width: 405, height: 229 },
+  greenTab: { left: 493.5, top: 175, height: 81 },
+  closePin: { left: 502.5, top: 118 },
+  soundButton: { left: 502.5, top: 192 },
+  dropShape: { left: 320.5, top: 345 },
+  creatorBadge: { left: 408, top: 244 },
 } as const;
 
 export const POSITIONS = {
   picking: {
-    card: { left: 0, top: 0, width: 500, height: 440 },
-    greenTab: { left: 500, top: 270, height: 90 },
-    closePin: { left: 508, top: 214 },
-    soundButton: { left: 507, top: 287 },
-    dropShape: { left: 317, top: 437 },
-    creatorBadge: { left: 400, top: 337 },
+    card: { left: 16, top: 33, width: 550, height: 399 },
+    greenTab: { left: 564, top: 307, height: 90 },
+    closePin: { left: 574, top: 251 },
+    soundButton: { left: 571, top: 323 },
+    dropShape: { left: 386, top: 432 },
+    creatorBadge: { left: 466, top: 374 },
   },
   preview: SHRUNKEN,
   'post-install': SHRUNKEN,
