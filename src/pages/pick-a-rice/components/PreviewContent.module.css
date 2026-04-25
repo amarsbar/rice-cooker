@@ -7,6 +7,24 @@
   inset: 0;
 }
 
+/* PREPPING loader overlay — covers the preview card's content area while
+   the Planck chop animation plays. Lime tint matches Figma 367:11764.
+   No z-index: an explicit stacking-context escape would leak above the
+   CreatorBadge wheel rendered after the card in stage order. The loader
+   and preview UI are mutually exclusive in `.wrap` so within-wrap stacking
+   isn't needed. */
+.loaderOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(232, 255, 118, 0.4);
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
 /* Theme name / creator name labels — Madimi One 15px yellow, centered
    horizontally. One sits above the APPLY pill, the other below it. */
 .label {
