@@ -1,16 +1,22 @@
 .list {
   position: absolute;
   left: 0;
-  top: 0;
+  top: 60px;
   width: 532px;
-  height: 381px;
-  overflow: hidden;
+  height: 321px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   pointer-events: auto;
+}
+
+.list::-webkit-scrollbar {
+  display: none;
 }
 
 .track {
   display: flex;
   flex-direction: column;
-  transition: transform 160ms ease-out;
-  will-change: transform;
+  padding-bottom: 29px;
 }

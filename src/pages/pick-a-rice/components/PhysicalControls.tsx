@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import styles from './PhysicalControls.module.css';
 import downButton from '@/assets/figma/physical-down.svg';
 import upButton from '@/assets/figma/physical-up.svg';
 import enterIcon from '@/assets/figma/enter-icon.svg';
+import { MORPH_TRANSITION, POSITIONS, useView } from '../view';
 
 type Control = 'down' | 'up' | 'enter';
 type ControlAction = () => void;
@@ -19,13 +21,23 @@ const KEY_TO_CONTROL: Record<string, Control> = {
   w: 'up',
   ArrowUp: 'up',
   Enter: 'enter',
+  e: 'enter',
 };
 
 const keyToControl = (key: string): Control | undefined =>
   KEY_TO_CONTROL[key] ?? KEY_TO_CONTROL[key.toLowerCase()];
 
+const REPEATING_CONTROLS = new Set<Control>(['down', 'up']);
+const REPEAT_DELAY_MS = 260;
+const REPEAT_INTERVAL_MS = 130;
+
 export function PhysicalControls({ onPrevious, onNext, onApply }: PhysicalControlsProps) {
+  const view = useView();
+  const cardPosition = POSITIONS[view].card;
   const [pressed, setPressed] = useState<Set<Control>>(new Set());
+  const repeatControlRef = useRef<Control | null>(null);
+  const repeatDelayRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const repeatIntervalRef = useRef<ReturnType<typeof window.setInterval> | null>(null);
 
   const runControlAction = useCallback((control: Control) => {
     if (control === 'up') onPrevious();
@@ -33,7 +45,7 @@ export function PhysicalControls({ onPrevious, onNext, onApply }: PhysicalContro
     else onApply();
   }, [onPrevious, onNext, onApply]);
 
-  const setControl = (control: Control, active: boolean) => {
+  const setControl = useCallback((control: Control, active: boolean) => {
     setPressed((current) => {
       if (current.has(control) === active) return current;
       const next = new Set(current);
@@ -41,25 +53,55 @@ export function PhysicalControls({ onPrevious, onNext, onApply }: PhysicalContro
       else next.delete(control);
       return next;
     });
-  };
+  }, []);
+
+  const stopRepeat = useCallback((control?: Control) => {
+    if (control && repeatControlRef.current !== control) return;
+    repeatControlRef.current = null;
+    if (repeatDelayRef.current !== null) {
+      window.clearTimeout(repeatDelayRef.current);
+      repeatDelayRef.current = null;
+    }
+    if (repeatIntervalRef.current !== null) {
+      window.clearInterval(repeatIntervalRef.current);
+      repeatIntervalRef.current = null;
+    }
+  }, []);
+
+  const startRepeat = useCallback((control: Control) => {
+    if (!REPEATING_CONTROLS.has(control)) return;
+    stopRepeat();
+    repeatControlRef.current = control;
+    repeatDelayRef.current = window.setTimeout(() => {
+      repeatDelayRef.current = null;
+      runControlAction(control);
+      repeatIntervalRef.current = window.setInterval(() => {
+        runControlAction(control);
+      }, REPEAT_INTERVAL_MS);
+    }, REPEAT_DELAY_MS);
+  }, [runControlAction, stopRepeat]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const control = keyToControl(event.key);
       if (!control) return;
       event.preventDefault();
-      if (!event.repeat) {
-        setControl(control, true);
-        runControlAction(control);
-      }
+      if (event.repeat) return;
+      setControl(control, true);
+      runControlAction(control);
+      startRepeat(control);
     };
     const onKeyUp = (event: KeyboardEvent) => {
       const control = keyToControl(event.key);
       if (!control) return;
       event.preventDefault();
       setControl(control, false);
+      stopRepeat(control);
     };
-    const clear = () => setPressed((current) => (current.size ? new Set() : current));
+    const clear = () => {
+      stopRepeat();
+      setPressed((current) => (current.size ? new Set() : current));
+    };
 
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
@@ -68,8 +110,9 @@ export function PhysicalControls({ onPrevious, onNext, onApply }: PhysicalContro
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', clear);
+      stopRepeat();
     };
-  }, [runControlAction]);
+  }, [runControlAction, setControl, startRepeat, stopRepeat]);
 
   const buttonClass = (control: Control, positionClass: string) =>
     `${styles.button} ${positionClass} ${pressed.has(control) ? styles.pressed : ''}`;
@@ -79,6 +122,7 @@ export function PhysicalControls({ onPrevious, onNext, onApply }: PhysicalContro
     event.currentTarget.setPointerCapture(event.pointerId);
     setControl(control, true);
     runControlAction(control);
+    startRepeat(control);
   };
 
   const pointerUp = (control: Control) => (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -87,10 +131,19 @@ export function PhysicalControls({ onPrevious, onNext, onApply }: PhysicalContro
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
     setControl(control, false);
+    stopRepeat(control);
   };
 
   return (
-    <div className={styles.controls}>
+    <motion.div
+      className={styles.controls}
+      initial={false}
+      animate={{
+        left: cardPosition.left + cardPosition.width - 250,
+        top: cardPosition.top,
+      }}
+      transition={MORPH_TRANSITION}
+    >
       <span className={`${styles.stem} ${styles.downStem}`} />
       <span className={`${styles.stem} ${styles.upStem}`} />
       <span className={`${styles.stem} ${styles.enterStem}`} />
@@ -136,6 +189,6 @@ export function PhysicalControls({ onPrevious, onNext, onApply }: PhysicalContro
           <img src={enterIcon} alt="" className={styles.enterIcon} />
         </span>
       </button>
-    </div>
+    </motion.div>
   );
 }
