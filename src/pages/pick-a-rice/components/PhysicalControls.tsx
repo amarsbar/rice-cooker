@@ -1,10 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import styles from './PhysicalControls.module.css';
 import downButton from '@/assets/figma/physical-down.svg';
 import upButton from '@/assets/figma/physical-up.svg';
 import enterIcon from '@/assets/figma/enter-icon.svg';
 
 type Control = 'down' | 'up' | 'enter';
+type ControlAction = () => void;
+
+interface PhysicalControlsProps {
+  onPrevious: ControlAction;
+  onNext: ControlAction;
+  onApply: ControlAction;
+}
 
 const KEY_TO_CONTROL: Record<string, Control> = {
   s: 'down',
@@ -17,8 +24,14 @@ const KEY_TO_CONTROL: Record<string, Control> = {
 const keyToControl = (key: string): Control | undefined =>
   KEY_TO_CONTROL[key] ?? KEY_TO_CONTROL[key.toLowerCase()];
 
-export function PhysicalControls() {
+export function PhysicalControls({ onPrevious, onNext, onApply }: PhysicalControlsProps) {
   const [pressed, setPressed] = useState<Set<Control>>(new Set());
+
+  const runControlAction = useCallback((control: Control) => {
+    if (control === 'up') onPrevious();
+    else if (control === 'down') onNext();
+    else onApply();
+  }, [onPrevious, onNext, onApply]);
 
   const setControl = (control: Control, active: boolean) => {
     setPressed((current) => {
@@ -33,11 +46,18 @@ export function PhysicalControls() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const control = keyToControl(event.key);
-      if (control) setControl(control, true);
+      if (!control) return;
+      event.preventDefault();
+      if (!event.repeat) {
+        setControl(control, true);
+        runControlAction(control);
+      }
     };
     const onKeyUp = (event: KeyboardEvent) => {
       const control = keyToControl(event.key);
-      if (control) setControl(control, false);
+      if (!control) return;
+      event.preventDefault();
+      setControl(control, false);
     };
     const clear = () => setPressed((current) => (current.size ? new Set() : current));
 
@@ -49,7 +69,7 @@ export function PhysicalControls() {
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', clear);
     };
-  }, []);
+  }, [runControlAction]);
 
   const buttonClass = (control: Control, positionClass: string) =>
     `${styles.button} ${positionClass} ${pressed.has(control) ? styles.pressed : ''}`;
@@ -58,6 +78,7 @@ export function PhysicalControls() {
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
     setControl(control, true);
+    runControlAction(control);
   };
 
   const pointerUp = (control: Control) => (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -83,7 +104,9 @@ export function PhysicalControls() {
         onPointerCancel={pointerUp('down')}
         onClick={(event) => event.stopPropagation()}
       >
-        <img src={downButton} alt="" className={styles.controlImage} />
+        <span className={styles.cap}>
+          <img src={downButton} alt="" className={styles.controlImage} />
+        </span>
       </button>
 
       <button
@@ -95,7 +118,9 @@ export function PhysicalControls() {
         onPointerCancel={pointerUp('up')}
         onClick={(event) => event.stopPropagation()}
       >
-        <img src={upButton} alt="" className={styles.controlImage} />
+        <span className={styles.cap}>
+          <img src={upButton} alt="" className={styles.controlImage} />
+        </span>
       </button>
 
       <button
@@ -107,7 +132,9 @@ export function PhysicalControls() {
         onPointerCancel={pointerUp('enter')}
         onClick={(event) => event.stopPropagation()}
       >
-        <img src={enterIcon} alt="" className={styles.enterIcon} />
+        <span className={`${styles.cap} ${styles.enterCap}`}>
+          <img src={enterIcon} alt="" className={styles.enterIcon} />
+        </span>
       </button>
     </div>
   );

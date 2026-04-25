@@ -14,8 +14,6 @@
   background: transparent;
   cursor: pointer;
   pointer-events: auto;
-  transform: translateY(0);
-  transition: transform 80ms ease-out;
 }
 
 .button:focus-visible {
@@ -23,7 +21,14 @@
   outline-offset: 2px;
 }
 
-.pressed {
+.cap {
+  position: absolute;
+  inset: 0;
+  transform: translateY(0);
+  transition: transform 80ms ease-out;
+}
+
+.pressed .cap {
   transform: translateY(5px);
 }
 
@@ -47,6 +52,9 @@
 .enterButton {
   left: 442px;
   width: 76px;
+}
+
+.enterCap {
   border-radius: 12.5px;
   background: var(--color-yellow);
 }

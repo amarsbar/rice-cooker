@@ -12,14 +12,16 @@ export function ViewProvider({ view, children }: { view: View; children: ReactNo
   return <ViewContext.Provider value={view}>{children}</ViewContext.Provider>;
 }
 
-/** Scroll state for the rice list — consumed by <CreatorBadge> to drive the
- *  bead indicator and cloud rotation. RiceList owns the scroll events;
- *  PickARice stores the state and provides it here. */
+/** Focus-derived rice position consumed by <CreatorBadge> to drive the bead
+ *  indicator and cloud rotation. */
 export interface ScrollState {
   offset: number;
   index: number;
   total: number;
 }
+
+export const RICE_ITEM_COUNT = 10;
+export const RICE_ITEM_PITCH = 292;
 
 const ScrollContext = createContext<ScrollState>({ offset: 0, index: 0, total: 1 });
 
