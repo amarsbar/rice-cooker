@@ -1,6 +1,6 @@
 .controls {
   position: absolute;
-  width: 210px;
+  width: 211px;
   height: 33px;
   z-index: 1;
   pointer-events: none;
@@ -8,13 +8,15 @@
 
 .button {
   position: absolute;
-  top: -33px;
-  height: 25px;
+  top: -31px;
+  height: 27px;
   border: 0;
   padding: 0;
   background: transparent;
   cursor: pointer;
   pointer-events: auto;
+  --button-bg: var(--color-yellow);
+  --button-icon: var(--color-brown);
 }
 
 .button:focus-visible {
@@ -24,13 +26,16 @@
 
 .cap {
   position: absolute;
-  inset: 0;
+  inset: 0 0 auto;
+  height: 22px;
   transform: translateY(0);
-  transition: transform 80ms ease-out;
+  transition: height 80ms ease-out, transform 80ms ease-out, background-color 80ms ease-out;
 }
 
 .pressed .cap {
-  transform: translateY(5px);
+  height: 20px;
+  transform: translateY(6px);
+  --button-bg: var(--color-lime);
 }
 
 .controlImage {
@@ -40,32 +45,40 @@
   pointer-events: none;
 }
 
-.downButton {
-  left: 2px;
-  width: 44px;
+.controlImage :global(.physicalControlFace) {
+  fill: var(--button-bg);
+}
+
+.controlImage :global(.physicalControlIcon) {
+  fill: var(--button-icon);
 }
 
 .upButton {
-  left: 58px;
-  width: 44px;
+  left: 3px;
+  width: 42px;
+}
+
+.downButton {
+  left: 59px;
+  width: 42px;
 }
 
 .enterButton {
-  left: 126px;
-  width: 76px;
+  left: 122px;
+  width: 86px;
 }
 
 .enterCap {
-  border-radius: 12.5px;
-  background: var(--color-yellow);
+  border-radius: 75.833px;
+  background: var(--button-bg);
 }
 
 .enterIcon {
   position: absolute;
-  left: calc(50% + 0.33px);
-  top: calc(50% + 0.83px);
-  width: 14.861px;
-  height: 14.861px;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
   transform: translate(-50%, -50%);
   pointer-events: none;
 }
@@ -76,20 +89,27 @@
   height: 5px;
   border-radius: 100px;
   background: var(--color-yellow);
+  transition: top 80ms ease-out, height 80ms ease-out, background-color 80ms ease-out;
   pointer-events: none;
 }
 
-.downStem {
+.stemPressed {
+  top: -3px;
+  height: 3px;
+  background: var(--color-lime);
+}
+
+.upStem {
   left: 0;
   width: 48px;
 }
 
-.upStem {
+.downStem {
   left: 56px;
   width: 48px;
 }
 
 .enterStem {
   left: 119px;
-  width: 91px;
+  width: 92px;
 }

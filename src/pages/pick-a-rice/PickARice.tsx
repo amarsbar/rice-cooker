@@ -18,7 +18,7 @@ import { ClosePin } from './components/ClosePin';
 import { SoundButton } from './components/SoundButton';
 import { ThemeKnob } from './components/ThemeKnob';
 import { ScrollWheel } from './components/ScrollWheel';
-import { PhysicalControls } from './components/PhysicalControls';
+import { PhysicalControls, type PhysicalControl } from './components/PhysicalControls';
 
 const CYCLE: View[] = ['picking', 'preview', 'post-install'];
 const clampRiceIndex = (index: number) => Math.max(0, Math.min(RICE_ITEM_COUNT - 1, index));
@@ -30,6 +30,7 @@ export function PickARice() {
   const [riceScrollOffset, setRiceScrollOffset] = useState(0);
   const [riceNavRequest, setRiceNavRequest] = useState({ index: 0, version: 0 });
   const [riceHoldDirection, setRiceHoldDirection] = useState<HoldDirection>(0);
+  const [pressedControls, setPressedControls] = useState<ReadonlySet<PhysicalControl>>(new Set());
   const requestedRiceIndexRef = useRef(0);
   const [cycleIdx, setCycleIdx] = useState(0);
   const theme = THEME_CYCLE[cycleIdx]!;
@@ -101,12 +102,14 @@ export function PickARice() {
               onApply={applyFocusedRice}
               onHoldStart={startRiceHold}
               onHoldEnd={stopRiceHold}
+              onPressedChange={setPressedControls}
             />
             <GreenTab />
             <RiceCard>
               <ScreenContent
                 holdDirection={riceHoldDirection}
                 navRequest={riceNavRequest}
+                pressedControls={pressedControls}
                 onScrollOffsetChange={syncRiceScroll}
               />
               <PreviewContent
