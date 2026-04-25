@@ -16,8 +16,8 @@ import { PreviewContent } from './components/PreviewContent';
 import { PostInstallContent } from './components/PostInstallContent';
 import { ClosePin } from './components/ClosePin';
 import { SoundButton } from './components/SoundButton';
-import { BottomDrop } from './components/BottomDrop';
-import { CreatorBadge } from './components/CreatorBadge';
+import { ThemeKnob } from './components/ThemeKnob';
+import { ScrollWheel } from './components/ScrollWheel';
 import { PhysicalControls } from './components/PhysicalControls';
 
 const CYCLE: View[] = ['picking', 'preview', 'post-install'];
@@ -118,8 +118,8 @@ export function PickARice() {
             </RiceCard>
             <ClosePin />
             <SoundButton />
-            <BottomDrop />
-            <CreatorBadge />
+            <ThemeKnob />
+            <ScrollWheel />
           </div>
         </ScrollProvider>
       </ViewProvider>

@@ -5,7 +5,7 @@
   height: 48px;
 }
 
-.shapePick {
+.base {
   position: absolute;
   left: 0;
   top: 0;
@@ -13,8 +13,6 @@
   height: 48px;
 }
 
-/* Body composite (green circle + centre dot + 3 pips), 44×36 centered in
-   the 104×48 drop. All pixel geometry below is derived from this origin. */
 .body {
   position: absolute;
   left: 30px;
@@ -23,10 +21,10 @@
   height: 36px;
 }
 
-/* Head anchored so its attach point (rect's right-middle) sits at the
+/* Handle anchored so its attach point (rect's right-middle) sits at the
    body's centre (58.82, 23.68) in group coords, and rotation pivots
-   around that point (23.41, 5.43) in head-local coords. */
-.head {
+   around that point (23.41, 5.43) in handle-local coords. */
+.handle {
   position: absolute;
   left: 35.41px;
   top: 18.25px;

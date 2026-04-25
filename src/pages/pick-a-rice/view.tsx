@@ -12,8 +12,7 @@ export function ViewProvider({ view, children }: { view: View; children: ReactNo
   return <ViewContext.Provider value={view}>{children}</ViewContext.Provider>;
 }
 
-/** Focus-derived rice position consumed by <CreatorBadge> to drive the bead
- *  indicator and cloud rotation. */
+/** Focus-derived rice position consumed by <ScrollWheel>. */
 export interface ScrollState {
   offset: number;
   index: number;
@@ -33,8 +32,8 @@ export function ScrollProvider({ value, children }: { value: ScrollState; childr
   return <ScrollContext.Provider value={value}>{children}</ScrollContext.Provider>;
 }
 
-/** Palette / colour theme. Three fixed variants; the sprout knob (rendered
- *  inside <BottomDrop>) is the picker. t2 is the default, centre-of-knob
+/** Palette / colour theme. Three fixed variants; <ThemeKnob> is the picker.
+ *  t2 is the default, centre-of-knob
  *  theme — tokens defined in `:root` match it. t1 and t3 get applied via
  *  `[data-theme='t1'|'t3']` override blocks on the stage element.
  *
@@ -77,8 +76,8 @@ const SHRUNKEN = {
   greenTab: { left: 493.5, top: 175, height: 81 },
   closePin: { left: 502.5, top: 118 },
   soundButton: { left: 502.5, top: 192 },
-  dropShape: { left: 320.5, top: 345 },
-  creatorBadge: { left: 408, top: 244 },
+  themeKnob: { left: 320.5, top: 345 },
+  scrollWheel: { left: 408, top: 244 },
 } as const;
 
 export const POSITIONS = {
@@ -87,8 +86,8 @@ export const POSITIONS = {
     greenTab: { left: 564, top: 307, height: 90 },
     closePin: { left: 574, top: 251 },
     soundButton: { left: 571, top: 323 },
-    dropShape: { left: 386, top: 432 },
-    creatorBadge: { left: 466, top: 374 },
+    themeKnob: { left: 386, top: 432 },
+    scrollWheel: { left: 466, top: 374 },
   },
   preview: SHRUNKEN,
   'post-install': SHRUNKEN,

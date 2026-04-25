@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import styles from './SoundButton.module.css';
-import SoundButtonSvg from '@/assets/figma/sound-button.svg?react';
+import SoundButtonSvg from '@/assets/icon-buttons/sound.svg?react';
 import { MORPH_TRANSITION, POSITIONS, useView } from '../view';
 
 const MotionSound = motion.create(SoundButtonSvg);

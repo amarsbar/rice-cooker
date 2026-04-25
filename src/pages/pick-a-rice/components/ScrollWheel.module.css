@@ -1,13 +1,11 @@
-/* Creator badge frame (350:6594 / 350:7374) — 200 × 200. Position is
-   motion-driven. */
-.badge {
+.root {
   position: absolute;
   z-index: 4;
   width: 199.999px;
   height: 200.001px;
 }
 
-.wheel {
+.rim {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -23,7 +21,7 @@
   top: 50%;
   width: 176px;
   height: 176px;
-  background: var(--c-cloud-inner);
+  background: var(--c-wheel-inner);
   border-radius: 50%;
   overflow: hidden;
   transform: translate(-50%, -50%);
@@ -32,7 +30,7 @@
 /* Dotted grid background (350:6633 / 350:7413) — same asset in both
    states. Extends 8px above the circle's top so the grid bleeds past the
    top edge before being clipped by the round inner. */
-.decor {
+.grid {
   position: absolute;
   left: 50%;
   top: -8px;
@@ -42,12 +40,12 @@
   pointer-events: none;
 }
 
-.decorBleed {
+.gridBleed {
   position: absolute;
   inset: -0.39%;
 }
 
-.decorBleed > img {
+.gridBleed > svg {
   display: block;
   width: 100%;
   height: 100%;

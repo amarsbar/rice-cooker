@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion';
-import styles from './BottomDrop.module.css';
-import DropShapeSvg from '@/assets/figma/drop-shape.svg?react';
-import DropBodySvg from '@/assets/figma/drop-body.svg?react';
-import DropHeadSvg from '@/assets/figma/drop-head.svg?react';
+import styles from './ThemeKnob.module.css';
+import KnobBaseSvg from '@/assets/theme-knob/base.svg?react';
+import KnobBodySvg from '@/assets/theme-knob/body.svg?react';
+import KnobHandleSvg from '@/assets/theme-knob/handle.svg?react';
 import {
   MORPH_TRANSITION,
   POSITIONS,
@@ -11,17 +11,16 @@ import {
   type Theme,
 } from '../view';
 
-const MotionDropHead = motion.create(DropHeadSvg);
+const MotionHandle = motion.create(KnobHandleSvg);
 
-/** Sprout head rotation per theme. Figma values: t1 = +40.15° (knob up
- *  ≈ theme 1), t2 = 0° (centre), t3 = -36.87° (knob down ≈ theme 3). */
+/** Handle rotation per theme. */
 const ROTATION_FOR_THEME: Record<Theme, number> = {
   t1: 40.15,
   t2: 0,
   t3: -36.87,
 };
 
-export function BottomDrop() {
+export function ThemeKnob() {
   const view = useView();
   const { theme, advance } = useTheme();
   const rotate = ROTATION_FOR_THEME[theme];
@@ -30,15 +29,15 @@ export function BottomDrop() {
     <motion.div
       className={styles.group}
       initial={false}
-      animate={POSITIONS[view].dropShape}
+      animate={POSITIONS[view].themeKnob}
       transition={MORPH_TRANSITION}
       style={{ pointerEvents: 'auto', cursor: 'pointer' }}
       onClick={advance}
     >
-      <DropShapeSvg className={styles.shapePick} />
-      <DropBodySvg className={styles.body} />
-      <MotionDropHead
-        className={styles.head}
+      <KnobBaseSvg className={styles.base} />
+      <KnobBodySvg className={styles.body} />
+      <MotionHandle
+        className={styles.handle}
         initial={false}
         animate={{ rotate }}
         transition={{ duration: 0.25, ease: 'easeOut' }}

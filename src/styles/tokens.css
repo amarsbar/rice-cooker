@@ -30,8 +30,8 @@
   --color-mute: #e0e1e1;
   --color-yellow-deep: #ffc501;
   --color-yellow-soft: #ffe57b;
-  --color-drop-green: #b9f018;
-  --color-drop-dot-t2: #6a9a79;
+  --color-knob-green: #b9f018;
+  --color-knob-dot-t2: #6a9a79;
   --color-grid-t1: #e9ebf0;
   --color-grid-t2: #f0ede9;
 
@@ -50,7 +50,7 @@
      palette. */
   --c-card-bg: #000001;                              /* opaque card bg in picking state */
   --c-card-bg-shrunken: rgba(26, 20, 25, 0.8);       /* semi-transparent in preview/post-install */
-  --c-card-border: var(--color-mint);                /* card border + green tab + drop shape outline */
+  --c-card-border: var(--color-mint);                /* card border + green tab + theme knob base */
   --c-sound-body: var(--color-teal);                 /* sound ring stroke + inner disc */
   --c-sound-icon: var(--color-mint);                 /* speaker glyph */
   --c-close-pin: var(--color-orange);
@@ -59,14 +59,14 @@
   --c-logo-stroke: black;
   --c-accent: var(--color-yellow);                   /* halo dots, WASD squares, step pill bg */
   --c-step-text: var(--color-brown);                 /* step pill "1" glyph */
-  --c-cloud-outer: var(--color-mint-deep);
-  --c-cloud-inner: var(--color-cream);
+  --c-wheel-rim: var(--color-mint-deep);
+  --c-wheel-inner: var(--color-cream);
   --c-grid: var(--color-grid-t2);
-  --c-drop-dot: var(--color-drop-dot-t2);
-  --c-sprout-1: var(--color-drop-green);           /* body big circle */
-  --c-sprout-2: var(--color-lime);                 /* head rect */
-  --c-sprout-3: var(--color-orange);               /* head top small circle */
-  --c-sprout-4: var(--color-orange);               /* body centre dot (same as head top in t2/t3, differs in t1) */
+  --c-knob-dot: var(--color-knob-dot-t2);
+  --c-knob-body: var(--color-knob-green);
+  --c-knob-handle: var(--color-lime);
+  --c-knob-handle-dot: var(--color-orange);
+  --c-knob-body-dot: var(--color-orange);
   --c-btn-default-icon: var(--color-brown);          /* back/github/delete default icon (fill + stroke) */
   --c-btn-hover-bg: var(--color-green);
   --c-btn-hover-icon: var(--color-lime);
@@ -110,14 +110,14 @@
   --c-logo-stroke: var(--color-near-black);
   --c-accent: var(--color-light-pink);
   --c-step-text: var(--color-counter-text);
-  --c-cloud-outer: var(--color-light-blue);
-  --c-cloud-inner: var(--color-cream-soft);
+  --c-wheel-rim: var(--color-light-blue);
+  --c-wheel-inner: var(--color-cream-soft);
   --c-grid: var(--color-grid-t1);
-  --c-drop-dot: var(--color-yellow-deep);
-  --c-sprout-1: var(--color-yellow-deep);          /* body big circle */
-  --c-sprout-2: var(--color-yellow-soft);          /* head rect */
-  --c-sprout-3: var(--color-ice);                  /* head top small circle */
-  --c-sprout-4: var(--color-yellow-soft);          /* body centre dot — differs from head-top in t1 */
+  --c-knob-dot: var(--color-yellow-deep);
+  --c-knob-body: var(--color-yellow-deep);
+  --c-knob-handle: var(--color-yellow-soft);
+  --c-knob-handle-dot: var(--color-ice);
+  --c-knob-body-dot: var(--color-yellow-soft);
   --c-btn-default-icon: var(--color-navy);
   --c-btn-hover-bg: var(--color-light-pink);
   --c-btn-hover-icon: var(--color-brown);          /* t1 hover arrow is brown, not lime */
@@ -142,16 +142,16 @@
   --c-logo-stroke: black;
   --c-accent: var(--color-lime);
   --c-step-text: var(--color-counter-text);
-  --c-cloud-outer: var(--color-sky-soft);
-  --c-cloud-inner: var(--color-charcoal);
+  --c-wheel-rim: var(--color-sky-soft);
+  --c-wheel-inner: var(--color-charcoal);
   /* Same grid as t2, knocked down to 10% alpha so it reads as a subtle
-     pattern on the dark t3 cloud rather than bright white lines. */
+     pattern on the dark t3 wheel rather than bright white lines. */
   --c-grid: rgba(240, 237, 233, 0.1);
-  --c-drop-dot: var(--color-blue-grey);
-  --c-sprout-1: var(--color-rose);                 /* body big circle */
-  --c-sprout-2: var(--color-rose-light);           /* head rect */
-  --c-sprout-3: var(--color-navy-deep);            /* head top small circle */
-  --c-sprout-4: var(--color-navy-deep);            /* body centre dot (same as head top in t3) */
+  --c-knob-dot: var(--color-blue-grey);
+  --c-knob-body: var(--color-rose);
+  --c-knob-handle: var(--color-rose-light);
+  --c-knob-handle-dot: var(--color-navy-deep);
+  --c-knob-body-dot: var(--color-navy-deep);
   --c-btn-default-icon: var(--color-brown);
   --c-btn-hover-bg: var(--color-light-blue);
   --c-btn-hover-icon: var(--color-navy);

@@ -10,7 +10,7 @@
 /* PREPPING loader overlay — covers the preview card's content area while
    the Planck chop animation plays. Lime tint matches Figma 367:11764.
    No z-index: an explicit stacking-context escape would leak above the
-   CreatorBadge wheel rendered after the card in stage order. The loader
+   ScrollWheel rendered after the card in stage order. The loader
    and preview UI are mutually exclusive in `.wrap` so within-wrap stacking
    isn't needed. */
 .loaderOverlay {

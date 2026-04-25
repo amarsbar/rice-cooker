@@ -1,8 +1,8 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import styles from './PreviewContent.module.css';
-import BackBtnSvg from '@/assets/figma/btn-back.svg?react';
-import GithubBtnSvg from '@/assets/figma/btn-github.svg?react';
+import BackBtnSvg from '@/assets/icon-buttons/back.svg?react';
+import GithubBtnSvg from '@/assets/icon-buttons/github.svg?react';
 import { SHRUNKEN_TEXT_VARIANTS, useView } from '../view';
 
 const PreppingLoader = lazy(() =>

@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import styles from './PostInstallContent.module.css';
-import DeleteBtnSvg from '@/assets/figma/btn-delete.svg?react';
+import DeleteBtnSvg from '@/assets/icon-buttons/delete.svg?react';
 import { SHRUNKEN_TEXT_VARIANTS, useView } from '../view';
 
 interface PostInstallContentProps {

@@ -1,6 +1,6 @@
 import styles from './CardHeader.module.css';
-import MenuDotsSvg from '@/assets/figma/menu-dots.svg?react';
-import screenDivider from '@/assets/figma/screen-divider.svg';
+import MenuDotsSvg from '@/assets/screen/menu-dots.svg?react';
+import screenDivider from '@/assets/screen/divider.svg';
 
 const APPLY_LABEL = 'APPLY';
 

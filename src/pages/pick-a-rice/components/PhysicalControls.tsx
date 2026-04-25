@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import styles from './PhysicalControls.module.css';
-import downButton from '@/assets/figma/physical-down.svg';
-import upButton from '@/assets/figma/physical-up.svg';
-import enterIcon from '@/assets/figma/enter-icon.svg';
+import downButton from '@/assets/physical-controls/down.svg';
+import upButton from '@/assets/physical-controls/up.svg';
+import enterIcon from '@/assets/physical-controls/enter.svg';
 import { MORPH_TRANSITION, POSITIONS, useView } from '../view';
 
 type Control = 'down' | 'up' | 'enter';

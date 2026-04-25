@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 import styles from './RiceCard.module.css';
-import cardBg from '@/assets/figma/card-bg.png';
+import cardBg from '@/assets/screen/card-bg.png';
 import { MORPH_TRANSITION, POSITIONS, useView } from '../view';
 
 /** Outer card. Size/position morphs between the picking and shrunken states. */

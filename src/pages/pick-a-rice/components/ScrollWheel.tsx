@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import styles from './CreatorBadge.module.css';
+import styles from './ScrollWheel.module.css';
 import { OutlinedText } from './OutlinedText';
-import WheelSvg from '@/assets/figma/creator-cloud.svg?react';
-import DecorSvg from '@/assets/figma/creator-decor.svg?react';
+import RimSvg from '@/assets/scroll-wheel/rim.svg?react';
+import GridSvg from '@/assets/scroll-wheel/grid.svg?react';
 import {
   MORPH_TRANSITION,
   POSITIONS,
@@ -13,7 +13,7 @@ import {
   useView,
 } from '../view';
 
-const MotionWheel = motion.create(WheelSvg);
+const MotionRim = motion.create(RimSvg);
 
 type DirKey = 'up' | 'left' | 'down' | 'right';
 
@@ -36,29 +36,29 @@ const CREAM_CENTER = 88;
  *  Re-enable with STEP > 0 to get the Figma-exact offset back. */
 const PILL_Y_BASE = 18.5;
 const PILL_Y_STEP = 0;
-const WHEEL_ROTATE_PER_PX = 0.2;
+const RIM_ROTATE_PER_PX = 0.2;
 
-export function CreatorBadge() {
+export function ScrollWheel() {
   const view = useView();
   const scroll = useScroll();
   const pressed = usePressedDirections();
 
   return (
     <motion.div
-      className={styles.badge}
+      className={styles.root}
       initial={false}
-      animate={POSITIONS[view].creatorBadge}
+      animate={POSITIONS[view].scrollWheel}
       transition={MORPH_TRANSITION}
     >
-      <MotionWheel
-        className={styles.wheel}
-        style={{ rotate: scroll.offset * WHEEL_ROTATE_PER_PX }}
+      <MotionRim
+        className={styles.rim}
+        style={{ rotate: scroll.offset * RIM_ROTATE_PER_PX }}
       />
 
       <div className={styles.inner}>
-        <div className={styles.decor}>
-          <div className={styles.decorBleed}>
-            <DecorSvg />
+        <div className={styles.grid}>
+          <div className={styles.gridBleed}>
+            <GridSvg />
           </div>
         </div>
 
