@@ -2,6 +2,7 @@
    motion-driven. */
 .badge {
   position: absolute;
+  z-index: 4;
   width: 199.999px;
   height: 200.001px;
 }

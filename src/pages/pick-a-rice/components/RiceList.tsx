@@ -4,14 +4,10 @@ import styles from './RiceList.module.css';
 import { RiceItem } from './RiceItem';
 import type { ScrollState } from '../view';
 
-const PLACEHOLDERS = Array.from({ length: 10 }, (_, i) => ({
-  themeName: `Theme ${i + 1}`,
-  creatorName: 'by creatorname',
-}));
+const ITEM_COUNT = 10;
+const ITEMS = Array.from({ length: ITEM_COUNT }, (_, i) => i);
 
-/** Pitch = item height (311) + gap (23). activeIndex is whichever item's
- *  top edge the scroll is closest to. */
-const PITCH = 334;
+const PITCH = 292;
 
 export function RiceList({ onScroll }: { onScroll: (s: ScrollState) => void }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -32,15 +28,15 @@ export function RiceList({ onScroll }: { onScroll: (s: ScrollState) => void }) {
     const offset = e.currentTarget.scrollTop;
     onScroll({
       offset,
-      index: Math.max(0, Math.min(PLACEHOLDERS.length - 1, Math.round(offset / PITCH))),
-      total: PLACEHOLDERS.length,
+      index: Math.max(0, Math.min(ITEM_COUNT - 1, Math.round(offset / PITCH))),
+      total: ITEM_COUNT,
     });
   };
 
   return (
     <div ref={ref} className={styles.list} onScroll={handleScroll}>
-      {PLACEHOLDERS.map((r, i) => (
-        <RiceItem key={i} themeName={r.themeName} creatorName={r.creatorName} />
+      {ITEMS.map((i) => (
+        <RiceItem key={i} variant={i === 0 ? 'primary' : 'trailing'} />
       ))}
     </div>
   );

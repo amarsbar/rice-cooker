@@ -1,5 +1,6 @@
 .wrap {
   position: absolute;
+  z-index: 3;
   width: 41.803px;
   height: 56.666px;
 }

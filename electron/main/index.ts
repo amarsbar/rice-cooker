@@ -57,7 +57,7 @@ async function injectCompositorRules(): Promise<void> {
   }
 }
 
-/** UI scale factor — design is 600×537 @ 1×; multiplied for readability on
+/** UI scale factor - design is 666 x 574 @ 1x; multiplied for readability on
  *  high-res monitors. Applied both to window size and via zoomFactor so
  *  every pixel-positioned element scales uniformly. Override with
  *  RICE_SCALE env var (e.g. `RICE_SCALE=2 npm run dev`). */
@@ -65,8 +65,8 @@ const SCALE = Number(process.env['RICE_SCALE']) || 1.75;
 
 function createWindow(): void {
   const win = new BrowserWindow({
-    width: Math.round(600 * SCALE),
-    height: Math.round(537 * SCALE),
+    width: Math.round(666 * SCALE),
+    height: Math.round(574 * SCALE),
     title: APP_TITLE,
     transparent: true,
     frame: false,
