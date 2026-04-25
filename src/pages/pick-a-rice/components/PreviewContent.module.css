@@ -74,6 +74,8 @@
   background: var(--c-pill-bg);
   border: none;
   border-radius: 130px;
+  font: inherit;
+  color: inherit;
   display: flex;
   flex-direction: column;
   align-items: flex-start;

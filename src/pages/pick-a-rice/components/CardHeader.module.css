@@ -4,7 +4,7 @@
   top: 13px;
   width: 19.999px;
   height: 19.999px;
-  --c-primary: var(--color-lime);
+  --c-primary: var(--c-screen-text);
 }
 
 .label {
@@ -13,7 +13,7 @@
   font-family: var(--font-pill);
   font-size: 14px;
   font-weight: 400;
-  color: var(--color-lime);
+  color: var(--c-screen-text);
   line-height: normal;
   white-space: nowrap;
 }
@@ -48,7 +48,7 @@
   height: 30.333px;
   margin-right: -9.333px;
   border-radius: 58.333px;
-  background: var(--color-lime);
+  background: var(--c-screen-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -56,7 +56,7 @@
   font-family: var(--font-pill);
   font-size: 16.333px;
   font-weight: 400;
-  color: var(--color-brown);
+  color: var(--c-screen-text-on-pill);
   line-height: 1;
   text-align: center;
 }

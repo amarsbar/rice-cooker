@@ -5,12 +5,13 @@ import { SHRUNKEN_TEXT_VARIANTS, useView } from '../view';
 
 interface PostInstallContentProps {
   themeName: string;
+  onApply: () => void;
 }
 
 /** Figma 350:7342 children — theme name label, delete button in the
  *  top-left corner, and the big central DONE pill. Fades in 150ms after
  *  the card morph completes. */
-export function PostInstallContent({ themeName }: PostInstallContentProps) {
+export function PostInstallContent({ themeName, onApply }: PostInstallContentProps) {
   const view = useView();
   const active = view === 'post-install';
   return (
@@ -27,7 +28,14 @@ export function PostInstallContent({ themeName }: PostInstallContentProps) {
         <DeleteBtnSvg />
       </button>
 
-      <div className={styles.doneBtn}>
+      <button
+        type="button"
+        className={styles.doneBtn}
+        onClick={(event) => {
+          event.stopPropagation();
+          onApply();
+        }}
+      >
         <div className={styles.doneCluster}>
           {'DONE'.split('').map((c, i) => (
             <span key={i} className={styles.doneLetter}>
@@ -35,7 +43,7 @@ export function PostInstallContent({ themeName }: PostInstallContentProps) {
             </span>
           ))}
         </div>
-      </div>
+      </button>
     </motion.div>
   );
 }

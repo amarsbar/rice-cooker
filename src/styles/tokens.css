@@ -76,6 +76,8 @@
   --c-pill-hover-bg: var(--color-yellow);
   --c-pill-hover-letter-bg: var(--color-brown);
   --c-pill-hover-letter-text: var(--color-lime);
+  --c-screen-text: var(--color-lime);
+  --c-screen-text-on-pill: var(--color-brown);
 
   /* Card dimensions */
   --card-radius: 26px;

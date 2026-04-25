@@ -9,7 +9,7 @@ export const PILL_COUNT = PREPPING.length;
 export const PILL_OFFSETS = [0, 45.44, 88.45, 128.22, 172.04, 217.48, 258.06, 301.06] as const;
 
 /** Width of the PREPPING text — left edge of first pill to right edge of last. */
-export const BITMAP_WIDTH = PILL_OFFSETS[PILL_OFFSETS.length - 1] + PILL_SIZE; // 353
+export const BITMAP_WIDTH = PILL_OFFSETS[PILL_OFFSETS.length - 1] + PILL_SIZE;
 export const BITMAP_HEIGHT = PILL_SIZE;
 
 /** Default stage dimensions — Figma content area (405×229 card minus 9px border). */

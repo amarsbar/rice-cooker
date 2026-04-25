@@ -30,6 +30,11 @@ const KEY_TO_CONTROL: Record<string, Control> = {
 const keyToControl = (key: string): Control | undefined =>
   KEY_TO_CONTROL[key] ?? KEY_TO_CONTROL[key.toLowerCase()];
 
+const isInteractiveTarget = (target: EventTarget | null): boolean =>
+  target instanceof HTMLElement &&
+  (target.isContentEditable ||
+    target.closest('input, textarea, select, button, a[href], [contenteditable="true"]') !== null);
+
 const HOLD_DIRECTION: Partial<Record<Control, HoldDirection>> = { up: -1, down: 1 };
 const HOLD_DELAY_MS = 220;
 
@@ -92,6 +97,7 @@ export function PhysicalControls({
     const onKeyDown = (event: KeyboardEvent) => {
       const control = keyToControl(event.key);
       if (!control) return;
+      if (isInteractiveTarget(event.target)) return;
       event.preventDefault();
       if (event.repeat) return;
       setControl(control, true);
@@ -101,6 +107,7 @@ export function PhysicalControls({
     const onKeyUp = (event: KeyboardEvent) => {
       const control = keyToControl(event.key);
       if (!control) return;
+      if (isInteractiveTarget(event.target)) return;
       event.preventDefault();
       setControl(control, false);
       stopHold(control);
@@ -141,6 +148,20 @@ export function PhysicalControls({
     stopHold(control);
   };
 
+  const buttonKey = (control: Control, active: boolean) => (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (active && event.repeat) return;
+    setControl(control, active);
+    if (active) {
+      runControlAction(control);
+      startHold(control);
+    } else {
+      stopHold(control);
+    }
+  };
+
   return (
     <motion.div
       className={styles.controls}
@@ -162,6 +183,8 @@ export function PhysicalControls({
         onPointerDown={pointerDown('down')}
         onPointerUp={pointerUp('down')}
         onPointerCancel={pointerUp('down')}
+        onKeyDown={buttonKey('down', true)}
+        onKeyUp={buttonKey('down', false)}
         onClick={(event) => event.stopPropagation()}
       >
         <span className={styles.cap}>
@@ -176,6 +199,8 @@ export function PhysicalControls({
         onPointerDown={pointerDown('up')}
         onPointerUp={pointerUp('up')}
         onPointerCancel={pointerUp('up')}
+        onKeyDown={buttonKey('up', true)}
+        onKeyUp={buttonKey('up', false)}
         onClick={(event) => event.stopPropagation()}
       >
         <span className={styles.cap}>
@@ -190,6 +215,8 @@ export function PhysicalControls({
         onPointerDown={pointerDown('enter')}
         onPointerUp={pointerUp('enter')}
         onPointerCancel={pointerUp('enter')}
+        onKeyDown={buttonKey('enter', true)}
+        onKeyUp={buttonKey('enter', false)}
         onClick={(event) => event.stopPropagation()}
       >
         <span className={`${styles.cap} ${styles.enterCap}`}>

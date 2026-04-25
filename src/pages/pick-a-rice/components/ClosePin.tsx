@@ -22,7 +22,7 @@ export function ClosePin() {
         aria-label="Close window"
         onClick={(e) => {
           e.stopPropagation();
-          window.rice.closeWindow();
+          window.rice?.closeWindow?.();
         }}
       />
     </motion.div>

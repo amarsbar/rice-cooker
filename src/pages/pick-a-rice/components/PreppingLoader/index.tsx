@@ -42,8 +42,6 @@ export function PreppingLoader({
 
   const durationMsRef = useRef(durationMs);
   durationMsRef.current = durationMs;
-  // Capture the latest onComplete so the trailing setTimeout doesn't fire a
-  // stale closure if the parent hands us a new callback identity mid-run.
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
@@ -61,16 +59,12 @@ export function PreppingLoader({
 
   useEffect(() => {
     if (!playing) {
-      // Cleanup from the previous run already cancelled timers, RAF, and
-      // destroyed bodies. Just clear React state so the static intact bitmap
-      // is shown.
       setPieces([]);
       setIntactWidth(BITMAP_WIDTH);
       completedRef.current = false;
       return;
     }
 
-    // ---------- fresh run state ----------
     const world = new planck.World(planck.Vec2(0, 0));
     worldRef.current = world;
     completedRef.current = false;
@@ -89,6 +83,11 @@ export function PreppingLoader({
 
     const rand = mulberry32(seed ^ Math.floor(durationMsRef.current));
     const lastChopMs = schedule.reduce((m, s) => Math.max(m, s.chopTimeMs), 0);
+    const finalStripIndex = schedule.reduce(
+      (finalIndex, strip, index) =>
+        strip.chopTimeMs > schedule[finalIndex]!.chopTimeMs ? index : finalIndex,
+      0,
+    );
 
     // Degenerate schedule guard. Impossible under getStripCountForSpeed's
     // minimum=5 clamp, but keeps the contract honest.
@@ -110,14 +109,10 @@ export function PreppingLoader({
       };
     }
 
-    schedule.forEach((strip) => {
+    schedule.forEach((strip, scheduleIndex) => {
       const t = window.setTimeout(() => {
         if (cancelled || worldRef.current !== world) return;
 
-        // Functional update so two near-simultaneous strip timers don't
-        // overwrite each other's intact-width shrink. Math.min ensures a
-        // late smaller-xStart strip can't widen the intact region back over
-        // a strip already cut.
         setIntactWidth((w) => Math.min(w, strip.xStart));
 
         const stripPxX = BITMAP_LEFT + strip.xStart + strip.width / 2;
@@ -151,7 +146,7 @@ export function PreppingLoader({
         // produced when multiple strip timers fired in the same frame.
         setPieces((prev) => [...prev, { strip, body }]);
 
-        if (strip.chopTimeMs === lastChopMs && !completedRef.current) {
+        if (scheduleIndex === finalStripIndex && !completedRef.current) {
           completedRef.current = true;
           // Push the trailing handle into the same timers array so an unmount
           // during AnimatePresence exit cancels it cleanly.
@@ -173,7 +168,14 @@ export function PreppingLoader({
       // regardless of wall-clock elapsed time.
       const dt = Math.min(1 / 30, Math.max(1 / 240, (now - lastPhysicsMs) / 1000));
       lastPhysicsMs = now;
-      world.step(dt, 6, 2);
+      try {
+        world.step(dt, 6, 2);
+      } catch (err) {
+        console.warn('[PreppingLoader] physics step failed', err);
+        completedRef.current = true;
+        onCompleteRef.current?.();
+        return;
+      }
       setTick((t) => (t + 1) & 0xffff);
       rafRef.current = requestAnimationFrame(loop);
     };
@@ -237,6 +239,9 @@ export function PreppingLoader({
       {pieces.map((piece) => {
         const pos = piece.body.getPosition();
         const angle = piece.body.getAngle();
+        if (!Number.isFinite(pos.x) || !Number.isFinite(pos.y) || !Number.isFinite(angle)) {
+          return null;
+        }
         const screenX = pos.x + centerX;
         const screenY = pos.y + centerY;
         return (

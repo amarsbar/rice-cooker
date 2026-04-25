@@ -1,5 +1,5 @@
 import styles from './RiceItem.module.css';
-import themePreview from '@/assets/figma/theme-preview.png';
+import themePreview from '@/assets/figma/theme-preview.webp';
 
 export function RiceItem() {
   return (

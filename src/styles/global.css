@@ -1,6 +1,20 @@
-@import '@fontsource/madimi-one/400.css';
-@import '@fontsource/capriola/400.css';
 @import './tokens.css';
+
+@font-face {
+  font-family: 'Madimi One';
+  src: url('@fontsource/madimi-one/files/madimi-one-latin-400-normal.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Capriola';
+  src: url('@fontsource/capriola/files/capriola-latin-400-normal.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 
 * {
   margin: 0;

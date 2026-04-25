@@ -1,14 +1,20 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import styles from './PreviewContent.module.css';
 import BackBtnSvg from '@/assets/figma/btn-back.svg?react';
 import GithubBtnSvg from '@/assets/figma/btn-github.svg?react';
 import { SHRUNKEN_TEXT_VARIANTS, useView } from '../view';
-import { PreppingLoader } from './PreppingLoader';
+
+const PreppingLoader = lazy(() =>
+  import('./PreppingLoader').then((mod) => ({ default: mod.PreppingLoader })),
+);
+
+const PREVIEW_LOAD_DURATION_MS = 1250;
 
 interface PreviewContentProps {
   themeName: string;
   creatorName: string;
+  onApply: () => void;
 }
 
 /** Figma 350:7160 children — preview mode shown before the user commits.
@@ -20,7 +26,7 @@ interface PreviewContentProps {
  *  before the preview content. For now it fires on every entry with a
  *  fixed 1.25s duration; once the real preview pipeline is wired up this
  *  will hook into actual load progress. */
-export function PreviewContent({ themeName, creatorName }: PreviewContentProps) {
+export function PreviewContent({ themeName, creatorName, onApply }: PreviewContentProps) {
   const view = useView();
   const active = view === 'preview';
   const [loading, setLoading] = useState(false);
@@ -30,6 +36,12 @@ export function PreviewContent({ themeName, creatorName }: PreviewContentProps) 
     if (active && !wasActiveRef.current) setLoading(true);
     wasActiveRef.current = active;
   }, [active]);
+
+  useEffect(() => {
+    if (!active || !loading) return;
+    const timeout = window.setTimeout(() => setLoading(false), PREVIEW_LOAD_DURATION_MS + 500);
+    return () => window.clearTimeout(timeout);
+  }, [active, loading]);
 
   return (
     <motion.div
@@ -48,11 +60,13 @@ export function PreviewContent({ themeName, creatorName }: PreviewContentProps) 
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
           >
-            <PreppingLoader
-              playing
-              durationMs={1250}
-              onComplete={() => setLoading(false)}
-            />
+            <Suspense fallback={null}>
+              <PreppingLoader
+                playing
+                durationMs={PREVIEW_LOAD_DURATION_MS}
+                onComplete={() => setLoading(false)}
+              />
+            </Suspense>
           </motion.div>
         )}
       </AnimatePresence>
@@ -71,7 +85,14 @@ export function PreviewContent({ themeName, creatorName }: PreviewContentProps) 
             <GithubBtnSvg />
           </button>
 
-          <div className={styles.applyBtn}>
+          <button
+            type="button"
+            className={styles.applyBtn}
+            onClick={(event) => {
+              event.stopPropagation();
+              onApply();
+            }}
+          >
             <div className={styles.applyCluster}>
               {'APPLY'.split('').map((c, i) => (
                 <span key={i} className={styles.applyLetter}>
@@ -79,7 +100,7 @@ export function PreviewContent({ themeName, creatorName }: PreviewContentProps) 
                 </span>
               ))}
             </div>
-          </div>
+          </button>
         </>
       )}
     </motion.div>

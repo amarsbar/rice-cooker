@@ -98,6 +98,20 @@ function createWindow(): void {
       win.webContents.executeJavaScript(
         '(() => { const el = document.querySelector("[class*=stage]"); if (!el) return false; el.click(); return true; })()',
       );
+    type CaptureView = 'picking' | 'preview' | 'post-install';
+    let captureView: CaptureView = 'picking';
+    const clickStageToNext = async () => {
+      const clicked = await clickStage();
+      if (clicked) {
+        captureView =
+          captureView === 'picking'
+            ? 'preview'
+            : captureView === 'preview'
+              ? 'post-install'
+              : 'picking';
+      }
+      return clicked;
+    };
 
     win.webContents.once('did-finish-load', async () => {
       const { writeFile } = await import('node:fs/promises');
@@ -109,7 +123,7 @@ function createWindow(): void {
 
       if (process.env['RICE_CAPTURE_ALL']) {
         for (const name of ['preview', 'post-install'] as const) {
-          const clicked = await clickStage();
+          const clicked = await clickStageToNext();
           if (!clicked) {
             console.warn('[rice-cooker] capture: stage element not found');
             break;
@@ -133,9 +147,14 @@ function createWindow(): void {
                return true;
              })()`,
           );
-        // Ensure we're back in the picking view.
-        for (let i = 0; i < 3; i++) await clickStage();
-        await new Promise((r) => setTimeout(r, MORPH_SETTLE_MS));
+        while (captureView !== 'picking') {
+          const clicked = await clickStageToNext();
+          if (!clicked) {
+            console.warn('[rice-cooker] capture: stage element not found');
+            return;
+          }
+          await new Promise((r) => setTimeout(r, MORPH_SETTLE_MS));
+        }
         // The cycle is t2 (0) → t1 (1) → t2 (2) → t3 (3). Walk
         // sequentially from the initial t2, capturing t1 after 1 click
         // and t3 after 2 further clicks.

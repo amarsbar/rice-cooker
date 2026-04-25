@@ -38,7 +38,11 @@ export function OutlinedText({
     };
   }, [children, theme]);
 
-  return <span ref={ref} className={className} aria-label={children} />;
+  return (
+    <span ref={ref} className={className} aria-label={children}>
+      {children}
+    </span>
+  );
 }
 
 function paint(

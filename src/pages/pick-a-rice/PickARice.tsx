@@ -33,7 +33,8 @@ export function PickARice() {
   const requestedRiceIndexRef = useRef(0);
   const [cycleIdx, setCycleIdx] = useState(0);
   const theme = THEME_CYCLE[cycleIdx]!;
-  const advance = () => setCycleIdx((i) => (i + 1) % THEME_CYCLE.length);
+  const advance = useCallback(() => setCycleIdx((i) => (i + 1) % THEME_CYCLE.length), []);
+  const themeValue = useMemo(() => ({ theme, advance }), [advance, theme]);
   const scroll = useMemo(
     () => ({
       offset: riceScrollOffset,
@@ -90,7 +91,7 @@ export function PickARice() {
   };
 
   return (
-    <ThemeProvider value={{ theme, advance }}>
+    <ThemeProvider value={themeValue}>
       <ViewProvider view={view}>
         <ScrollProvider value={scroll}>
           <div className={styles.stage} data-theme={theme} onClick={cycleOnBareStage}>
@@ -108,8 +109,12 @@ export function PickARice() {
                 navRequest={riceNavRequest}
                 onScrollOffsetChange={syncRiceScroll}
               />
-              <PreviewContent themeName="theme name" creatorName="by creator name" />
-              <PostInstallContent themeName="theme name" />
+              <PreviewContent
+                themeName="theme name"
+                creatorName="by creator name"
+                onApply={applyFocusedRice}
+              />
+              <PostInstallContent themeName="theme name" onApply={applyFocusedRice} />
             </RiceCard>
             <ClosePin />
             <SoundButton />
