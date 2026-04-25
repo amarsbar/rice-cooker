@@ -48,7 +48,7 @@
      [data-theme='t1'] / [data-theme='t3'] blocks below redefine the
      same names — components only reference role tokens, never raw
      palette. */
-  --c-card-bg: rgba(0, 0, 0, 0.8);                   /* card bg in picking state */
+  --c-card-bg: #000001;                              /* opaque card bg in picking state */
   --c-card-bg-shrunken: rgba(26, 20, 25, 0.8);       /* semi-transparent in preview/post-install */
   --c-card-border: var(--color-mint);                /* card border + green tab + drop shape outline */
   --c-sound-body: var(--color-teal);                 /* sound ring stroke + inner disc */

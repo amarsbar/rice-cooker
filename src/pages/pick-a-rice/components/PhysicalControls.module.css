@@ -1,13 +1,14 @@
 .controls {
   position: absolute;
-  inset: 0;
-  z-index: 0;
+  width: 210px;
+  height: 33px;
+  z-index: 1;
   pointer-events: none;
 }
 
 .button {
   position: absolute;
-  top: 0;
+  top: -33px;
   height: 25px;
   border: 0;
   padding: 0;
@@ -40,17 +41,17 @@
 }
 
 .downButton {
-  left: 318px;
+  left: 2px;
   width: 44px;
 }
 
 .upButton {
-  left: 374px;
+  left: 58px;
   width: 44px;
 }
 
 .enterButton {
-  left: 442px;
+  left: 126px;
   width: 76px;
 }
 
@@ -71,7 +72,7 @@
 
 .stem {
   position: absolute;
-  top: 28px;
+  top: -5px;
   height: 5px;
   border-radius: 100px;
   background: var(--color-yellow);
@@ -79,16 +80,16 @@
 }
 
 .downStem {
-  left: 316px;
+  left: 0;
   width: 48px;
 }
 
 .upStem {
-  left: 372px;
+  left: 56px;
   width: 48px;
 }
 
 .enterStem {
-  left: 435px;
+  left: 119px;
   width: 91px;
 }

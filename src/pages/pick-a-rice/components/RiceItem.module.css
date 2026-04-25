@@ -7,23 +7,13 @@
 
 .preview {
   position: absolute;
+  left: 20px;
+  top: 0;
+  width: 498px;
+  height: 278px;
   overflow: hidden;
   border-radius: 12px;
   pointer-events: none;
-}
-
-.primary {
-  left: 20px;
-  top: 60px;
-  width: 498px;
-  height: 278px;
-}
-
-.trailing {
-  left: 31px;
-  top: 60px;
-  width: 476px;
-  height: 267px;
 }
 
 .image {
@@ -34,15 +24,5 @@
   max-width: none;
   border-radius: 12px;
   object-fit: cover;
-  pointer-events: none;
-}
-
-.trailingOverlay {
-  position: absolute;
-  left: -0.4%;
-  top: -9.81%;
-  width: 100.79%;
-  height: 119.61%;
-  max-width: none;
   pointer-events: none;
 }
