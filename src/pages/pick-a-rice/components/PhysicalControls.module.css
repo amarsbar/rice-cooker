@@ -1,0 +1,95 @@
+.controls {
+  position: absolute;
+  width: 210px;
+  height: 33px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.button {
+  position: absolute;
+  top: -33px;
+  height: 25px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--color-lime);
+  outline-offset: 2px;
+}
+
+.cap {
+  position: absolute;
+  inset: 0;
+  transform: translateY(0);
+  transition: transform 80ms ease-out;
+}
+
+.pressed .cap {
+  transform: translateY(5px);
+}
+
+.controlImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.downButton {
+  left: 2px;
+  width: 44px;
+}
+
+.upButton {
+  left: 58px;
+  width: 44px;
+}
+
+.enterButton {
+  left: 126px;
+  width: 76px;
+}
+
+.enterCap {
+  border-radius: 12.5px;
+  background: var(--color-yellow);
+}
+
+.enterIcon {
+  position: absolute;
+  left: calc(50% + 0.33px);
+  top: calc(50% + 0.83px);
+  width: 14.861px;
+  height: 14.861px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.stem {
+  position: absolute;
+  top: -5px;
+  height: 5px;
+  border-radius: 100px;
+  background: var(--color-yellow);
+  pointer-events: none;
+}
+
+.downStem {
+  left: 0;
+  width: 48px;
+}
+
+.upStem {
+  left: 56px;
+  width: 48px;
+}
+
+.enterStem {
+  left: 119px;
+  width: 91px;
+}

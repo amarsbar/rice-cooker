@@ -1,39 +1,128 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import styles from './PickARice.module.css';
-import { ViewProvider, type View } from './view';
-import { DotsBackground } from './components/DotsBackground';
+import {
+  RICE_ITEM_COUNT,
+  RICE_ITEM_PITCH,
+  ViewProvider,
+  ScrollProvider,
+  ThemeProvider,
+  THEME_CYCLE,
+  type View,
+} from './view';
 import { GreenTab } from './components/GreenTab';
 import { RiceCard } from './components/RiceCard';
 import { ScreenContent } from './components/ScreenContent';
 import { PreviewContent } from './components/PreviewContent';
+import { PostInstallContent } from './components/PostInstallContent';
+import { ClosePin } from './components/ClosePin';
 import { SoundButton } from './components/SoundButton';
-import { CloseIcon } from './components/CloseIcon';
-import { BottomDrop } from './components/BottomDrop';
-import { CreatorBadge } from './components/CreatorBadge';
+import { ThemeKnob } from './components/ThemeKnob';
+import { ScrollWheel } from './components/ScrollWheel';
+import { PhysicalControls } from './components/PhysicalControls';
+
+const CYCLE: View[] = ['picking', 'preview', 'post-install'];
+const clampRiceIndex = (index: number) => Math.max(0, Math.min(RICE_ITEM_COUNT - 1, index));
+type HoldDirection = -1 | 0 | 1;
 
 export function PickARice() {
   const [view, setView] = useState<View>('picking');
-  /** Debug-toggle trigger. Restricted to the bare stage (not child clicks) so
-   *  future interactive children don't have to remember to `stopPropagation`. */
-  const toggleOnBareStage = (e: React.MouseEvent<HTMLDivElement>) => {
+  const [focusedRiceIndex, setFocusedRiceIndex] = useState(0);
+  const [riceScrollOffset, setRiceScrollOffset] = useState(0);
+  const [riceNavRequest, setRiceNavRequest] = useState({ index: 0, version: 0 });
+  const [riceHoldDirection, setRiceHoldDirection] = useState<HoldDirection>(0);
+  const requestedRiceIndexRef = useRef(0);
+  const [cycleIdx, setCycleIdx] = useState(0);
+  const theme = THEME_CYCLE[cycleIdx]!;
+  const advance = useCallback(() => setCycleIdx((i) => (i + 1) % THEME_CYCLE.length), []);
+  const themeValue = useMemo(() => ({ theme, advance }), [advance, theme]);
+  const scroll = useMemo(
+    () => ({
+      offset: riceScrollOffset,
+      index: focusedRiceIndex,
+      total: RICE_ITEM_COUNT,
+    }),
+    [focusedRiceIndex, riceScrollOffset],
+  );
+
+  const requestFocusedRice = useCallback((nextIndex: number) => {
+    const index = clampRiceIndex(nextIndex);
+    requestedRiceIndexRef.current = index;
+    setRiceNavRequest((request) => ({ index, version: request.version + 1 }));
+  }, []);
+
+  const focusPreviousRice = useCallback(() => {
+    if (view !== 'picking') return;
+    requestFocusedRice(requestedRiceIndexRef.current - 1);
+  }, [requestFocusedRice, view]);
+
+  const focusNextRice = useCallback(() => {
+    if (view !== 'picking') return;
+    requestFocusedRice(requestedRiceIndexRef.current + 1);
+  }, [requestFocusedRice, view]);
+
+  const syncRiceScroll = useCallback((offset: number) => {
+    const index = clampRiceIndex(Math.round(offset / RICE_ITEM_PITCH));
+    requestedRiceIndexRef.current = index;
+    setRiceScrollOffset(offset);
+    setFocusedRiceIndex(index);
+  }, []);
+
+  const startRiceHold = useCallback((direction: -1 | 1) => {
+    if (view === 'picking') setRiceHoldDirection(direction);
+  }, [view]);
+
+  const stopRiceHold = useCallback(() => setRiceHoldDirection(0), []);
+
+  useEffect(() => {
+    if (view !== 'picking') setRiceHoldDirection(0);
+  }, [view]);
+
+  const applyFocusedRice = useCallback(() => {
+    setView((current) => {
+      if (current === 'picking') return 'preview';
+      if (current === 'preview') return 'post-install';
+      return 'picking';
+    });
+  }, []);
+
+  const cycleOnBareStage = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target !== e.currentTarget) return;
-    setView((v) => (v === 'picking' ? 'preview' : 'picking'));
+    setView((v) => CYCLE[(CYCLE.indexOf(v) + 1) % CYCLE.length]!);
   };
 
   return (
-    <ViewProvider view={view}>
-      <div className={styles.stage} onClick={toggleOnBareStage}>
-        <DotsBackground />
-        <GreenTab />
-        <RiceCard>
-          <ScreenContent />
-          <PreviewContent />
-        </RiceCard>
-        <SoundButton />
-        <CloseIcon />
-        <BottomDrop />
-        <CreatorBadge name="Ricename" creator="creatorname" />
-      </div>
-    </ViewProvider>
+    <ThemeProvider value={themeValue}>
+      <ViewProvider view={view}>
+        <ScrollProvider value={scroll}>
+          <div className={styles.stage} data-theme={theme} onClick={cycleOnBareStage}>
+            <PhysicalControls
+              onPrevious={focusPreviousRice}
+              onNext={focusNextRice}
+              onApply={applyFocusedRice}
+              onHoldStart={startRiceHold}
+              onHoldEnd={stopRiceHold}
+            />
+            <GreenTab />
+            <RiceCard>
+              <ScreenContent
+                holdDirection={riceHoldDirection}
+                navRequest={riceNavRequest}
+                onScrollOffsetChange={syncRiceScroll}
+              />
+              <PreviewContent
+                themeName="theme name"
+                creatorName="by creator name"
+                onApply={applyFocusedRice}
+              />
+              <PostInstallContent themeName="theme name" onApply={applyFocusedRice} />
+            </RiceCard>
+            <ClosePin />
+            <SoundButton />
+            <ThemeKnob />
+            <ScrollWheel />
+          </div>
+        </ScrollProvider>
+      </ViewProvider>
+    </ThemeProvider>
   );
 }

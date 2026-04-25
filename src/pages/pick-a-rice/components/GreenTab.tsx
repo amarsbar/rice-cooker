@@ -2,8 +2,8 @@ import { motion } from 'framer-motion';
 import styles from './GreenTab.module.css';
 import { MORPH_TRANSITION, POSITIONS, useView } from '../view';
 
-/** Figma node 168:6738 / 168:6840 — mint rectangle that protrudes from the
- *  card's right edge, backing the close pin and sound button. */
+/** Mint tab that protrudes past the card's right edge. Shifts up and
+ *  shrinks slightly (90→81 tall) when the card morphs to shrunken. */
 export function GreenTab() {
   const view = useView();
   return (

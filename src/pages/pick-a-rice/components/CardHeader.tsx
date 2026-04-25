@@ -1,32 +1,24 @@
 import styles from './CardHeader.module.css';
-import logoSvg from '@/assets/figma/logo.svg';
-import dividerSvg from '@/assets/figma/divider-dotted.svg';
+import MenuDotsSvg from '@/assets/screen/menu-dots.svg?react';
+import screenDivider from '@/assets/screen/divider.svg';
 
-interface CardHeaderProps {
-  step: number;
-  total: number;
-  title?: string;
-}
+const APPLY_LABEL = 'APPLY';
 
-export function CardHeader({ step, total, title = 'Pick a rice' }: CardHeaderProps) {
+export function CardHeader() {
   return (
     <>
-      <div className={styles.logo}>
-        <div className={styles.logoBleed}>
-          <img src={logoSvg} alt="" />
-        </div>
+      <MenuDotsSvg className={styles.menuIcon} />
+      <p className={`${styles.label} ${styles.menuLabel}`}>Menu</p>
+      <p className={`${styles.label} ${styles.nextLabel}`}>Next</p>
+      <p className={`${styles.label} ${styles.prevLabel}`}>Prev</p>
+      <div className={styles.applyCluster}>
+        {APPLY_LABEL.split('').map((char, index) => (
+          <span key={index} className={styles.applyLetter}>
+            {char}
+          </span>
+        ))}
       </div>
-      <p className={styles.title}>{title}</p>
-      <div className={`${styles.pill} ${styles.pillStep}`}>
-        <p>{step}</p>
-      </div>
-      <div className={`${styles.pill} ${styles.pillSlash}`}>
-        <p>/</p>
-      </div>
-      <div className={`${styles.pill} ${styles.pillTotal}`}>
-        <p>{total}</p>
-      </div>
-      <img src={dividerSvg} alt="" className={styles.divider} />
+      <img src={screenDivider} alt="" className={styles.divider} />
     </>
   );
 }

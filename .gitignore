@@ -9,7 +9,6 @@ dist
 .env.local
 backend/target
 backend/screenshots/
-.claude/
 
 # makepkg build artifacts
 packaging/aur/*/pkg/

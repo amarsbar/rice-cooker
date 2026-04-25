@@ -1,9 +1,23 @@
-/* Figma node 168:7234 — main card.
-   Position + size are motion-driven (see view.tsx / POSITIONS). */
+/* Main card. Position + size are motion-driven (see view.tsx / POSITIONS).
+   Background is set inline per-view (solid in picking, 80% in shrunken). */
 .card {
   position: absolute;
-  background: var(--color-card-bg);
-  border: var(--card-border-width) solid var(--color-mint);
+  z-index: 2;
+  border: var(--card-border-width) solid var(--c-card-border);
   border-radius: var(--card-radius);
   overflow: hidden;
+  transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Figma 509:34645: 552 x 558 at inner-frame (15, -109), 50% opacity. */
+.bg {
+  position: absolute;
+  left: 15px;
+  top: -109px;
+  width: 552px;
+  height: 558px;
+  object-fit: cover;
+  opacity: 0.5;
+  max-width: none;
+  pointer-events: none;
 }

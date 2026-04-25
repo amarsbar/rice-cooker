@@ -1,0 +1,34 @@
+.group {
+  position: absolute;
+  z-index: 3;
+  width: 104px;
+  height: 48px;
+}
+
+.base {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 104px;
+  height: 48px;
+}
+
+.body {
+  position: absolute;
+  left: 30px;
+  top: 6px;
+  width: 44px;
+  height: 36px;
+}
+
+/* Handle anchored so its attach point (rect's right-middle) sits at the
+   body's centre (58.82, 23.68) in group coords, and rotation pivots
+   around that point (23.41, 5.43) in handle-local coords. */
+.handle {
+  position: absolute;
+  left: 35.41px;
+  top: 18.25px;
+  width: 21px;
+  height: 12px;
+  transform-origin: 23.41px 5.43px;
+}

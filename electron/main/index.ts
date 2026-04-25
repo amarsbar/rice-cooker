@@ -57,10 +57,16 @@ async function injectCompositorRules(): Promise<void> {
   }
 }
 
+/** UI scale factor - design is 666 x 574 @ 1x; multiplied for readability on
+ *  high-res monitors. Applied both to window size and via zoomFactor so
+ *  every pixel-positioned element scales uniformly. Override with
+ *  RICE_SCALE env var (e.g. `RICE_SCALE=2 npm run dev`). */
+const SCALE = Number(process.env['RICE_SCALE']) || 1.75;
+
 function createWindow(): void {
   const win = new BrowserWindow({
-    width: 615,
-    height: 598,
+    width: Math.round(666 * SCALE),
+    height: Math.round(574 * SCALE),
     title: APP_TITLE,
     transparent: true,
     frame: false,
@@ -78,32 +84,95 @@ function createWindow(): void {
     },
   });
 
+  win.webContents.on('did-finish-load', () => win.webContents.setZoomFactor(SCALE));
   win.once('ready-to-show', () => win.show());
 
   const captureOut = process.env['RICE_CAPTURE_OUT'];
   if (captureOut) {
     /** Time for fonts + large images to load and the initial layout to paint. */
     const INITIAL_SETTLE_MS = 1500;
-    /** Covers the full picking → preview sequence: 500ms morph + ~1s radial
-     *  cascade + buffer. Should stay >= the sum of constants in view.tsx. */
-    const ANIMATION_SETTLE_MS = 1800;
+    /** Time for one card-morph + content-crossfade pass to finish. */
+    const MORPH_SETTLE_MS = 900;
+
+    const clickStage = () =>
+      win.webContents.executeJavaScript(
+        '(() => { const el = document.querySelector("[class*=stage]"); if (!el) return false; el.click(); return true; })()',
+      );
+    type CaptureView = 'picking' | 'preview' | 'post-install';
+    let captureView: CaptureView = 'picking';
+    const clickStageToNext = async () => {
+      const clicked = await clickStage();
+      if (clicked) {
+        captureView =
+          captureView === 'picking'
+            ? 'preview'
+            : captureView === 'preview'
+              ? 'post-install'
+              : 'picking';
+      }
+      return clicked;
+    };
 
     win.webContents.once('did-finish-load', async () => {
       const { writeFile } = await import('node:fs/promises');
+      const base = captureOut.replace(/\.png$/, '');
       await new Promise((r) => setTimeout(r, INITIAL_SETTLE_MS));
-      const pickingImg = await win.webContents.capturePage();
-      await writeFile(captureOut.replace(/\.png$/, '') + '-picking.png', pickingImg.toPNG());
 
-      if (process.env['RICE_CAPTURE_BOTH']) {
-        const clicked = await win.webContents.executeJavaScript(
-          '(() => { const el = document.querySelector("[class*=stage]"); if (!el) return false; el.click(); return true; })()'
-        );
-        if (!clicked) {
-          console.warn('[rice-cooker] capture: stage element not found, skipping preview shot');
-        } else {
-          await new Promise((r) => setTimeout(r, ANIMATION_SETTLE_MS));
-          const previewImg = await win.webContents.capturePage();
-          await writeFile(captureOut.replace(/\.png$/, '') + '-preview.png', previewImg.toPNG());
+      const pickingImg = await win.webContents.capturePage();
+      await writeFile(`${base}-picking.png`, pickingImg.toPNG());
+
+      if (process.env['RICE_CAPTURE_ALL']) {
+        for (const name of ['preview', 'post-install'] as const) {
+          const clicked = await clickStageToNext();
+          if (!clicked) {
+            console.warn('[rice-cooker] capture: stage element not found');
+            break;
+          }
+          await new Promise((r) => setTimeout(r, MORPH_SETTLE_MS));
+          const img = await win.webContents.capturePage();
+          await writeFile(`${base}-${name}.png`, img.toPNG());
+        }
+      }
+
+      if (process.env['RICE_CAPTURE_THEMES']) {
+        // Cycle back to picking and click the theme knob (sprout) to
+        // advance through t2 → t1 → t3 → t2. Uses a transient dispatch
+        // via document.querySelector to find the knob click target.
+        const clickKnob = () =>
+          win.webContents.executeJavaScript(
+            `(() => {
+               const el = document.querySelector('[style*="cursor"][style*="pointer"]');
+               if (!el) return false;
+               el.click();
+               return true;
+             })()`,
+          );
+        while (captureView !== 'picking') {
+          const clicked = await clickStageToNext();
+          if (!clicked) {
+            console.warn('[rice-cooker] capture: stage element not found');
+            return;
+          }
+          await new Promise((r) => setTimeout(r, MORPH_SETTLE_MS));
+        }
+        // The cycle is t2 (0) → t1 (1) → t2 (2) → t3 (3). Walk
+        // sequentially from the initial t2, capturing t1 after 1 click
+        // and t3 after 2 further clicks.
+        const steps: { label: 't1' | 't3'; advance: number }[] = [
+          { label: 't1', advance: 1 },
+          { label: 't3', advance: 2 },
+        ];
+        for (const { label, advance } of steps) {
+          for (let i = 0; i < advance; i++) {
+            const clicked = await clickKnob();
+            if (!clicked) {
+              console.warn('[rice-cooker] capture: knob not found');
+              return;
+            }
+            await new Promise((r) => setTimeout(r, MORPH_SETTLE_MS));
+          }
+          const img = await win.webContents.capturePage();
+          await writeFile(`${base}-theme-${label}.png`, img.toPNG());
         }
       }
 

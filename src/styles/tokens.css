@@ -1,30 +1,164 @@
 :root {
-  /* Colors from Figma */
-  --color-card-bg: #000001;
+  /* ----- Palette -----
+     Every hex the design uses, named by colour. These are the raw
+     inventory; reference them through the role tokens below (only
+     reach for the raw palette if the value is theme-invariant). */
+  --color-yellow: #fade26;
+  --color-brown: #3f3833;
+  --color-lime: #e8ff76;
+  --color-green: #73a94a;
+  --color-light-blue: #d0ecfb;
+  --color-light-pink: #fdb1e5;
+  --color-navy: #2e5b89;
+  --color-navy-deep: #293349;
+  --color-charcoal: #20212e;
+  --color-near-black: #0f0f15;
   --color-mint: #dfecdb;
-  --color-yellow: #ffc501;
+  --color-mint-deep: #c7d8bf;
   --color-teal: #4b837d;
   --color-cream: #fdfdf1;
-  --color-pink: #ff99a9;
-  --color-mauve: #917c89;
-  --color-pill-text: #feffff;
+  --color-cream-soft: #f8feff;
+  --color-ice: #f3f6fd;
+  --color-orange: #fe6a00;
+  --color-red: #ed3d3e;
+  --color-pink: #fc6984;
+  --color-rose: #f66ea2;
+  --color-rose-light: #ffafce;
+  --color-sky-soft: #7e92c4;
+  --color-blue-grey: #9eabc5;
+  --color-slate: #737d91;
+  --color-mute: #e0e1e1;
+  --color-yellow-deep: #ffc501;
+  --color-yellow-soft: #ffe57b;
+  --color-knob-green: #b9f018;
+  --color-knob-dot-t2: #6a9a79;
+  --color-grid-t1: #e9ebf0;
+  --color-grid-t2: #f0ede9;
+
+  /* Static (theme-invariant) tokens kept from the old palette. */
+  --color-card-bg-shrunken: rgba(26, 20, 25, 0.8);
+  --color-frame: #3b353b;
+  --color-frame-inner: #1a1419;
+  --color-peek: #d9d9d9;
+  --color-pill-text: #f8feff;
   --color-counter-text: #000001;
 
-  /* Card dimensions — sizes vary per view and live in view.tsx POSITIONS. */
-  --card-radius: 32px;
+  /* ----- Role tokens (theme 2 defaults) -----
+     Every UI role whose colour changes between themes binds here. The
+     [data-theme='t1'] / [data-theme='t3'] blocks below redefine the
+     same names — components only reference role tokens, never raw
+     palette. */
+  --c-card-bg: #000001;                              /* opaque card bg in picking state */
+  --c-card-bg-shrunken: rgba(26, 20, 25, 0.8);       /* semi-transparent in preview/post-install */
+  --c-card-border: var(--color-mint);                /* card border + green tab + theme knob base */
+  --c-sound-body: var(--color-teal);                 /* sound ring stroke + inner disc */
+  --c-sound-icon: var(--color-mint);                 /* speaker glyph */
+  --c-close-pin: var(--color-orange);
+  --c-primary: var(--color-yellow);                  /* letter pills, menu dots, logo fill, button default bg */
+  --c-primary-text: var(--color-counter-text);       /* letter pill text */
+  --c-logo-stroke: black;
+  --c-accent: var(--color-yellow);                   /* halo dots, WASD squares, step pill bg */
+  --c-step-text: var(--color-brown);                 /* step pill "1" glyph */
+  --c-wheel-rim: var(--color-mint-deep);
+  --c-wheel-inner: var(--color-cream);
+  --c-grid: var(--color-grid-t2);
+  --c-knob-dot: var(--color-knob-dot-t2);
+  --c-knob-body: var(--color-knob-green);
+  --c-knob-handle: var(--color-lime);
+  --c-knob-handle-dot: var(--color-orange);
+  --c-knob-body-dot: var(--color-orange);
+  --c-btn-default-icon: var(--color-brown);          /* back/github/delete default icon (fill + stroke) */
+  --c-btn-hover-bg: var(--color-green);
+  --c-btn-hover-icon: var(--color-lime);
+  --c-pill-bg: var(--color-green);                   /* APPLY/DONE default bg */
+  --c-pill-letter-bg: var(--color-lime);             /* letter circle default bg */
+  --c-pill-letter-text: var(--color-brown);          /* letter default text */
+  --c-pill-hover-bg: var(--color-yellow);
+  --c-pill-hover-letter-bg: var(--color-brown);
+  --c-pill-hover-letter-text: var(--color-lime);
+  --c-screen-text: var(--color-lime);
+  --c-screen-text-on-pill: var(--color-brown);
+
+  /* Card dimensions */
+  --card-radius: 26px;
   --card-border-width: 9px;
 
   /* Preview dimensions */
-  --preview-radius-top: 9.683px;
-  --preview-radius-bottom: 6.899px;
-  --preview-dashed-radius: 12px;
-
-  /* Header */
-  --header-height: 48px;
+  --preview-outer-radius: 11.965px;
+  --preview-inner-radius: 9.655px;
+  --preview-image-radius: 8.36px;
 
   /* Fonts */
   --font-display: 'Madimi One', sans-serif;
+  --font-pill: 'Capriola', sans-serif;
   --fs-title: 24px;
-  --fs-counter: 15px;
-  --fs-pill: 13px;
+  --fs-letter: 15px;
+  --fs-pill: 14px;
+  --fs-tag: 27.65px;
+}
+
+/* ----- Theme 1 (knob top, pink/blue) ----- */
+[data-theme='t1'] {
+  --c-card-bg: var(--color-near-black);
+  --c-card-bg-shrunken: rgba(15, 15, 21, 0.8);
+  --c-card-border: var(--color-ice);
+  --c-sound-body: var(--color-navy);
+  --c-sound-icon: var(--color-ice);
+  --c-close-pin: var(--color-pink);
+  --c-primary: var(--color-light-blue);
+  --c-primary-text: var(--color-near-black);
+  --c-logo-stroke: var(--color-near-black);
+  --c-accent: var(--color-light-pink);
+  --c-step-text: var(--color-counter-text);
+  --c-wheel-rim: var(--color-light-blue);
+  --c-wheel-inner: var(--color-cream-soft);
+  --c-grid: var(--color-grid-t1);
+  --c-knob-dot: var(--color-yellow-deep);
+  --c-knob-body: var(--color-yellow-deep);
+  --c-knob-handle: var(--color-yellow-soft);
+  --c-knob-handle-dot: var(--color-ice);
+  --c-knob-body-dot: var(--color-yellow-soft);
+  --c-btn-default-icon: var(--color-navy);
+  --c-btn-hover-bg: var(--color-light-pink);
+  --c-btn-hover-icon: var(--color-brown);          /* t1 hover arrow is brown, not lime */
+  --c-pill-bg: var(--color-navy);
+  --c-pill-letter-bg: var(--color-light-blue);
+  --c-pill-letter-text: var(--color-brown);
+  --c-pill-hover-bg: var(--color-light-pink);
+  --c-pill-hover-letter-bg: var(--color-navy);
+  --c-pill-hover-letter-text: var(--color-light-blue);
+}
+
+/* ----- Theme 3 (knob bottom, dark-blue/lime) ----- */
+[data-theme='t3'] {
+  --c-card-bg: var(--color-near-black);
+  --c-card-bg-shrunken: rgba(15, 15, 21, 0.8);
+  --c-card-border: var(--color-navy-deep);
+  --c-sound-body: var(--color-slate);
+  --c-sound-icon: var(--color-mute);
+  --c-close-pin: var(--color-red);
+  --c-primary: var(--color-lime);
+  --c-primary-text: var(--color-brown);
+  --c-logo-stroke: black;
+  --c-accent: var(--color-lime);
+  --c-step-text: var(--color-counter-text);
+  --c-wheel-rim: var(--color-sky-soft);
+  --c-wheel-inner: var(--color-charcoal);
+  /* Same grid as t2, knocked down to 10% alpha so it reads as a subtle
+     pattern on the dark t3 wheel rather than bright white lines. */
+  --c-grid: rgba(240, 237, 233, 0.1);
+  --c-knob-dot: var(--color-blue-grey);
+  --c-knob-body: var(--color-rose);
+  --c-knob-handle: var(--color-rose-light);
+  --c-knob-handle-dot: var(--color-navy-deep);
+  --c-knob-body-dot: var(--color-navy-deep);
+  --c-btn-default-icon: var(--color-brown);
+  --c-btn-hover-bg: var(--color-light-blue);
+  --c-btn-hover-icon: var(--color-navy);
+  --c-pill-bg: var(--color-lime);
+  --c-pill-letter-bg: var(--color-green);
+  --c-pill-letter-text: var(--color-lime);
+  --c-pill-hover-bg: var(--color-light-blue);
+  --c-pill-hover-letter-bg: var(--color-charcoal);
+  --c-pill-hover-letter-text: var(--color-light-blue);
 }

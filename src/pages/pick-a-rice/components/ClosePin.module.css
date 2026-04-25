@@ -1,0 +1,29 @@
+.wrap {
+  position: absolute;
+  z-index: 3;
+  width: 41.803px;
+  height: 56.666px;
+}
+
+.svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  pointer-events: none;
+}
+
+.hitbox {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 41.803px;
+  height: 41.803px;
+  clip-path: circle(50%);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  appearance: none;
+}

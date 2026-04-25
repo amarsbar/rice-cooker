@@ -1,0 +1,206 @@
+.root {
+  position: absolute;
+  z-index: 4;
+  width: 199.999px;
+  height: 200.001px;
+}
+
+.rim {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Cream inner circle (350:6632 / 350:7412) — 176 × 176 centered; clips
+   everything inside to the circle shape. */
+.inner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 176px;
+  height: 176px;
+  background: var(--c-wheel-inner);
+  border-radius: 50%;
+  overflow: hidden;
+  transform: translate(-50%, -50%);
+}
+
+/* Dotted grid background (350:6633 / 350:7413) — same asset in both
+   states. Extends 8px above the circle's top so the grid bleeds past the
+   top edge before being clipped by the round inner. */
+.grid {
+  position: absolute;
+  left: 50%;
+  top: -8px;
+  width: 190px;
+  height: 191.805px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.gridBleed {
+  position: absolute;
+  inset: -0.39%;
+}
+
+.gridBleed > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+}
+
+/* View-specific content layers, stacked and crossfaded. */
+.content {
+  position: absolute;
+  inset: 0;
+}
+
+/* ---- Picking content (bead indicator + niri/dms + WASD) ---- */
+
+/* Bead: always a 25 × 25 circle. Framer-motion animates `scale` to resize
+   between pill (scale 1, active, shows number) and the smaller halo
+   diameters (scale 0.58 / 0.38 / 0.27 for LG/MD/SM); outside the arc,
+   scale 0. Keeping width === height === 25 means transform scale just
+   shrinks the circle uniformly, no width/height interpolation. */
+.bead {
+  position: absolute;
+  width: 25px;
+  height: 25px;
+  background: var(--c-accent);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center;
+  pointer-events: none;
+}
+
+.beadNum {
+  font-family: var(--font-display);
+  font-size: var(--fs-letter);
+  color: var(--c-step-text);
+  line-height: 1;
+  transition: opacity 0.2s ease-out;
+}
+
+.tag {
+  position: absolute;
+  font-family: var(--font-display);
+  font-size: var(--fs-tag);
+  font-weight: 400;
+  color: var(--color-brown);
+  line-height: normal;
+  white-space: nowrap;
+  --outline-color: var(--c-accent);
+  --outline-width: 6px;
+}
+
+.tagTop {
+  left: 70px;
+  top: 59px;
+}
+
+.tagBottom {
+  left: 52px;
+  top: 81px;
+}
+
+.tagPlus {
+  left: 108px;
+  top: 78px;
+}
+
+.key {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 4px;
+  background: var(--c-accent);
+  pointer-events: none;
+  transition: background-color 80ms ease-out;
+}
+
+.keyPressed {
+  background: var(--color-orange);
+}
+
+.key_up {
+  left: 86.08px;
+  top: 148px;
+}
+
+.key_down {
+  left: 86px;
+  top: 159.92px;
+}
+
+.key_right {
+  left: 98px;
+  top: 160px;
+}
+
+.key_left {
+  left: 74px;
+  top: 160px;
+}
+
+/* ---- Preview content ("previewing" label tilted -14.18°) ---- */
+
+/* 350:7243 — "previewing" Madimi One 28px dark ink, centered in the cream
+   circle and tilted. Figma wraps the text in a 141.889 × 69.424 flex box
+   at left=(50% - 71.39), top=(50% - 34.55); inside the box a rotated
+   flex-none container holds the text. Reproducing that visually: anchor
+   the text to the box center and apply the rotation on the text itself. */
+.previewing {
+  position: absolute;
+  left: calc(50% - 71.39px + 141.889px / 2);
+  top: calc(50% - 34.55px + 69.424px / 2);
+  transform: translate(-50%, -50%) rotate(-14.18deg);
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 400;
+  color: var(--color-frame-inner);
+  line-height: normal;
+  white-space: nowrap;
+  margin: 0;
+  --outline-color: var(--c-accent);
+  --outline-width: 6px;
+}
+
+/* ---- Post-install content (rice installed !) ---- */
+
+/* "rice installed !" lettering — Madimi One 31.392px, dark ink. */
+.installText {
+  position: absolute;
+  font-family: var(--font-display);
+  font-size: 31.392px;
+  font-weight: 400;
+  color: var(--color-frame-inner);
+  line-height: normal;
+  white-space: nowrap;
+  --outline-color: var(--c-accent);
+  --outline-width: 6px;
+}
+
+.installRice {
+  left: 43.03px;
+  top: 53.2px;
+}
+
+.installInstalled {
+  left: 29.03px;
+  top: 81.2px;
+}
+
+/* "!" sits to the right of "rice", tilted slightly. The transform
+   rotates around the glyph's center for the hand-drawn feel. */
+.installBang {
+  left: 117.03px;
+  top: 55.2px;
+  transform-origin: center;
+  transform: rotate(-18.79deg);
+}
+

@@ -1,0 +1,28 @@
+.item {
+  position: relative;
+  width: 532px;
+  height: 292px;
+  flex-shrink: 0;
+}
+
+.preview {
+  position: absolute;
+  left: 20px;
+  top: 0;
+  width: 498px;
+  height: 278px;
+  overflow: hidden;
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+.image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  border-radius: 12px;
+  object-fit: cover;
+  pointer-events: none;
+}

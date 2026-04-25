@@ -1,5 +1,20 @@
-@import '@fontsource/madimi-one/400.css';
 @import './tokens.css';
+
+@font-face {
+  font-family: 'Madimi One';
+  src: url('@fontsource/madimi-one/files/madimi-one-latin-400-normal.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Capriola';
+  src: url('@fontsource/capriola/files/capriola-latin-400-normal.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 
 * {
   margin: 0;
@@ -29,3 +44,57 @@ img {
   display: block;
   -webkit-user-drag: none;
 }
+
+/* Shared icon button — each button is a 42 × 44 box that inlines one
+   SVG (main circle + icon + two corner ellipses). Fills are driven by
+   two classes on the SVG children (.btnShape for the yellow parts,
+   .btnIcon for the dark icon); :hover on the button flips both. */
+.iconBtn {
+  position: absolute;
+  width: 42px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.btnShape {
+  fill: var(--c-primary);
+  transition: fill 100ms ease-out;
+}
+
+.btnIcon {
+  fill: var(--c-btn-default-icon);
+  stroke: var(--c-btn-default-icon);
+  transition: fill 100ms ease-out, stroke 100ms ease-out;
+}
+
+.iconBtn:hover .btnShape {
+  fill: var(--c-btn-hover-bg);
+}
+
+.iconBtn:hover .btnIcon {
+  fill: var(--c-btn-hover-icon);
+  stroke: var(--c-btn-hover-icon);
+}
+
+/* Theme-driven SVG fill/stroke classes — applied to <path>/<rect>/<circle>
+   inside svgr-imported SVGs so colour flows from the role tokens. The
+   consuming component imports the .svg via `?react` (not as a URL) so
+   the DOM nodes actually receive these classes. */
+.fillPrimary { fill: var(--c-primary); }
+.strokeLogo { stroke: var(--c-logo-stroke); }
+.fillCardBorder { fill: var(--c-card-border); }
+.fillWheelRim { fill: var(--c-wheel-rim); }
+.strokeGrid { stroke: var(--c-grid); }
+.fillClosePin { fill: var(--c-close-pin); }
+.strokeClosePin { stroke: var(--c-close-pin); }
+.fillSoundBody { fill: var(--c-sound-body); }
+.strokeSoundBody { stroke: var(--c-sound-body); }
+.fillSoundIcon { fill: var(--c-sound-icon); }
+.fillKnobDot { fill: var(--c-knob-dot); }
+.fillKnobBody { fill: var(--c-knob-body); }
+.fillKnobHandle { fill: var(--c-knob-handle); }
+.fillKnobHandleDot { fill: var(--c-knob-handle-dot); }
+.fillKnobBodyDot { fill: var(--c-knob-body-dot); }

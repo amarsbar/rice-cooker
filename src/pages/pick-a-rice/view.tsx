@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react';
 
-export type View = 'picking' | 'preview';
+export type View = 'picking' | 'preview' | 'post-install';
 
 const ViewContext = createContext<View>('picking');
 
@@ -12,49 +12,91 @@ export function ViewProvider({ view, children }: { view: View; children: ReactNo
   return <ViewContext.Provider value={view}>{children}</ViewContext.Provider>;
 }
 
-/** Target position/size for every moving element in each view state.
- *  All coordinates are pixel offsets within the 614.4 × 597.4 stage. */
+/** Focus-derived rice position consumed by <ScrollWheel>. */
+export interface ScrollState {
+  offset: number;
+  index: number;
+  total: number;
+}
+
+export const RICE_ITEM_COUNT = 10;
+export const RICE_ITEM_PITCH = 292;
+
+const ScrollContext = createContext<ScrollState>({ offset: 0, index: 0, total: 1 });
+
+export function useScroll() {
+  return useContext(ScrollContext);
+}
+
+export function ScrollProvider({ value, children }: { value: ScrollState; children: ReactNode }) {
+  return <ScrollContext.Provider value={value}>{children}</ScrollContext.Provider>;
+}
+
+/** Palette / colour theme. Three fixed variants; <ThemeKnob> is the picker.
+ *  t2 is the default, centre-of-knob
+ *  theme — tokens defined in `:root` match it. t1 and t3 get applied via
+ *  `[data-theme='t1'|'t3']` override blocks on the stage element.
+ *
+ *  The cycle goes centre → top → centre → bottom → centre → …, so t2 is
+ *  visited between every non-default theme. That requires tracking a
+ *  4-step cycle index rather than the theme alone (otherwise t2 can't
+ *  remember which direction it came from). Consumers see the derived
+ *  `theme` + an `advance()` that bumps the index. */
+export type Theme = 't1' | 't2' | 't3';
+
+export const THEME_CYCLE: readonly Theme[] = ['t2', 't1', 't2', 't3'] as const;
+
+interface ThemeCtxValue {
+  theme: Theme;
+  advance: () => void;
+}
+
+const ThemeContext = createContext<ThemeCtxValue>({
+  theme: 't2',
+  advance: () => {},
+});
+
+export function useTheme() {
+  return useContext(ThemeContext);
+}
+
+export function ThemeProvider({
+  value,
+  children,
+}: {
+  value: ThemeCtxValue;
+  children: ReactNode;
+}) {
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}
+
+/** Target position/size for every moving element in each view state. */
+const SHRUNKEN = {
+  card: { left: 88.5, top: 118, width: 405, height: 229 },
+  greenTab: { left: 493.5, top: 175, height: 81 },
+  closePin: { left: 502.5, top: 118 },
+  soundButton: { left: 502.5, top: 192 },
+  themeKnob: { left: 320.5, top: 345 },
+  scrollWheel: { left: 408, top: 244 },
+} as const;
+
 export const POSITIONS = {
   picking: {
-    card: { left: 0, top: 0, width: 500, height: 500 },
-    greenTab: { left: 500, top: 328 },
-    soundRing: { left: 509, top: 345 },
-    soundInner: { left: 510.31, top: 346.31 },
-    closeIcon: { left: 509, top: 271 },
-    dropShape: { left: 327, top: 498 },
-    dropInner: { left: 359, top: 504 },
-    creatorCloud: { left: 414.406, top: 397.406 },
-    creatorInner: { left: 426, top: 409 },
+    card: { left: 16, top: 33, width: 550, height: 399 },
+    greenTab: { left: 564, top: 307, height: 90 },
+    closePin: { left: 574, top: 251 },
+    soundButton: { left: 571, top: 323 },
+    themeKnob: { left: 386, top: 432 },
+    scrollWheel: { left: 466, top: 374 },
   },
-  preview: {
-    card: { left: 36, top: 136, width: 416, height: 229 },
-    greenTab: { left: 452, top: 193 },
-    soundRing: { left: 461, top: 210 },
-    soundInner: { left: 462.31, top: 211.31 },
-    closeIcon: { left: 461, top: 136 },
-    dropShape: { left: 279, top: 363 },
-    dropInner: { left: 311, top: 369 },
-    creatorCloud: { left: 366.406, top: 262.406 },
-    creatorInner: { left: 378, top: 274 },
-  },
+  preview: SHRUNKEN,
+  'post-install': SHRUNKEN,
 } as const;
 
-/** Eased transition for the window morph (card size + position, external elements). */
-export const MORPH_TRANSITION = { duration: 0.5, ease: [0.4, 0.0, 0.2, 1] } as const;
+export const MORPH_TRANSITION = { duration: 0.3, ease: [0.4, 0.0, 0.2, 1] as const } as const;
+export const SCREEN_FADE_TRANSITION = { duration: 0.2 } as const;
 
-/** Screen-content crossfade. Same duration as morph so they finish together. */
-export const SCREEN_FADE_TRANSITION = { duration: 0.5 } as const;
-
-/** Preview-mode text fade. 150ms duration, delayed until after the morph
- *  completes in the picking → preview direction. */
-export const PREVIEW_TEXT_VARIANTS = {
-  visible: { opacity: 1, transition: { duration: 0.15, delay: 0.5 } },
-  hidden: { opacity: 0, transition: { duration: 0.15 } },
-} as const;
-
-/** Same timing as PREVIEW_TEXT_VARIANTS but peaks at 0.4 for the dimmed
- *  "Preview state" label in the creator bubble (Figma opacity-40 text). */
-export const PREVIEW_DIM_TEXT_VARIANTS = {
-  visible: { opacity: 0.4, transition: { duration: 0.15, delay: 0.5 } },
-  hidden: { opacity: 0, transition: { duration: 0.15 } },
+export const SHRUNKEN_TEXT_VARIANTS = {
+  visible: { opacity: 1, transition: { duration: 0.12 } },
+  hidden: { opacity: 0, transition: { duration: 0.1 } },
 } as const;
