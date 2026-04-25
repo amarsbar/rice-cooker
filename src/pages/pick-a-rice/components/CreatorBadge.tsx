@@ -81,7 +81,7 @@ export function CreatorBadge() {
           animate={view === 'preview' ? 'visible' : 'hidden'}
           variants={SHRUNKEN_TEXT_VARIANTS}
         >
-          <p className={styles.previewing}>previewing</p>
+          <OutlinedText className={styles.previewing}>previewing</OutlinedText>
         </motion.div>
 
         <motion.div
@@ -90,9 +90,9 @@ export function CreatorBadge() {
           animate={view === 'post-install' ? 'visible' : 'hidden'}
           variants={SHRUNKEN_TEXT_VARIANTS}
         >
-          <p className={`${styles.installText} ${styles.installRice}`}>rice</p>
-          <p className={`${styles.installText} ${styles.installInstalled}`}>installed</p>
-          <p className={`${styles.installText} ${styles.installBang}`}>!</p>
+          <OutlinedText className={`${styles.installText} ${styles.installRice}`}>rice</OutlinedText>
+          <OutlinedText className={`${styles.installText} ${styles.installInstalled}`}>installed</OutlinedText>
+          <OutlinedText className={`${styles.installText} ${styles.installBang}`}>!</OutlinedText>
         </motion.div>
       </div>
     </motion.div>

@@ -96,7 +96,7 @@
   line-height: normal;
   white-space: nowrap;
   --outline-color: var(--c-accent);
-  --outline-width: 5.58px;
+  --outline-width: 6px;
 }
 
 .tagTop {
@@ -167,6 +167,8 @@
   line-height: normal;
   white-space: nowrap;
   margin: 0;
+  --outline-color: var(--c-accent);
+  --outline-width: 6px;
 }
 
 /* ---- Post-install content (rice installed !) ---- */
@@ -180,6 +182,8 @@
   color: var(--color-frame-inner);
   line-height: normal;
   white-space: nowrap;
+  --outline-color: var(--c-accent);
+  --outline-width: 6px;
 }
 
 .installRice {
