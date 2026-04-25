@@ -19,8 +19,7 @@
     "framer-motion": "^12.38.0",
     "planck": "^1.5.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "scroll-snap": "^5.0.2"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@fontsource/capriola": "^5.2.7",

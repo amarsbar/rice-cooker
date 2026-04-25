@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import styles from './ScreenContent.module.css';
-import { POSITIONS, SCREEN_FADE_TRANSITION, useView, type ScrollState } from '../view';
+import { POSITIONS, SCREEN_FADE_TRANSITION, useView } from '../view';
 import { CardHeader } from './CardHeader';
 import { RiceList } from './RiceList';
 
@@ -9,9 +9,9 @@ const CENTER_OFFSET_X =
 const CENTER_OFFSET_Y =
   -(POSITIONS.picking.card.height - POSITIONS['post-install'].card.height) / 2;
 
-/** Picking-state card content — header on top, scrollable rice list below.
+/** Picking-state card content: header on top, focused rice preview below.
  *  Fades + translates to stay centered while the card shrinks. */
-export function ScreenContent({ onScroll }: { onScroll: (s: ScrollState) => void }) {
+export function ScreenContent({ focusedIndex }: { focusedIndex: number }) {
   const view = useView();
   const shrunken = view !== 'picking';
   return (
@@ -26,7 +26,7 @@ export function ScreenContent({ onScroll }: { onScroll: (s: ScrollState) => void
       transition={SCREEN_FADE_TRANSITION}
     >
       <CardHeader />
-      <RiceList onScroll={onScroll} />
+      <RiceList focusedIndex={focusedIndex} />
     </motion.div>
   );
 }

@@ -4,15 +4,13 @@
   top: 0;
   width: 532px;
   height: 381px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  display: flex;
-  flex-direction: column;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  overflow: hidden;
   pointer-events: auto;
 }
 
-.list::-webkit-scrollbar {
-  display: none;
+.track {
+  display: flex;
+  flex-direction: column;
+  transition: transform 160ms ease-out;
+  will-change: transform;
 }
