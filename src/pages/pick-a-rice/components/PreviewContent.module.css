@@ -54,8 +54,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  --fill-0: currentColor;
-  --stroke-0: currentColor;
+  --fill-0: currentcolor;
+  --stroke-0: currentcolor;
 }
 
 .actionActive {

@@ -20,11 +20,11 @@
 
 .menuLabel {
   left: 50px;
-  color: var(--color-yellow);
+  color: var(--c-header-accent);
 }
 
 .navLabel {
-  color: var(--color-yellow);
+  color: var(--c-header-accent);
   text-align: center;
   transform: translateX(-50%);
   transition: color 80ms ease-out, transform 80ms ease-out;

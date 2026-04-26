@@ -208,7 +208,7 @@ function createWindow(): void {
   const devUrl = process.env['ELECTRON_RENDERER_URL'];
   const failLoad = (kind: 'loadURL' | 'loadFile', err: unknown) => {
     console.error(`[rice-cooker] ${kind} failed:`, err);
-    if (captureOut) app.exit(1);
+    app.exit(1);
   };
   if (devUrl) {
     void win.loadURL(devUrl).catch((err) => failLoad('loadURL', err));

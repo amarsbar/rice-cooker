@@ -56,6 +56,7 @@
   --c-close-pin: var(--color-orange);
   --c-primary: var(--color-yellow);                  /* letter pills, menu dots, logo fill, button default bg */
   --c-primary-text: var(--color-counter-text);       /* letter pill text */
+  --c-header-accent: var(--color-yellow);
   --c-logo-stroke: black;
   --c-accent: var(--color-yellow);                   /* halo dots, WASD squares, step pill bg */
   --c-step-text: var(--color-brown);                 /* step pill "1" glyph */
