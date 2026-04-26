@@ -70,12 +70,6 @@
   --c-btn-default-icon: var(--color-brown);          /* back/github/delete default icon (fill + stroke) */
   --c-btn-hover-bg: var(--color-green);
   --c-btn-hover-icon: var(--color-lime);
-  --c-pill-bg: var(--color-green);                   /* large action pill default bg */
-  --c-pill-letter-bg: var(--color-lime);             /* letter circle default bg */
-  --c-pill-letter-text: var(--color-brown);          /* letter default text */
-  --c-pill-hover-bg: var(--color-yellow);
-  --c-pill-hover-letter-bg: var(--color-brown);
-  --c-pill-hover-letter-text: var(--color-lime);
   --c-screen-text: var(--color-lime);
   --c-screen-text-on-pill: var(--color-brown);
 
@@ -121,12 +115,6 @@
   --c-btn-default-icon: var(--color-navy);
   --c-btn-hover-bg: var(--color-light-pink);
   --c-btn-hover-icon: var(--color-brown);          /* t1 hover arrow is brown, not lime */
-  --c-pill-bg: var(--color-navy);
-  --c-pill-letter-bg: var(--color-light-blue);
-  --c-pill-letter-text: var(--color-brown);
-  --c-pill-hover-bg: var(--color-light-pink);
-  --c-pill-hover-letter-bg: var(--color-navy);
-  --c-pill-hover-letter-text: var(--color-light-blue);
 }
 
 /* ----- Theme 3 (knob bottom, dark-blue/lime) ----- */
@@ -155,10 +143,4 @@
   --c-btn-default-icon: var(--color-brown);
   --c-btn-hover-bg: var(--color-light-blue);
   --c-btn-hover-icon: var(--color-navy);
-  --c-pill-bg: var(--color-lime);
-  --c-pill-letter-bg: var(--color-green);
-  --c-pill-letter-text: var(--color-lime);
-  --c-pill-hover-bg: var(--color-light-blue);
-  --c-pill-hover-letter-bg: var(--color-charcoal);
-  --c-pill-hover-letter-text: var(--color-light-blue);
 }

@@ -26,7 +26,7 @@ const clampRiceIndex = (index: number) => Math.max(0, Math.min(RICE_ITEM_COUNT -
 type HoldDirection = -1 | 0 | 1;
 const cyclePreviewOption = (option: PreviewOption, delta: -1 | 1) => {
   const index = PREVIEW_OPTIONS.indexOf(option);
-  return PREVIEW_OPTIONS[(index + delta + PREVIEW_OPTIONS.length) % PREVIEW_OPTIONS.length]!;
+  return PREVIEW_OPTIONS[(index + delta + PREVIEW_OPTIONS.length) % PREVIEW_OPTIONS.length];
 };
 
 export function PickARice() {
@@ -39,7 +39,7 @@ export function PickARice() {
   const [pressedControls, setPressedControls] = useState<ReadonlySet<PhysicalControl>>(new Set());
   const requestedRiceIndexRef = useRef(0);
   const [cycleIdx, setCycleIdx] = useState(0);
-  const theme = THEME_CYCLE[cycleIdx]!;
+  const theme = THEME_CYCLE[cycleIdx];
   const advance = useCallback(() => setCycleIdx((i) => (i + 1) % THEME_CYCLE.length), []);
   const themeValue = useMemo(() => ({ theme, advance }), [advance, theme]);
   const scroll = useMemo(
@@ -91,18 +91,14 @@ export function PickARice() {
   }, [view]);
 
   const applyFocusedRice = useCallback(() => {
-    if (view === 'picking') {
-      setPreviewOption('install');
-      setView('preview');
-    } else {
-      setView('picking');
-    }
-  }, [view]);
+    setPreviewOption('install');
+    setView((current) => (current === 'picking' ? 'preview' : 'picking'));
+  }, []);
 
   const cycleOnBareStage = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target !== e.currentTarget) return;
-    if (view === 'picking') setPreviewOption('install');
-    setView(view === 'picking' ? 'preview' : 'picking');
+    setPreviewOption('install');
+    setView((current) => (current === 'picking' ? 'preview' : 'picking'));
   };
 
   return (

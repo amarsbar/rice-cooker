@@ -10,6 +10,7 @@ import tryAnotherSvg from '@/assets/scroll-wheel/try-another.svg';
 import {
   MORPH_TRANSITION,
   POSITIONS,
+  PREVIEW_OPTIONS,
   type PreviewOption,
   SCREEN_FADE_TRANSITION,
   SHRUNKEN_TEXT_VARIANTS,
@@ -110,7 +111,6 @@ function PreviewWheelGraphic({ option }: { option: PreviewOption }) {
   return <img className={cls} src={src} alt="" aria-hidden="true" />;
 }
 
-const PREVIEW_DOT_IDS: PreviewOption[] = ['leave', 'install', 'dots'];
 const PREVIEW_DOTS: Record<
   PreviewOption,
   Record<PreviewOption, { x: number; y: number; size: number }>
@@ -135,7 +135,7 @@ const PREVIEW_DOTS: Record<
 function PreviewDots({ option }: { option: PreviewOption }) {
   return (
     <>
-      {PREVIEW_DOT_IDS.map((id) => {
+      {PREVIEW_OPTIONS.map((id) => {
         const dot = PREVIEW_DOTS[option][id];
         return (
           <motion.span

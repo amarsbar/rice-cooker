@@ -1,7 +1,8 @@
 import { createContext, useContext, type ReactNode } from 'react';
 
 export type View = 'picking' | 'preview';
-export type PreviewOption = 'leave' | 'install' | 'dots';
+export const PREVIEW_OPTIONS = ['leave', 'install', 'dots'] as const;
+export type PreviewOption = (typeof PREVIEW_OPTIONS)[number];
 
 const ViewContext = createContext<View>('picking');
 
@@ -32,8 +33,6 @@ export function useScroll() {
 export function ScrollProvider({ value, children }: { value: ScrollState; children: ReactNode }) {
   return <ScrollContext.Provider value={value}>{children}</ScrollContext.Provider>;
 }
-
-export const PREVIEW_OPTIONS: readonly PreviewOption[] = ['leave', 'install', 'dots'] as const;
 
 const PreviewOptionContext = createContext<PreviewOption>('install');
 
