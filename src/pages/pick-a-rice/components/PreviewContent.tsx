@@ -1,15 +1,13 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
+import BackIcon from '@/assets/preview-actions/back.svg?react';
+import DownloadIcon from '@/assets/preview-actions/download.svg?react';
+import GithubIcon from '@/assets/preview-actions/github.svg?react';
+import pointerDots from '@/assets/preview-actions/pointer-dots.svg';
+import pointerInstallBottom from '@/assets/preview-actions/pointer-install-bottom.svg';
+import pointerInstallTop from '@/assets/preview-actions/pointer-install-top.svg';
+import pointerLeave from '@/assets/preview-actions/pointer-leave.svg';
 import styles from './PreviewContent.module.css';
-import BackBtnSvg from '@/assets/icon-buttons/back.svg?react';
-import GithubBtnSvg from '@/assets/icon-buttons/github.svg?react';
-import { SHRUNKEN_TEXT_VARIANTS, useView } from '../view';
-
-const PreppingLoader = lazy(() =>
-  import('./PreppingLoader').then((mod) => ({ default: mod.PreppingLoader })),
-);
-
-const PREVIEW_LOAD_DURATION_MS = 1250;
+import { SHRUNKEN_TEXT_VARIANTS, usePreviewOption, useView, type PreviewOption } from '../view';
 
 interface PreviewContentProps {
   themeName: string;
@@ -17,31 +15,21 @@ interface PreviewContentProps {
   onApply: () => void;
 }
 
-/** Figma 350:7160 children — preview mode shown before the user commits.
- *  Back and GitHub buttons on the left, big central APPLY pill, theme
- *  name at top, "by creator name" at bottom. Fades in 150ms after the
- *  card morph completes.
- *
- *  Entering preview briefly shows the PREPPING loader (Figma 367:11763)
- *  before the preview content. For now it fires on every entry with a
- *  fixed 1.25s duration; once the real preview pipeline is wired up this
- *  will hook into actual load progress. */
+const WORDS: Record<PreviewOption, string> = {
+  leave: 'LEAVE',
+  install: 'INSTALL',
+  dots: 'DOTS',
+};
+const ICONS = {
+  leave: BackIcon,
+  install: DownloadIcon,
+  dots: GithubIcon,
+} as const;
+
 export function PreviewContent({ themeName, creatorName, onApply }: PreviewContentProps) {
   const view = useView();
+  const option = usePreviewOption();
   const active = view === 'preview';
-  const [loading, setLoading] = useState(false);
-  const wasActiveRef = useRef(false);
-
-  useEffect(() => {
-    if (active && !wasActiveRef.current) setLoading(true);
-    wasActiveRef.current = active;
-  }, [active]);
-
-  useEffect(() => {
-    if (!active || !loading) return;
-    const timeout = window.setTimeout(() => setLoading(false), PREVIEW_LOAD_DURATION_MS + 500);
-    return () => window.clearTimeout(timeout);
-  }, [active, loading]);
 
   return (
     <motion.div
@@ -51,58 +39,75 @@ export function PreviewContent({ themeName, creatorName, onApply }: PreviewConte
       variants={SHRUNKEN_TEXT_VARIANTS}
       style={{ pointerEvents: active ? 'auto' : 'none' }}
     >
-      <AnimatePresence>
-        {loading && active && (
-          <motion.div
-            className={styles.loaderOverlay}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-          >
-            <Suspense fallback={null}>
-              <PreppingLoader
-                playing
-                durationMs={PREVIEW_LOAD_DURATION_MS}
-                onComplete={() => setLoading(false)}
-              />
-            </Suspense>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <p className={`${styles.navLabel} ${styles.prevLabel}`}>Prev</p>
+      <p className={`${styles.navLabel} ${styles.nextLabel}`}>Next</p>
+      <p className={`${styles.navLabel} ${styles.confirmLabel}`}>CONFIRM</p>
 
-      {/* Preview UI — hidden while the PREPPING loader is up so only the chop
-          animation + lime overlay show during the loading phase. */}
-      {!loading && (
-        <>
-          <p className={`${styles.label} ${styles.themeName}`}>{themeName}</p>
-          <p className={`${styles.label} ${styles.creatorName}`}>{creatorName}</p>
+      <ActionButton type="leave" active={option === 'leave'} />
+      <ActionButton type="install" active={option === 'install'} />
+      <ActionButton type="dots" active={option === 'dots'} />
+      <OptionPointers option={option} />
 
-          <button type="button" className={styles.backBtn} aria-label="Back">
-            <BackBtnSvg />
-          </button>
-          <button type="button" className={styles.githubBtn} aria-label="View on GitHub">
-            <GithubBtnSvg />
-          </button>
+      <button
+        type="button"
+        className={`${styles.wordPill} ${styles[`word_${option}`]}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          onApply();
+        }}
+      >
+        <span className={styles.wordCluster}>
+          {WORDS[option].split('').map((char, index) => (
+            <span key={index} className={styles.wordLetter}>
+              {char}
+            </span>
+          ))}
+        </span>
+      </button>
 
-          <button
-            type="button"
-            className={styles.applyBtn}
-            onClick={(event) => {
-              event.stopPropagation();
-              onApply();
-            }}
-          >
-            <div className={styles.applyCluster}>
-              {'APPLY'.split('').map((c, i) => (
-                <span key={i} className={styles.applyLetter}>
-                  {c}
-                </span>
-              ))}
-            </div>
-          </button>
-        </>
-      )}
+      <p className={styles.metaLabel}>
+        {themeName} by {creatorName}
+      </p>
     </motion.div>
+  );
+}
+
+function ActionButton({ type, active }: { type: PreviewOption; active: boolean }) {
+  const className = `${styles.actionBtn} ${styles[`action_${type}`]} ${
+    active ? styles.actionActive : ''
+  }`;
+  const Icon = ICONS[type];
+  return (
+    <span className={className} aria-hidden="true">
+      <Icon className={styles.actionIcon} />
+    </span>
+  );
+}
+
+function OptionPointers({ option }: { option: PreviewOption }) {
+  if (option === 'install') {
+    return (
+      <>
+        <img
+          alt=""
+          src={pointerInstallTop}
+          className={`${styles.pointer} ${styles.pointerInstallTop}`}
+        />
+        <img
+          alt=""
+          src={pointerInstallBottom}
+          className={`${styles.pointer} ${styles.pointerInstallBottom}`}
+        />
+      </>
+    );
+  }
+  return (
+    <img
+      alt=""
+      src={option === 'leave' ? pointerLeave : pointerDots}
+      className={`${styles.pointer} ${
+        option === 'leave' ? styles.pointerLeave : styles.pointerDots
+      }`}
+    />
   );
 }

@@ -49,7 +49,7 @@
      same names — components only reference role tokens, never raw
      palette. */
   --c-card-bg: #000001;                              /* opaque card bg in picking state */
-  --c-card-bg-shrunken: rgba(26, 20, 25, 0.8);       /* semi-transparent in preview/post-install */
+  --c-card-bg-shrunken: rgba(26, 20, 25, 0.8);       /* semi-transparent in preview */
   --c-card-border: var(--color-mint);                /* card border + green tab + theme knob base */
   --c-sound-body: var(--color-teal);                 /* sound ring stroke + inner disc */
   --c-sound-icon: var(--color-mint);                 /* speaker glyph */
@@ -70,7 +70,7 @@
   --c-btn-default-icon: var(--color-brown);          /* back/github/delete default icon (fill + stroke) */
   --c-btn-hover-bg: var(--color-green);
   --c-btn-hover-icon: var(--color-lime);
-  --c-pill-bg: var(--color-green);                   /* APPLY/DONE default bg */
+  --c-pill-bg: var(--color-green);                   /* large action pill default bg */
   --c-pill-letter-bg: var(--color-lime);             /* letter circle default bg */
   --c-pill-letter-text: var(--color-brown);          /* letter default text */
   --c-pill-hover-bg: var(--color-yellow);

@@ -6,9 +6,9 @@ import { RiceList, type RiceNavRequest } from './RiceList';
 import type { PhysicalControl } from './PhysicalControls';
 
 const CENTER_OFFSET_X =
-  -(POSITIONS.picking.card.width - POSITIONS['post-install'].card.width) / 2;
+  -(POSITIONS.picking.card.width - POSITIONS.preview.card.width) / 2;
 const CENTER_OFFSET_Y =
-  -(POSITIONS.picking.card.height - POSITIONS['post-install'].card.height) / 2;
+  -(POSITIONS.picking.card.height - POSITIONS.preview.card.height) / 2;
 
 /** Picking-state card content: header on top, focused rice preview below.
  *  Fades + translates to stay centered while the card shrinks. */

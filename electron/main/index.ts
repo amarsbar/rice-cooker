@@ -98,20 +98,22 @@ function createWindow(): void {
       win.webContents.executeJavaScript(
         '(() => { const el = document.querySelector("[class*=stage]"); if (!el) return false; el.click(); return true; })()',
       );
-    type CaptureView = 'picking' | 'preview' | 'post-install';
+    type CaptureView = 'picking' | 'preview';
     let captureView: CaptureView = 'picking';
     const clickStageToNext = async () => {
       const clicked = await clickStage();
       if (clicked) {
-        captureView =
-          captureView === 'picking'
-            ? 'preview'
-            : captureView === 'preview'
-              ? 'post-install'
-              : 'picking';
+        captureView = captureView === 'picking' ? 'preview' : 'picking';
       }
       return clicked;
     };
+    const pressKey = (key: string) =>
+      win.webContents.executeJavaScript(
+        `(() => {
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: '${key}' }));
+          window.dispatchEvent(new KeyboardEvent('keyup', { key: '${key}' }));
+        })()`,
+      );
 
     win.webContents.once('did-finish-load', async () => {
       const { writeFile } = await import('node:fs/promises');
@@ -122,7 +124,7 @@ function createWindow(): void {
       await writeFile(`${base}-picking.png`, pickingImg.toPNG());
 
       if (process.env['RICE_CAPTURE_ALL']) {
-        for (const name of ['preview', 'post-install'] as const) {
+        for (const name of ['preview'] as const) {
           const clicked = await clickStageToNext();
           if (!clicked) {
             console.warn('[rice-cooker] capture: stage element not found');
@@ -131,6 +133,14 @@ function createWindow(): void {
           await new Promise((r) => setTimeout(r, MORPH_SETTLE_MS));
           const img = await win.webContents.capturePage();
           await writeFile(`${base}-${name}.png`, img.toPNG());
+        }
+        if (process.env['RICE_CAPTURE_PREVIEW_OPTIONS']) {
+          for (const name of ['dots', 'leave'] as const) {
+            await pressKey('ArrowDown');
+            await new Promise((r) => setTimeout(r, MORPH_SETTLE_MS));
+            const img = await win.webContents.capturePage();
+            await writeFile(`${base}-preview-${name}.png`, img.toPNG());
+          }
         }
       }
 

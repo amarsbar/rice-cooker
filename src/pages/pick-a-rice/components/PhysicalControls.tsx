@@ -177,7 +177,7 @@ export function PhysicalControls({
       className={styles.controls}
       initial={false}
       animate={{
-        left: cardPosition.left + cardPosition.width - 250,
+        left: cardPosition.left + cardPosition.width - 241,
         top: cardPosition.top,
       }}
       transition={MORPH_TRANSITION}

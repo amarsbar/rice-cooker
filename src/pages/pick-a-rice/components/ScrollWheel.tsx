@@ -4,11 +4,16 @@ import styles from './ScrollWheel.module.css';
 import { OutlinedText } from './OutlinedText';
 import RimSvg from '@/assets/scroll-wheel/rim.svg?react';
 import GridSvg from '@/assets/scroll-wheel/grid.svg?react';
+import installRiceSvg from '@/assets/scroll-wheel/install-rice.svg';
+import dotfilesSvg from '@/assets/scroll-wheel/dotfiles.svg';
+import tryAnotherSvg from '@/assets/scroll-wheel/try-another.svg';
 import {
   MORPH_TRANSITION,
   POSITIONS,
+  type PreviewOption,
   SCREEN_FADE_TRANSITION,
   SHRUNKEN_TEXT_VARIANTS,
+  usePreviewOption,
   useScroll,
   useView,
 } from '../view';
@@ -40,6 +45,7 @@ const RIM_ROTATE_PER_PX = 0.2;
 
 export function ScrollWheel() {
   const view = useView();
+  const previewOption = usePreviewOption();
   const scroll = useScroll();
   const pressed = usePressedDirections();
 
@@ -81,21 +87,71 @@ export function ScrollWheel() {
           animate={view === 'preview' ? 'visible' : 'hidden'}
           variants={SHRUNKEN_TEXT_VARIANTS}
         >
-          <OutlinedText className={styles.previewing}>previewing</OutlinedText>
-        </motion.div>
-
-        <motion.div
-          className={styles.content}
-          initial={false}
-          animate={view === 'post-install' ? 'visible' : 'hidden'}
-          variants={SHRUNKEN_TEXT_VARIANTS}
-        >
-          <OutlinedText className={`${styles.installText} ${styles.installRice}`}>rice</OutlinedText>
-          <OutlinedText className={`${styles.installText} ${styles.installInstalled}`}>installed</OutlinedText>
-          <OutlinedText className={`${styles.installText} ${styles.installBang}`}>!</OutlinedText>
+          <PreviewWheelGraphic option={previewOption} />
         </motion.div>
       </div>
+
+      <motion.div
+        className={styles.previewDots}
+        initial={false}
+        animate={view === 'preview' ? 'visible' : 'hidden'}
+        variants={SHRUNKEN_TEXT_VARIANTS}
+      >
+        <PreviewDots option={previewOption} />
+      </motion.div>
     </motion.div>
+  );
+}
+
+function PreviewWheelGraphic({ option }: { option: PreviewOption }) {
+  const cls = `${styles.previewGraphic} ${styles[`previewGraphic_${option}`]}`;
+  const src =
+    option === 'leave' ? tryAnotherSvg : option === 'dots' ? dotfilesSvg : installRiceSvg;
+  return <img className={cls} src={src} alt="" aria-hidden="true" />;
+}
+
+const PREVIEW_DOT_IDS: PreviewOption[] = ['leave', 'install', 'dots'];
+const PREVIEW_DOTS: Record<
+  PreviewOption,
+  Record<PreviewOption, { x: number; y: number; size: number }>
+> = {
+  leave: {
+    leave: { x: 99.59, y: 16.59, size: 20 },
+    install: { x: 122.97, y: 23.59, size: 10.754 },
+    dots: { x: 138.3, y: 29.59, size: 9.414 },
+  },
+  install: {
+    leave: { x: 76.59, y: 27.59, size: 10 },
+    install: { x: 100.59, y: 19.59, size: 20 },
+    dots: { x: 125.05, y: 27.16, size: 10.754 },
+  },
+  dots: {
+    leave: { x: 64.09, y: 30.59, size: 7 },
+    install: { x: 80.09, y: 23.59, size: 11 },
+    dots: { x: 103.59, y: 16.59, size: 22 },
+  },
+};
+
+function PreviewDots({ option }: { option: PreviewOption }) {
+  return (
+    <>
+      {PREVIEW_DOT_IDS.map((id) => {
+        const dot = PREVIEW_DOTS[option][id];
+        return (
+          <motion.span
+            key={id}
+            className={styles.previewDot}
+            animate={{
+              left: dot.x - dot.size / 2,
+              top: dot.y,
+              width: dot.size,
+              height: dot.size,
+            }}
+            transition={MORPH_TRANSITION}
+          />
+        );
+      })}
+    </>
   );
 }
 

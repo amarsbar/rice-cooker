@@ -20,7 +20,7 @@ export function RiceCard({ children }: { children: ReactNode }) {
           : 'var(--c-card-bg-shrunken)',
       }}
     >
-      <img src={cardBg} alt="" className={styles.bg} />
+      <img src={cardBg} alt="" className={`${styles.bg} ${!isPicking ? styles.bgShrunken : ''}`} />
       {children}
     </motion.div>
   );
