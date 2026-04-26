@@ -72,17 +72,17 @@
 }
 
 .action_leave.actionActive {
-  left: 22px;
-  top: 15px;
+  left: 31px;
+  top: 24px;
 }
 
 .action_install {
-  left: 11px;
+  left: 20px;
   top: 94px;
 }
 
 .action_install.actionActive {
-  left: 21px;
+  left: 30px;
   top: 90px;
 }
 
@@ -92,8 +92,8 @@
 }
 
 .action_dots.actionActive {
-  left: 22px;
-  top: 147px;
+  left: 31px;
+  top: 156px;
 }
 
 .pointer {
@@ -102,29 +102,29 @@
 }
 
 .pointerLeave {
-  left: 32.69px;
-  top: 66.06px;
+  left: 42.69px;
+  top: 75.06px;
   width: 9.535px;
   height: 8.921px;
 }
 
 .pointerInstallTop {
-  left: 32px;
-  top: 69px;
+  left: 42px;
+  top: 78px;
   width: 9.66px;
   height: 9.075px;
 }
 
 .pointerInstallBottom {
-  left: 32px;
-  top: 131px;
+  left: 42px;
+  top: 140px;
   width: 9.533px;
   height: 8.919px;
 }
 
 .pointerDots {
-  left: 32px;
-  top: 136px;
+  left: 42px;
+  top: 145px;
   width: 9.533px;
   height: 8.919px;
 }
