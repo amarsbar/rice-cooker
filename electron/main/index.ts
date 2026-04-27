@@ -33,6 +33,7 @@ if (process.env['XDG_SESSION_TYPE'] === 'wayland') {
 
 app.commandLine.appendSwitch('enable-transparent-visuals');
 
+// Live props avoid runtime windowrule accumulation, but Hyprland reloads can drop them.
 async function applyHyprlandWindowProps(): Promise<void> {
   if (!process.env['HYPRLAND_INSTANCE_SIGNATURE']) return;
 
@@ -58,7 +59,11 @@ async function applyHyprlandWindowProps(): Promise<void> {
 
       const target = `address:${fields.address}`;
       for (const [prop, value] of HYPRLAND_WINDOW_EFFECTS) {
-        await execFileAsync('hyprctl', ['dispatch', 'setprop', target, prop, value]);
+        try {
+          await execFileAsync('hyprctl', ['dispatch', 'setprop', target, prop, value]);
+        } catch (err) {
+          console.warn(`[rice-cooker] hyprctl setprop ${prop} failed:`, err);
+        }
       }
     }
   } catch (err) {
