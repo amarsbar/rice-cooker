@@ -1,8 +1,14 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
-import { execFile } from 'node:child_process';
+import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import type {
+  BackendRunRequest,
+  BackendRunResult,
+  RiceListRow,
+} from '../../src/shared/backend';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const execFileAsync = promisify(execFile);
@@ -62,6 +68,103 @@ async function injectCompositorRules(): Promise<void> {
  *  every pixel-positioned element scales uniformly. Override with
  *  RICE_SCALE env var (e.g. `RICE_SCALE=2 npm run dev`). */
 const SCALE = Number(process.env['RICE_SCALE']) || 1.75;
+const RAW_TAIL_LIMIT = 100;
+let activeBackendChild: ChildProcessWithoutNullStreams | null = null;
+
+function backendBin(): string {
+  const override = process.env['RICE_COOKER_BACKEND'];
+  if (override) return override;
+  if (app.isPackaged) return 'rice-cooker-backend';
+
+  for (const candidate of [
+    join(process.cwd(), 'backend/target/debug/rice-cooker-backend'),
+    join(process.cwd(), 'backend/target/release/rice-cooker-backend'),
+  ]) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return 'rice-cooker-backend';
+}
+
+async function backendList(): Promise<RiceListRow[]> {
+  const { stdout } = await execFileAsync(backendBin(), ['list'], {
+    maxBuffer: 1024 * 1024,
+  });
+  return JSON.parse(stdout) as RiceListRow[];
+}
+
+function parseBackendEvent(line: string): BackendRunResult['events'][number] | null {
+  try {
+    const value = JSON.parse(line) as unknown;
+    if (value && typeof value === 'object' && 'type' in value) {
+      return value as BackendRunResult['events'][number];
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function pushRawTail(rawTail: string[], line: string): void {
+  if (!line.trim()) return;
+  rawTail.push(line);
+  if (rawTail.length > RAW_TAIL_LIMIT) rawTail.splice(0, rawTail.length - RAW_TAIL_LIMIT);
+}
+
+function backendArgs(request: BackendRunRequest): string[] {
+  if (request.command === 'uninstall') return ['uninstall'];
+  if (!request.name) throw new Error(`${request.command} requires a rice name`);
+  return [request.command, request.name];
+}
+
+function runBackend(request: BackendRunRequest): Promise<BackendRunResult> {
+  if (activeBackendChild) throw new Error('a backend command is already running');
+
+  const events: BackendRunResult['events'] = [];
+  const rawTail: string[] = [];
+  const child = spawn(backendBin(), backendArgs(request), {
+    cwd: process.cwd(),
+    env: process.env,
+  });
+  activeBackendChild = child;
+
+  let stdoutBuffer = '';
+  let stderrBuffer = '';
+  const consume = (chunk: Buffer, isStdout: boolean) => {
+    let buffer = (isStdout ? stdoutBuffer : stderrBuffer) + chunk.toString('utf8');
+    let newline = buffer.indexOf('\n');
+    while (newline !== -1) {
+      const line = buffer.slice(0, newline).trimEnd();
+      buffer = buffer.slice(newline + 1);
+      const event = parseBackendEvent(line);
+      if (event) {
+        events.push(event);
+      } else {
+        pushRawTail(rawTail, line);
+      }
+      newline = buffer.indexOf('\n');
+    }
+    if (isStdout) stdoutBuffer = buffer;
+    else stderrBuffer = buffer;
+  };
+
+  child.stdout.on('data', (chunk: Buffer) => consume(chunk, true));
+  child.stderr.on('data', (chunk: Buffer) => consume(chunk, false));
+
+  return new Promise((resolve, reject) => {
+    child.on('error', (err) => {
+      activeBackendChild = null;
+      reject(err);
+    });
+    child.on('close', (exitCode) => {
+      if (stdoutBuffer) pushRawTail(rawTail, stdoutBuffer);
+      if (stderrBuffer) pushRawTail(rawTail, stderrBuffer);
+      activeBackendChild = null;
+      const failed = events.some((event) => event.type === 'fail');
+      const succeeded = events.some((event) => event.type === 'success');
+      resolve({ ok: exitCode === 0 && succeeded && !failed, events, rawTail, exitCode });
+    });
+  });
+}
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -241,6 +344,10 @@ ipcMain.on('window:close', (event) => {
   if (!fromOwnRenderer) return;
   win.close();
 });
+
+ipcMain.handle('backend:list', () => backendList());
+
+ipcMain.handle('backend:run', (_event, request: BackendRunRequest) => runBackend(request));
 
 app.whenReady()
   .then(async () => {

@@ -1,11 +1,20 @@
 import styles from './RiceItem.module.css';
 import placeholderRice from '@/assets/rices/placeholder-rice.webp';
+import dmsScreenshot from '@/assets/rice-screenshots/dankmaterialshell.png';
+import noctaliaScreenshot from '@/assets/rice-screenshots/noctalia-dark-1.png';
+import type { RiceListRow } from '@/shared/backend';
 
-export function RiceItem() {
+const SCREENSHOTS: Record<string, string> = {
+  dms: dmsScreenshot,
+  noctalia: noctaliaScreenshot,
+};
+
+export function RiceItem({ rice }: { rice: RiceListRow }) {
+  const image = SCREENSHOTS[rice.name] ?? placeholderRice;
   return (
     <div className={styles.item}>
       <div className={styles.preview}>
-        <img src={placeholderRice} alt="" className={styles.image} />
+        <img src={image} alt="" className={styles.image} />
       </div>
     </div>
   );

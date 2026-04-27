@@ -1,7 +1,8 @@
 import { useEffect, useRef, type UIEvent } from 'react';
 import styles from './RiceList.module.css';
-import { RICE_ITEM_COUNT, RICE_ITEM_PITCH } from '../view';
+import { RICE_ITEM_PITCH } from '../view';
 import { RiceItem } from './RiceItem';
+import type { RiceListRow } from '@/shared/backend';
 
 export interface RiceNavRequest {
   index: number;
@@ -10,18 +11,18 @@ export interface RiceNavRequest {
 
 interface RiceListProps {
   active: boolean;
+  rices: RiceListRow[];
   holdDirection: -1 | 0 | 1;
   navRequest: RiceNavRequest;
   onScrollOffsetChange: (offset: number) => void;
 }
 
-const ITEMS = Array.from({ length: RICE_ITEM_COUNT }, (_, i) => i);
-const MAX_SCROLL = (RICE_ITEM_COUNT - 1) * RICE_ITEM_PITCH;
 const HOLD_SPEED = RICE_ITEM_PITCH / 220;
 const SNAP_DELAY_MS = 120;
 
 export function RiceList({
   active,
+  rices,
   holdDirection,
   navRequest,
   onScrollOffsetChange,
@@ -29,6 +30,7 @@ export function RiceList({
   const ref = useRef<HTMLDivElement>(null);
   const snapTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const wasHoldingRef = useRef(false);
+  const maxScroll = Math.max(0, (rices.length - 1) * RICE_ITEM_PITCH);
 
   const clearSnap = () => {
     if (snapTimerRef.current === null) return;
@@ -38,7 +40,10 @@ export function RiceList({
 
   const snap = (el: HTMLDivElement) => {
     el.scrollTo({
-      top: Math.max(0, Math.min(MAX_SCROLL, Math.round(el.scrollTop / RICE_ITEM_PITCH) * RICE_ITEM_PITCH)),
+      top: Math.max(
+        0,
+        Math.min(maxScroll, Math.round(el.scrollTop / RICE_ITEM_PITCH) * RICE_ITEM_PITCH),
+      ),
       behavior: 'smooth',
     });
   };
@@ -59,13 +64,16 @@ export function RiceList({
     const tick = (now: number) => {
       const el = ref.current;
       if (!el) return;
-      el.scrollTop = Math.max(0, Math.min(MAX_SCROLL, el.scrollTop + holdDirection * HOLD_SPEED * (now - last)));
+      el.scrollTop = Math.max(
+        0,
+        Math.min(maxScroll, el.scrollTop + holdDirection * HOLD_SPEED * (now - last)),
+      );
       last = now;
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [active, holdDirection]);
+  }, [active, holdDirection, maxScroll]);
 
   useEffect(() => {
     if (ref.current && active && holdDirection === 0 && wasHoldingRef.current) snap(ref.current);
@@ -95,8 +103,8 @@ export function RiceList({
       onScroll={reportScrollOffset}
     >
       <div className={styles.track}>
-        {ITEMS.map((i) => (
-          <RiceItem key={i} />
+        {rices.map((rice) => (
+          <RiceItem key={rice.name} rice={rice} />
         ))}
       </div>
     </div>
