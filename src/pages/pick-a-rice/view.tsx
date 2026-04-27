@@ -21,7 +21,6 @@ export interface ScrollState {
   total: number;
 }
 
-export const RICE_ITEM_COUNT = 10;
 export const RICE_ITEM_PITCH = 292;
 
 const ScrollContext = createContext<ScrollState>({ offset: 0, index: 0, total: 1 });

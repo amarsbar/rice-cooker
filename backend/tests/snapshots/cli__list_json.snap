@@ -7,6 +7,7 @@ expression: stdout
     "name": "one",
     "display_name": "One",
     "description": "first rice",
+    "repo": "https://example.invalid/one",
     "install_supported": true,
     "installed": false,
     "documented_system_effects": [
@@ -17,6 +18,7 @@ expression: stdout
     "name": "two",
     "display_name": "Two",
     "description": "",
+    "repo": "https://example.invalid/two",
     "install_supported": false,
     "installed": false,
     "documented_system_effects": []

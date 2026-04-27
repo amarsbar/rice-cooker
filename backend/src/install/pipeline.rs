@@ -32,6 +32,7 @@ pub struct ListRow {
     pub name: String,
     pub display_name: String,
     pub description: String,
+    pub repo: String,
     pub install_supported: bool,
     pub installed: bool,
     pub documented_system_effects: Vec<String>,
@@ -268,7 +269,6 @@ fn run_activate<W: Write>(
         }
     }
 
-    let _ = Command::new("hyprctl").arg("reload").output();
     events.emit(&Event::Success {
         active: Some(name.to_string()),
     })?;
@@ -302,7 +302,6 @@ pub fn run_uninstall<W: Write>(
     if !replay_original_shell(paths, events)? {
         return Ok(false);
     }
-    let _ = Command::new("hyprctl").arg("reload").output();
     events.emit(&Event::Success { active: None })?;
     Ok(true)
 }
@@ -457,6 +456,7 @@ pub fn list(cat: &Catalog, paths: &Paths) -> Result<Vec<ListRow>> {
             name: name.clone(),
             display_name: entry.display_name.clone(),
             description: entry.description.clone(),
+            repo: entry.repo.clone(),
             install_supported: entry.install_supported,
             installed: current.as_deref() == Some(name.as_str()),
             documented_system_effects: entry.documented_system_effects.clone(),

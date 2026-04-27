@@ -1,19 +1,26 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
-import { execFile } from 'node:child_process';
+import { app, BrowserWindow, ipcMain, screen, shell } from 'electron';
+import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import type {
+  BackendRunRequest,
+  BackendRunResult,
+  RiceListRow,
+} from '../../src/shared/backend';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const execFileAsync = promisify(execFile);
 
-/** Identifiers compositor rules match against. The Wayland app_id Chromium
- *  advertises varies: "Electron" under a direct `electron` launch,
- *  "rice-cooker" under electron-vite dev (which spawns with a different
- *  argv[0]). We match either class plus the stable title to hit both cases. */
-const APP_CLASS_REGEX = '^(Electron|rice-cooker)$';
+const APP_CLASS_PATTERN = /^(electron|Electron|rice-cooker)$/;
 const APP_TITLE = 'Rice Cooker';
-const APP_TITLE_REGEX = '^(Rice Cooker)$';
+const HYPRLAND_WINDOW_EFFECTS = [
+  ['no_blur', 'on'],
+  ['no_shadow', 'on'],
+  ['rounding', '0'],
+  ['border_size', '0'],
+] as const;
 
 app.setName('rice-cooker');
 
@@ -26,47 +33,168 @@ if (process.env['XDG_SESSION_TYPE'] === 'wayland') {
 
 app.commandLine.appendSwitch('enable-transparent-visuals');
 
-/** Inject runtime windowrules so our transparent pixels aren't muddied by the
- *  compositor's blur/shadow/rounding, regardless of user config. Matching on
- *  class+title narrows to our own window; rules persist for the current
- *  compositor session and affect no other apps.
- *
- *  Note: Hyprland's CLI has no way to remove a specific runtime windowrule.
- *  Rules accumulate across dev reloads until `hyprctl reload` is run (which
- *  would nuke every runtime rule on the system, not just ours). Since each
- *  duplicate targets the same match, duplicates are functionally a no-op —
- *  only harmless rule-list bloat in the compositor session. */
-async function injectCompositorRules(): Promise<void> {
-  // Niri has no compositor blur/shadow and no runtime IPC for window rules,
-  // so nothing to inject there; transparent pixels already pass through clean.
+// Live props avoid runtime windowrule accumulation, but Hyprland reloads can drop them.
+async function applyHyprlandWindowProps(): Promise<void> {
   if (!process.env['HYPRLAND_INSTANCE_SIGNATURE']) return;
 
-  const match = `match:class ${APP_CLASS_REGEX}, match:title ${APP_TITLE_REGEX}`;
-  const rules = [
-    `no_blur on, ${match}`,
-    `no_shadow on, ${match}`,
-    `rounding 0, ${match}`,
-    `border_size 0, ${match}`,
-  ];
-  for (const rule of rules) {
-    try {
-      await execFileAsync('hyprctl', ['keyword', 'windowrule', rule]);
-    } catch (err) {
-      console.warn('[rice-cooker] hyprctl windowrule failed:', rule, err);
+  try {
+    const { stdout } = await execFileAsync('hyprctl', ['clients', '-j'], {
+      maxBuffer: 1024 * 1024,
+    });
+    const clients = JSON.parse(stdout) as unknown;
+    if (!Array.isArray(clients)) return;
+
+    for (const client of clients) {
+      if (!client || typeof client !== 'object') continue;
+      const fields = client as { address?: unknown; class?: unknown; title?: unknown };
+      if (
+        typeof fields.address !== 'string' ||
+        typeof fields.class !== 'string' ||
+        typeof fields.title !== 'string' ||
+        !APP_CLASS_PATTERN.test(fields.class) ||
+        fields.title !== APP_TITLE
+      ) {
+        continue;
+      }
+
+      const target = `address:${fields.address}`;
+      for (const [prop, value] of HYPRLAND_WINDOW_EFFECTS) {
+        try {
+          await execFileAsync('hyprctl', ['dispatch', 'setprop', target, prop, value]);
+        } catch (err) {
+          console.warn(`[rice-cooker] hyprctl setprop ${prop} failed:`, err);
+        }
+      }
     }
+  } catch (err) {
+    console.warn('[rice-cooker] hyprctl live window props failed:', err);
   }
 }
 
-/** UI scale factor - design is 666 x 574 @ 1x; multiplied for readability on
- *  high-res monitors. Applied both to window size and via zoomFactor so
- *  every pixel-positioned element scales uniformly. Override with
- *  RICE_SCALE env var (e.g. `RICE_SCALE=2 npm run dev`). */
-const SCALE = Number(process.env['RICE_SCALE']) || 1.75;
+const BASE_SIZE = { width: 666, height: 574 } as const;
+const FIGMA_HEIGHT_RATIO = 600 / 1080;
+const RAW_TAIL_LIMIT = 100;
+let activeBackendChild: ChildProcessWithoutNullStreams | null = null;
+
+function backendBin(): string {
+  const override = process.env['RICE_COOKER_BACKEND'];
+  if (override) return override;
+  if (app.isPackaged) return 'rice-cooker-backend';
+
+  for (const candidate of [
+    join(process.cwd(), 'backend/target/debug/rice-cooker-backend'),
+    join(process.cwd(), 'backend/target/release/rice-cooker-backend'),
+  ]) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return 'rice-cooker-backend';
+}
+
+async function backendList(): Promise<RiceListRow[]> {
+  const { stdout } = await execFileAsync(backendBin(), ['list'], {
+    maxBuffer: 1024 * 1024,
+  });
+  return JSON.parse(stdout) as RiceListRow[];
+}
+
+function parseBackendEvent(line: string): BackendRunResult['events'][number] | null {
+  try {
+    const value = JSON.parse(line) as unknown;
+    if (value && typeof value === 'object' && 'type' in value) {
+      return value as BackendRunResult['events'][number];
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function pushRawTail(rawTail: string[], line: string): void {
+  if (!line.trim()) return;
+  rawTail.push(line);
+  if (rawTail.length > RAW_TAIL_LIMIT) rawTail.splice(0, rawTail.length - RAW_TAIL_LIMIT);
+}
+
+function backendArgs(request: BackendRunRequest): string[] {
+  switch (request.command) {
+    case 'uninstall':
+      return ['uninstall'];
+    case 'preview':
+    case 'try':
+      if (!request.name) throw new Error(`${request.command} requires a rice name`);
+      return [request.command, request.name];
+    default:
+      throw new Error(`unknown backend command: ${String((request as { command?: unknown }).command)}`);
+  }
+}
+
+function runBackend(request: BackendRunRequest): Promise<BackendRunResult> {
+  if (activeBackendChild) throw new Error('a backend command is already running');
+
+  const events: BackendRunResult['events'] = [];
+  const rawTail: string[] = [];
+  const child = spawn(backendBin(), backendArgs(request), {
+    cwd: process.cwd(),
+    env: process.env,
+  });
+  activeBackendChild = child;
+
+  let stdoutBuffer = '';
+  let stderrBuffer = '';
+  const consume = (chunk: Buffer, isStdout: boolean) => {
+    let buffer = (isStdout ? stdoutBuffer : stderrBuffer) + chunk.toString('utf8');
+    let newline = buffer.indexOf('\n');
+    while (newline !== -1) {
+      const line = buffer.slice(0, newline).trimEnd();
+      buffer = buffer.slice(newline + 1);
+      const event = parseBackendEvent(line);
+      if (event) {
+        events.push(event);
+      } else {
+        pushRawTail(rawTail, line);
+      }
+      newline = buffer.indexOf('\n');
+    }
+    if (isStdout) stdoutBuffer = buffer;
+    else stderrBuffer = buffer;
+  };
+
+  child.stdout.on('data', (chunk: Buffer) => consume(chunk, true));
+  child.stderr.on('data', (chunk: Buffer) => consume(chunk, false));
+
+  return new Promise((resolve, reject) => {
+    child.on('error', (err) => {
+      activeBackendChild = null;
+      reject(err);
+    });
+    child.on('close', (exitCode) => {
+      if (stdoutBuffer) pushRawTail(rawTail, stdoutBuffer);
+      if (stderrBuffer) pushRawTail(rawTail, stderrBuffer);
+      activeBackendChild = null;
+      const failed = events.some((event) => event.type === 'fail');
+      const succeeded = events.some((event) => event.type === 'success');
+      void applyHyprlandWindowProps();
+      resolve({ ok: exitCode === 0 && succeeded && !failed, events, rawTail, exitCode });
+    });
+  });
+}
 
 function createWindow(): void {
+  const scale =
+    Number(process.env['RICE_SCALE']) ||
+    Math.max(
+      0.95,
+      Math.min(
+        2.15,
+        (screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workAreaSize.height *
+          FIGMA_HEIGHT_RATIO) /
+          BASE_SIZE.height,
+      ),
+    );
+
   const win = new BrowserWindow({
-    width: Math.round(666 * SCALE),
-    height: Math.round(574 * SCALE),
+    width: Math.round(BASE_SIZE.width * scale),
+    height: Math.round(BASE_SIZE.height * scale),
     title: APP_TITLE,
     transparent: true,
     frame: false,
@@ -84,8 +212,11 @@ function createWindow(): void {
     },
   });
 
-  win.webContents.on('did-finish-load', () => win.webContents.setZoomFactor(SCALE));
-  win.once('ready-to-show', () => win.show());
+  win.webContents.on('did-finish-load', () => win.webContents.setZoomFactor(scale));
+  win.once('ready-to-show', () => {
+    win.show();
+    void applyHyprlandWindowProps();
+  });
 
   const captureOut = process.env['RICE_CAPTURE_OUT'];
   if (captureOut) {
@@ -242,9 +373,12 @@ ipcMain.on('window:close', (event) => {
   win.close();
 });
 
+ipcMain.handle('backend:list', () => backendList());
+
+ipcMain.handle('backend:run', (_event, request: BackendRunRequest) => runBackend(request));
+
 app.whenReady()
-  .then(async () => {
-    await injectCompositorRules();
+  .then(() => {
     createWindow();
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
