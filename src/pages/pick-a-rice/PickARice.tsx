@@ -39,6 +39,7 @@ export function PickARice() {
   const [riceNavRequest, setRiceNavRequest] = useState({ index: 0, version: 0 });
   const [riceHoldDirection, setRiceHoldDirection] = useState<HoldDirection>(0);
   const [pressedControls, setPressedControls] = useState<ReadonlySet<PhysicalControl>>(new Set());
+  const backendRunningRef = useRef(false);
   const requestedRiceIndexRef = useRef(0);
   const [cycleIdx, setCycleIdx] = useState(0);
   const theme = THEME_CYCLE[cycleIdx];
@@ -74,6 +75,8 @@ export function PickARice() {
   }, []);
 
   const runBackend = useCallback(async (request: BackendRunRequest, afterSuccess?: () => void) => {
+    if (backendRunningRef.current) return;
+    backendRunningRef.current = true;
     setBackendRunning(true);
     try {
       const result = await window.rice.backend.run(request);
@@ -85,6 +88,7 @@ export function PickARice() {
     } catch (error) {
       console.error('[rice-cooker] backend command failed:', error);
     } finally {
+      backendRunningRef.current = false;
       setBackendRunning(false);
     }
   }, []);

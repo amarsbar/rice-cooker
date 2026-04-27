@@ -116,9 +116,16 @@ function pushRawTail(rawTail: string[], line: string): void {
 }
 
 function backendArgs(request: BackendRunRequest): string[] {
-  if (request.command === 'uninstall') return ['uninstall'];
-  if (!request.name) throw new Error(`${request.command} requires a rice name`);
-  return [request.command, request.name];
+  switch (request.command) {
+    case 'uninstall':
+      return ['uninstall'];
+    case 'preview':
+    case 'try':
+      if (!request.name) throw new Error(`${request.command} requires a rice name`);
+      return [request.command, request.name];
+    default:
+      throw new Error(`unknown backend command: ${String((request as { command?: unknown }).command)}`);
+  }
 }
 
 function runBackend(request: BackendRunRequest): Promise<BackendRunResult> {
