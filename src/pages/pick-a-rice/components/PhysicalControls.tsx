@@ -35,7 +35,11 @@ const keyToControl = (key: string): Control | undefined =>
 const isInteractiveTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement &&
   (target.isContentEditable ||
-    target.closest('input, textarea, select, button, a[href], [contenteditable="true"]') !== null);
+    target.closest('input, textarea, select, [contenteditable="true"]') !== null);
+
+const preventFocus = (event: React.MouseEvent<HTMLButtonElement>) => {
+  event.preventDefault();
+};
 
 const HOLD_DIRECTION: Partial<Record<Control, HoldDirection>> = { up: -1, down: 1 };
 const HOLD_DELAY_MS = 220;
@@ -142,6 +146,7 @@ export function PhysicalControls({
     `${styles.stem} ${positionClass} ${pressed.has(control) ? styles.stemPressed : ''}`;
 
   const pointerDown = (control: Control) => (event: React.PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
     setControl(control, true);
@@ -188,9 +193,11 @@ export function PhysicalControls({
 
       <button
         type="button"
+        tabIndex={-1}
         className={buttonClass('up', styles.upButton)}
         aria-label="Previous"
         onPointerDown={pointerDown('up')}
+        onMouseDown={preventFocus}
         onPointerUp={pointerUp('up')}
         onPointerCancel={pointerUp('up')}
         onKeyDown={buttonKey('up', true)}
@@ -204,9 +211,11 @@ export function PhysicalControls({
 
       <button
         type="button"
+        tabIndex={-1}
         className={buttonClass('down', styles.downButton)}
         aria-label="Next"
         onPointerDown={pointerDown('down')}
+        onMouseDown={preventFocus}
         onPointerUp={pointerUp('down')}
         onPointerCancel={pointerUp('down')}
         onKeyDown={buttonKey('down', true)}
@@ -220,9 +229,11 @@ export function PhysicalControls({
 
       <button
         type="button"
+        tabIndex={-1}
         className={buttonClass('enter', styles.enterButton)}
         aria-label="Enter"
         onPointerDown={pointerDown('enter')}
+        onMouseDown={preventFocus}
         onPointerUp={pointerUp('enter')}
         onPointerCancel={pointerUp('enter')}
         onKeyDown={buttonKey('enter', true)}

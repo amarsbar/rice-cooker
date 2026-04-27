@@ -4,4 +4,5 @@
   width: 61px;
   background: var(--c-card-border);
   border-top-right-radius: 16px;
+  transition: background-color var(--theme-color-transition);
 }

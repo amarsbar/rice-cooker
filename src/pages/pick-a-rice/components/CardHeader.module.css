@@ -16,6 +16,7 @@
   color: var(--c-screen-text);
   line-height: normal;
   white-space: nowrap;
+  transition: color var(--theme-color-transition);
 }
 
 .menuLabel {
@@ -27,7 +28,9 @@
   color: var(--c-header-accent);
   text-align: center;
   transform: translateX(-50%);
-  transition: color 80ms ease-out, transform 80ms ease-out;
+  transition:
+    color var(--theme-color-transition),
+    transform 80ms ease-out;
 }
 
 .prevLabel {
@@ -68,6 +71,9 @@
   color: var(--c-screen-text-on-pill);
   line-height: 1;
   text-align: center;
+  transition:
+    background-color var(--theme-color-transition),
+    color var(--theme-color-transition);
 }
 
 .divider {

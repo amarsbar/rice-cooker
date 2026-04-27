@@ -6,7 +6,9 @@
   border: var(--card-border-width) solid var(--c-card-border);
   border-radius: var(--card-radius);
   overflow: hidden;
-  transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    background-color var(--theme-color-transition),
+    border-color var(--theme-color-transition);
 }
 
 /* Figma 509:34645: 552 x 558 at inner-frame (15, -109), 50% opacity. */

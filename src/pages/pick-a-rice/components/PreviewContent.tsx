@@ -61,9 +61,11 @@ export function PreviewContent({
 
       <button
         type="button"
+        tabIndex={-1}
         className={`${styles.wordPill} ${styles[`word_${option}`]} ${
           installUnavailable ? styles.wordUnavailable : ''
         }`}
+        onMouseDown={(event) => event.preventDefault()}
         onClick={(event) => {
           event.stopPropagation();
           onApply();

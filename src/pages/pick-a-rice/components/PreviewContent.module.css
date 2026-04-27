@@ -220,6 +220,7 @@
   line-height: normal;
   text-align: center;
   white-space: nowrap;
+  transition: color var(--theme-color-transition);
 }
 
 @media (prefers-reduced-motion: reduce) {

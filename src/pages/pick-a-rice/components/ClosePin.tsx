@@ -18,8 +18,10 @@ export function ClosePin() {
       <ClosePinSvg className={styles.svg} />
       <button
         type="button"
+        tabIndex={-1}
         className={styles.hitbox}
         aria-label="Close window"
+        onMouseDown={(e) => e.preventDefault()}
         onClick={(e) => {
           e.stopPropagation();
           window.rice?.closeWindow?.();

@@ -25,6 +25,7 @@
   border-radius: 50%;
   overflow: hidden;
   transform: translate(-50%, -50%);
+  transition: background-color var(--theme-color-transition);
 }
 
 /* Dotted grid background (350:6633 / 350:7413) — same asset in both
@@ -76,6 +77,7 @@
   justify-content: center;
   transform-origin: center;
   pointer-events: none;
+  transition: background-color var(--theme-color-transition);
 }
 
 .beadNum {
@@ -83,7 +85,9 @@
   font-size: var(--fs-letter);
   color: var(--c-step-text);
   line-height: 1;
-  transition: opacity 0.2s ease-out;
+  transition:
+    color var(--theme-color-transition),
+    opacity 0.2s ease-out;
 }
 
 .tag {
@@ -120,11 +124,12 @@
   border-radius: 4px;
   background: var(--c-accent);
   pointer-events: none;
-  transition: background-color 80ms ease-out;
+  transition: background-color var(--theme-color-transition);
 }
 
 .keyPressed {
   background: var(--color-orange);
+  transition: background-color 80ms ease-out;
 }
 
 .key_up {
