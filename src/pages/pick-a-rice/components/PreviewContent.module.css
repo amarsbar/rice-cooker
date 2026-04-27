@@ -86,6 +86,11 @@
   top: 90px;
 }
 
+.actionUnavailable {
+  background: #3d373c;
+  color: #878784;
+}
+
 .action_dots {
   left: 20px;
   top: 167px;
@@ -152,9 +157,31 @@
   top: calc(50% - 0.5px);
 }
 
+.wordUnavailable {
+  width: 268px;
+  height: 64px;
+  padding: 0;
+  background: #3d373c;
+  color: var(--c-card-border);
+  cursor: default;
+}
+
 .word_dots {
   left: calc(50% - 50.5px);
   top: calc(50% + 38.5px);
+}
+
+.unavailableText {
+  position: absolute;
+  left: 50%;
+  top: calc(50% - 10px);
+  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: normal;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .wordCluster {

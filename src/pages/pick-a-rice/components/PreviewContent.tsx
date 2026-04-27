@@ -12,6 +12,7 @@ import { SHRUNKEN_TEXT_VARIANTS, usePreviewOption, useView, type PreviewOption }
 interface PreviewContentProps {
   themeName: string;
   creatorName: string;
+  installSupported: boolean;
   onApply: () => void;
 }
 
@@ -26,10 +27,16 @@ const ICONS = {
   dots: GithubIcon,
 } as const;
 
-export function PreviewContent({ themeName, creatorName, onApply }: PreviewContentProps) {
+export function PreviewContent({
+  themeName,
+  creatorName,
+  installSupported,
+  onApply,
+}: PreviewContentProps) {
   const view = useView();
   const option = usePreviewOption();
   const active = view === 'preview';
+  const installUnavailable = option === 'install' && !installSupported;
 
   return (
     <motion.div
@@ -44,25 +51,35 @@ export function PreviewContent({ themeName, creatorName, onApply }: PreviewConte
       <p className={`${styles.navLabel} ${styles.confirmLabel}`}>CONFIRM</p>
 
       <ActionButton type="leave" active={option === 'leave'} />
-      <ActionButton type="install" active={option === 'install'} />
+      <ActionButton
+        type="install"
+        active={option === 'install'}
+        unavailable={!installSupported}
+      />
       <ActionButton type="dots" active={option === 'dots'} />
       <OptionPointers option={option} />
 
       <button
         type="button"
-        className={`${styles.wordPill} ${styles[`word_${option}`]}`}
+        className={`${styles.wordPill} ${styles[`word_${option}`]} ${
+          installUnavailable ? styles.wordUnavailable : ''
+        }`}
         onClick={(event) => {
           event.stopPropagation();
           onApply();
         }}
       >
-        <span className={styles.wordCluster}>
-          {WORDS[option].split('').map((char, index) => (
-            <span key={index} className={styles.wordLetter}>
-              {char}
-            </span>
-          ))}
-        </span>
+        {installUnavailable ? (
+          <span className={styles.unavailableText}>Installation not available</span>
+        ) : (
+          <span className={styles.wordCluster}>
+            {WORDS[option].split('').map((char, index) => (
+              <span key={index} className={styles.wordLetter}>
+                {char}
+              </span>
+            ))}
+          </span>
+        )}
       </button>
 
       <p className={styles.metaLabel}>
@@ -72,10 +89,18 @@ export function PreviewContent({ themeName, creatorName, onApply }: PreviewConte
   );
 }
 
-function ActionButton({ type, active }: { type: PreviewOption; active: boolean }) {
+function ActionButton({
+  type,
+  active,
+  unavailable = false,
+}: {
+  type: PreviewOption;
+  active: boolean;
+  unavailable?: boolean;
+}) {
   const className = `${styles.actionBtn} ${styles[`action_${type}`]} ${
     active ? styles.actionActive : ''
-  }`;
+  } ${unavailable ? styles.actionUnavailable : ''}`;
   const Icon = ICONS[type];
   return (
     <span className={className} aria-hidden="true">

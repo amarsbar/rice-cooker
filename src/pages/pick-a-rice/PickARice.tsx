@@ -188,6 +188,7 @@ export function PickARice() {
                 <PreviewContent
                   themeName="themename"
                   creatorName="creatorname"
+                  installSupported={selectedRice?.install_supported ?? true}
                   onApply={applyFocusedRice}
                 />
               </RiceCard>
