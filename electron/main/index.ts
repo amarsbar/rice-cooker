@@ -107,14 +107,22 @@ function createWindow(): void {
       }
       return clicked;
     };
-    const pressKey = (key: string) =>
-      win.webContents.executeJavaScript(
-        `(() => {
-          const keydownHandled = !window.dispatchEvent(new KeyboardEvent('keydown', { key: '${key}', cancelable: true }));
-          const keyupHandled = !window.dispatchEvent(new KeyboardEvent('keyup', { key: '${key}', cancelable: true }));
-          return keydownHandled || keyupHandled;
-        })()`,
+    const pressKey = (key: string) => {
+      const keyLiteral = JSON.stringify(key);
+      return win.webContents.executeJavaScript(
+        `(() => new Promise((resolve) => {
+          const el = document.querySelector('[data-preview-option]');
+          if (!el) {
+            resolve(false);
+            return;
+          }
+          const before = el.getAttribute('data-preview-option');
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: ${keyLiteral}, cancelable: true }));
+          window.dispatchEvent(new KeyboardEvent('keyup', { key: ${keyLiteral}, cancelable: true }));
+          requestAnimationFrame(() => resolve(before !== el.getAttribute('data-preview-option')));
+        }))()`,
       );
+    };
 
     win.webContents.once('did-finish-load', async () => {
       try {
@@ -146,12 +154,11 @@ function createWindow(): void {
 
         if (process.env['RICE_CAPTURE_THEMES']) {
           // Cycle back to picking and click the theme knob (sprout) to
-          // advance through t2 → t1 → t3 → t2. Uses a transient dispatch
-          // via document.querySelector to find the knob click target.
+          // advance through t2 → t1 → t3 → t2 via a dedicated capture hook.
           const clickKnob = () =>
             win.webContents.executeJavaScript(
               `(() => {
-                 const el = document.querySelector('[style*="cursor"][style*="pointer"]');
+                 const el = document.querySelector('[data-capture-theme-knob]');
                  if (!el) return false;
                  el.click();
                  return true;
@@ -193,10 +200,11 @@ function createWindow(): void {
     // (file:, javascript:, chrome:, data:, etc.) could be abused to reach
     // outside the app's trust boundary, so refuse outright.
     try {
-      const { protocol } = new URL(url);
+      const { origin, pathname, protocol } = new URL(url);
       if (protocol === 'http:' || protocol === 'https:') {
+        const safeUrl = `${origin}${pathname}`;
         void shell.openExternal(url).catch((err) => {
-          console.warn('[rice-cooker] openExternal failed:', url, err);
+          console.warn('[rice-cooker] openExternal failed:', safeUrl, err);
         });
       }
     } catch {

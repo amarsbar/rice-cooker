@@ -4,7 +4,7 @@
   top: 13px;
   width: 19.999px;
   height: 19.999px;
-  --c-primary: var(--color-yellow);
+  --c-primary: var(--c-header-accent);
 }
 
 .label {

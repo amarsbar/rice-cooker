@@ -194,3 +194,10 @@
   text-align: center;
   white-space: nowrap;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .actionBtn,
+  .wordPill {
+    transition: none;
+  }
+}

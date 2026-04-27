@@ -106,7 +106,12 @@ export function PickARice() {
       <ViewProvider view={view}>
         <PreviewOptionProvider value={previewOption}>
           <ScrollProvider value={scroll}>
-            <div className={styles.stage} data-theme={theme} onClick={cycleOnBareStage}>
+            <div
+              className={styles.stage}
+              data-theme={theme}
+              data-preview-option={previewOption}
+              onClick={cycleOnBareStage}
+            >
               <PhysicalControls
                 onPrevious={focusPreviousRice}
                 onNext={focusNextRice}
