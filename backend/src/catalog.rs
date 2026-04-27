@@ -2,8 +2,8 @@
 //!
 //! Hand-maintained in Rice Cooker's repo. Each entry: upstream repo at
 //! a pinned commit, a symlink src/dst that points into the clone, and
-//! optional `pacman_deps` / `aur_deps` (paru resolves transitive AUR
-//! deps — we only list top-level names).
+//! optional dependency lists (paru resolves transitive AUR deps — we only
+//! list top-level names).
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -28,11 +28,13 @@ pub struct RiceEntry {
     /// Full commit SHA — pinned for reproducibility. Placeholder values
     /// containing "PLACEHOLDER" are refused at install time.
     pub commit: String,
-    /// Install is one `ln -sfnT <clone>/<symlink_src> <symlink_dst>`.
+    /// Source path installed by the symlink step, relative to the clone dir.
     pub symlink_src: String,
-    /// Absolute `ln -sfnT` destination, `~`-expanded. Must stay under
-    /// `$HOME`.
+    /// Symlink destination, `~`-expanded. Must stay under `$HOME`.
     pub symlink_dst: String,
+    /// Default false; flip to true after auditing the upstream install.
+    #[serde(default)]
+    pub install_supported: bool,
     /// Top-level AUR dep names. Paru resolves transitive deps. No
     /// commit pins — paru builds whatever the AUR maintainer published.
     #[serde(default)]
@@ -41,6 +43,12 @@ pub struct RiceEntry {
     /// from aur_deps' own depends lists. Usually empty.
     #[serde(default)]
     pub pacman_deps: Vec<String>,
+    /// Minimal AUR deps needed even for dependency-light preview.
+    #[serde(default)]
+    pub preview_aur_deps: Vec<String>,
+    /// Minimal repo deps needed even for dependency-light preview.
+    #[serde(default)]
+    pub preview_pacman_deps: Vec<String>,
     /// Reserved for future interactive-installer support. Set to true ⇒
     /// install refuses (see `docs/issues/interactive-installs.md`).
     #[serde(default)]
@@ -171,6 +179,9 @@ mod tests {
         assert_eq!(e.display_name, "DMS");
         assert!(e.aur_deps.is_empty());
         assert!(e.pacman_deps.is_empty());
+        assert!(e.preview_aur_deps.is_empty());
+        assert!(e.preview_pacman_deps.is_empty());
+        assert!(!e.install_supported);
         assert!(!e.interactive);
     }
 
@@ -288,10 +299,14 @@ mod tests {
             commit = "0283b44960791ab12cde19c9797d70976a0b96a4"
             symlink_src = "."
             symlink_dst = "~/.config/quickshell/caelestia"
+            install_supported = true
             aur_deps = ["caelestia-shell-git"]
+            preview_aur_deps = ["caelestia-shell-git"]
         "#;
         let c = Catalog::parse(t).unwrap();
         let e = c.get("caelestia").unwrap();
+        assert!(e.install_supported);
         assert_eq!(e.aur_deps, vec!["caelestia-shell-git"]);
+        assert_eq!(e.preview_aur_deps, vec!["caelestia-shell-git"]);
     }
 }

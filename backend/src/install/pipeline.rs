@@ -1,4 +1,4 @@
-//! try / uninstall / list / status pipeline.
+//! preview / try / uninstall / list / status pipeline.
 
 use std::fs;
 use std::io::Write;
@@ -32,6 +32,7 @@ pub struct ListRow {
     pub name: String,
     pub display_name: String,
     pub description: String,
+    pub install_supported: bool,
     pub installed: bool,
     pub documented_system_effects: Vec<String>,
 }
@@ -39,6 +40,32 @@ pub struct ListRow {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct StatusRow {
     pub installed: Option<InstallRecord>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ActivateMode {
+    Install,
+    Preview,
+}
+
+impl ActivateMode {
+    fn subcommand(self) -> &'static str {
+        match self {
+            ActivateMode::Install => "try",
+            ActivateMode::Preview => "preview",
+        }
+    }
+
+    fn deps_for(self, entry: &RiceEntry) -> Vec<String> {
+        let (pacman, aur) = match self {
+            ActivateMode::Install => (entry.pacman_deps.as_slice(), entry.aur_deps.as_slice()),
+            ActivateMode::Preview => (
+                entry.preview_pacman_deps.as_slice(),
+                entry.preview_aur_deps.as_slice(),
+            ),
+        };
+        [pacman, aur].concat()
+    }
 }
 
 /// Unwrap or emit a Fail event and return Ok(false). Post-hello contract.
@@ -74,7 +101,26 @@ pub fn run_try<W: Write>(
     name: &str,
     events: &mut EventWriter<W>,
 ) -> Result<bool> {
-    hello(events, "try")?;
+    run_activate(cat, paths, name, ActivateMode::Install, events)
+}
+
+pub fn run_preview<W: Write>(
+    cat: &Catalog,
+    paths: &Paths,
+    name: &str,
+    events: &mut EventWriter<W>,
+) -> Result<bool> {
+    run_activate(cat, paths, name, ActivateMode::Preview, events)
+}
+
+fn run_activate<W: Write>(
+    cat: &Catalog,
+    paths: &Paths,
+    name: &str,
+    mode: ActivateMode,
+    events: &mut EventWriter<W>,
+) -> Result<bool> {
+    hello(events, mode.subcommand())?;
     try_stage!(events, "init", paths.ensure_rices());
     try_stage!(events, "init", paths.ensure_installs());
     let Some(_lock) = acquire_lock(paths, events)? else {
@@ -105,11 +151,22 @@ pub fn run_try<W: Write>(
             return Ok(false);
         }
     };
-    let all_deps: Vec<String> = [entry.pacman_deps.as_slice(), entry.aur_deps.as_slice()].concat();
+
+    if mode == ActivateMode::Install && !entry.install_supported {
+        emit_fail(
+            events,
+            "preflight",
+            &format!("{name}: install is not supported; use preview instead"),
+            None,
+        )?;
+        return Ok(false);
+    }
+
+    let selected_deps = mode.deps_for(entry);
 
     step(events, Step::Preflight, StepState::Start)?;
     try_stage!(events, "preflight", "git", git::preflight());
-    if !all_deps.is_empty() {
+    if !selected_deps.is_empty() {
         try_stage!(
             events,
             "preflight",
@@ -118,7 +175,7 @@ pub fn run_try<W: Write>(
         );
     }
     let current = try_stage!(events, "preflight", read_current(paths));
-    if current.is_none() && !paths.original_is_recorded() {
+    if !paths.original_is_recorded() {
         try_stage!(
             events,
             "preflight",
@@ -128,20 +185,25 @@ pub fn run_try<W: Write>(
     }
     step(events, Step::Preflight, StepState::Done)?;
 
-    if current.as_deref() == Some(name) {
+    let mut prior_added_explicit = Vec::new();
+    let same_current = current.as_deref() == Some(name);
+    if same_current {
         // current.json can be stale (crash, manual kill) — only short-circuit
-        // if the process is actually running; otherwise fall through and launch.
+        // if the process is actually running and the requested deps are present.
         let alive = try_stage!(events, "liveness", process::rice_shell_alive(name));
-        if alive {
+        if alive && try_stage!(events, "deps", deps_are_satisfied(&selected_deps)) {
             events.emit(&Event::Success {
                 active: Some(name.to_string()),
             })?;
             return Ok(true);
         }
+        let record_path = try_stage!(events, "record", "path", paths.record_json(name));
+        let record = try_stage!(events, "record", "load", load_record(&record_path));
+        prior_added_explicit = record.pacman_diff.added_explicit;
     }
 
     // Evict outgoing rice (no replay — we launch a new one next).
-    if let Some(outgoing) = current.as_deref() {
+    if let Some(outgoing) = current.as_deref().filter(|_| !same_current) {
         step(events, Step::Evict, StepState::Start)?;
         if !uninstall_locked(paths, Flags::default(), events, outgoing)? {
             return Ok(false);
@@ -154,8 +216,9 @@ pub fn run_try<W: Write>(
     step(events, Step::Clone, StepState::Done)?;
 
     step(events, Step::Deps, StepState::Start)?;
-    let added_explicit = try_stage!(events, "deps", do_deps(&all_deps));
+    let newly_added = try_stage!(events, "deps", do_deps(&selected_deps));
     step(events, Step::Deps, StepState::Done)?;
+    let added_explicit = merge_added_explicit(prior_added_explicit, newly_added);
 
     // Record persists BEFORE symlink so a symlink failure still leaves
     // a record uninstall can use to roll back the packages.
@@ -394,6 +457,7 @@ pub fn list(cat: &Catalog, paths: &Paths) -> Result<Vec<ListRow>> {
             name: name.clone(),
             display_name: entry.display_name.clone(),
             description: entry.description.clone(),
+            install_supported: entry.install_supported,
             installed: current.as_deref() == Some(name.as_str()),
             documented_system_effects: entry.documented_system_effects.clone(),
         })
@@ -454,6 +518,17 @@ fn do_deps(all_deps: &[String]) -> Result<Vec<String>> {
     deps::install_packages(&missing)?;
     let post = pacman_explicit().context("pacman -Qqe post-snapshot")?;
     Ok(diff_explicit(&pre, &post))
+}
+
+fn deps_are_satisfied(all_deps: &[String]) -> Result<bool> {
+    Ok(deps::missing(all_deps)?.is_empty())
+}
+
+fn merge_added_explicit(mut prior: Vec<String>, newly_added: Vec<String>) -> Vec<String> {
+    prior.extend(newly_added);
+    prior.sort();
+    prior.dedup();
+    prior
 }
 
 fn do_record(paths: &Paths, name: &str, entry: &RiceEntry, added: Vec<String>) -> Result<()> {
@@ -675,6 +750,52 @@ mod tests {
         (t, p)
     }
 
+    fn entry_with_deps() -> RiceEntry {
+        RiceEntry {
+            display_name: "X".into(),
+            description: String::new(),
+            repo: "https://x".into(),
+            commit: "0123456789abcdef0123456789abcdef01234567".into(),
+            symlink_src: ".".into(),
+            symlink_dst: "~/.config/quickshell/x".into(),
+            install_supported: true,
+            aur_deps: vec!["aur-install".into()],
+            pacman_deps: vec!["repo-install".into()],
+            preview_aur_deps: vec!["aur-preview".into()],
+            preview_pacman_deps: vec!["repo-preview".into()],
+            interactive: false,
+            documented_system_effects: vec![],
+        }
+    }
+
+    #[test]
+    fn activate_mode_selects_only_its_dependency_set() {
+        let entry = entry_with_deps();
+        assert_eq!(
+            ActivateMode::Install.deps_for(&entry),
+            vec!["repo-install".to_string(), "aur-install".to_string()]
+        );
+        assert_eq!(
+            ActivateMode::Preview.deps_for(&entry),
+            vec!["repo-preview".to_string(), "aur-preview".to_string()]
+        );
+    }
+
+    #[test]
+    fn merge_added_explicit_sorts_and_dedups() {
+        assert_eq!(
+            merge_added_explicit(
+                vec!["zsh".into(), "fish".into()],
+                vec!["fish".into(), "starship".into()]
+            ),
+            vec![
+                "fish".to_string(),
+                "starship".to_string(),
+                "zsh".to_string()
+            ]
+        );
+    }
+
     #[test]
     fn run_uninstall_is_idempotent_when_nothing_is_installed() {
         let (_t, paths) = tmp_paths();
@@ -702,5 +823,71 @@ mod tests {
         let out = std::str::from_utf8(&buf).unwrap();
         assert!(out.contains(r#""stage":"preflight""#));
         assert!(out.contains("not in catalog"));
+    }
+
+    #[test]
+    fn run_try_refuses_preview_only_entry() {
+        let (_t, paths) = tmp_paths();
+        let cat = Catalog::parse(
+            r#"
+            [x]
+            display_name = "X"
+            repo = "https://x"
+            commit = "0123456789abcdef0123456789abcdef01234567"
+            symlink_src = "."
+            symlink_dst = "~/.config/quickshell/x"
+            "#,
+        )
+        .unwrap();
+        let mut buf = Vec::new();
+        {
+            let mut events = EventWriter::new(&mut buf);
+            assert!(!run_try(&cat, &paths, "x", &mut events).unwrap());
+        }
+        let out = std::str::from_utf8(&buf).unwrap();
+        assert!(out.contains(r#""subcommand":"try""#));
+        assert!(out.contains(r#""stage":"preflight""#));
+        assert!(out.contains("install is not supported"));
+    }
+
+    #[test]
+    fn run_preview_uses_preview_subcommand() {
+        let (_t, paths) = tmp_paths();
+        let cat = Catalog::default();
+        let mut buf = Vec::new();
+        {
+            let mut events = EventWriter::new(&mut buf);
+            assert!(!run_preview(&cat, &paths, "x", &mut events).unwrap());
+        }
+        let out = std::str::from_utf8(&buf).unwrap();
+        assert!(out.contains(r#""subcommand":"preview""#));
+        assert!(out.contains(r#""stage":"preflight""#));
+        assert!(out.contains("not in catalog"));
+    }
+
+    #[test]
+    fn run_preview_does_not_refuse_preview_only_entry() {
+        let (_t, paths) = tmp_paths();
+        let cat = Catalog::parse(
+            r#"
+            [x]
+            display_name = "X"
+            repo = "-invalid-local-repo"
+            commit = "0123456789abcdef0123456789abcdef01234567"
+            symlink_src = "."
+            symlink_dst = "~/.config/quickshell/x"
+            "#,
+        )
+        .unwrap();
+        let mut buf = Vec::new();
+        {
+            let mut events = EventWriter::new(&mut buf);
+            assert!(!run_preview(&cat, &paths, "x", &mut events).unwrap());
+        }
+        let out = std::str::from_utf8(&buf).unwrap();
+        assert!(out.contains(r#""subcommand":"preview""#));
+        assert!(out.contains(r#""stage":"clone""#));
+        assert!(out.contains("refusing repo URL starting with"));
+        assert!(!out.contains("install is not supported"));
     }
 }

@@ -5,9 +5,8 @@
 //! tests at module bottoms can't catch a regression at the argv /
 //! stdout boundary.
 //!
-//! Read-only subcommands only (`list`, `status`). `try` / `uninstall`
-//! shell out to git / pacman / pkexec and aren't safe to drive from a
-//! plain cargo-test run.
+//! Mostly read-only subcommands. `preview` is only exercised on the
+//! missing-catalog-entry path because the successful path shells out.
 
 use std::fs;
 
@@ -22,6 +21,7 @@ repo = "https://example.invalid/one"
 commit = "0123456789abcdef0123456789abcdef01234567"
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/one"
+install_supported = true
 documented_system_effects = ["writes /etc/thing"]
 
 [two]
@@ -61,4 +61,22 @@ fn list_prints_catalog_entries_as_json_array() {
         .success();
     let stdout = std::str::from_utf8(&out.get_output().stdout).unwrap();
     insta::assert_snapshot!("list_json", stdout);
+}
+
+#[test]
+fn preview_wires_to_preview_subcommand() {
+    let t = scratch();
+    let out = cmd(&t)
+        .args([
+            "--catalog",
+            t.path().join("catalog.toml").to_str().unwrap(),
+            "preview",
+            "missing",
+        ])
+        .assert()
+        .failure();
+    let stdout = std::str::from_utf8(&out.get_output().stdout).unwrap();
+    assert!(stdout.contains(r#""subcommand":"preview""#));
+    assert!(stdout.contains(r#""stage":"preflight""#));
+    assert!(stdout.contains("missing: not in catalog"));
 }

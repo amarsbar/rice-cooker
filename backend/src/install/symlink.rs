@@ -1,4 +1,4 @@
-//! Atomic symlink install — `ln -sfnT <clone>/<symlink_src> <symlink_dst>`.
+//! Atomic symlink install for one catalog-managed config path.
 
 use std::fs;
 use std::os::unix::fs::symlink;
@@ -74,8 +74,11 @@ mod tests {
             commit: "0123456789abcdef0123456789abcdef01234567".into(),
             symlink_src: src.into(),
             symlink_dst: dst.into(),
+            install_supported: false,
             aur_deps: vec![],
             pacman_deps: vec![],
+            preview_aur_deps: vec![],
+            preview_pacman_deps: vec![],
             interactive: false,
             documented_system_effects: vec![],
         }
