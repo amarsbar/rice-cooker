@@ -98,85 +98,100 @@ function createWindow(): void {
       win.webContents.executeJavaScript(
         '(() => { const el = document.querySelector("[class*=stage]"); if (!el) return false; el.click(); return true; })()',
       );
-    type CaptureView = 'picking' | 'preview' | 'post-install';
+    type CaptureView = 'picking' | 'preview';
     let captureView: CaptureView = 'picking';
     const clickStageToNext = async () => {
       const clicked = await clickStage();
       if (clicked) {
-        captureView =
-          captureView === 'picking'
-            ? 'preview'
-            : captureView === 'preview'
-              ? 'post-install'
-              : 'picking';
+        captureView = captureView === 'picking' ? 'preview' : 'picking';
       }
       return clicked;
     };
-
-    win.webContents.once('did-finish-load', async () => {
-      const { writeFile } = await import('node:fs/promises');
-      const base = captureOut.replace(/\.png$/, '');
-      await new Promise((r) => setTimeout(r, INITIAL_SETTLE_MS));
-
-      const pickingImg = await win.webContents.capturePage();
-      await writeFile(`${base}-picking.png`, pickingImg.toPNG());
-
-      if (process.env['RICE_CAPTURE_ALL']) {
-        for (const name of ['preview', 'post-install'] as const) {
-          const clicked = await clickStageToNext();
-          if (!clicked) {
-            console.warn('[rice-cooker] capture: stage element not found');
-            break;
-          }
-          await new Promise((r) => setTimeout(r, MORPH_SETTLE_MS));
-          const img = await win.webContents.capturePage();
-          await writeFile(`${base}-${name}.png`, img.toPNG());
-        }
-      }
-
-      if (process.env['RICE_CAPTURE_THEMES']) {
-        // Cycle back to picking and click the theme knob (sprout) to
-        // advance through t2 → t1 → t3 → t2. Uses a transient dispatch
-        // via document.querySelector to find the knob click target.
-        const clickKnob = () =>
-          win.webContents.executeJavaScript(
-            `(() => {
-               const el = document.querySelector('[style*="cursor"][style*="pointer"]');
-               if (!el) return false;
-               el.click();
-               return true;
-             })()`,
-          );
-        while (captureView !== 'picking') {
-          const clicked = await clickStageToNext();
-          if (!clicked) {
-            console.warn('[rice-cooker] capture: stage element not found');
+    const pressKey = (key: string) => {
+      const keyLiteral = JSON.stringify(key);
+      return win.webContents.executeJavaScript(
+        `(() => new Promise((resolve) => {
+          const el = document.querySelector('[data-preview-option]');
+          if (!el) {
+            resolve(false);
             return;
           }
-          await new Promise((r) => setTimeout(r, MORPH_SETTLE_MS));
-        }
-        // The cycle is t2 (0) → t1 (1) → t2 (2) → t3 (3). Walk
-        // sequentially from the initial t2, capturing t1 after 1 click
-        // and t3 after 2 further clicks.
-        const steps: { label: 't1' | 't3'; advance: number }[] = [
-          { label: 't1', advance: 1 },
-          { label: 't3', advance: 2 },
-        ];
-        for (const { label, advance } of steps) {
-          for (let i = 0; i < advance; i++) {
-            const clicked = await clickKnob();
-            if (!clicked) {
-              console.warn('[rice-cooker] capture: knob not found');
-              return;
-            }
-            await new Promise((r) => setTimeout(r, MORPH_SETTLE_MS));
-          }
-          const img = await win.webContents.capturePage();
-          await writeFile(`${base}-theme-${label}.png`, img.toPNG());
-        }
-      }
+          const before = el.getAttribute('data-preview-option');
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: ${keyLiteral}, cancelable: true }));
+          window.dispatchEvent(new KeyboardEvent('keyup', { key: ${keyLiteral}, cancelable: true }));
+          requestAnimationFrame(() => resolve(before !== el.getAttribute('data-preview-option')));
+        }))()`,
+      );
+    };
 
-      app.exit(0);
+    win.webContents.once('did-finish-load', async () => {
+      try {
+        const { writeFile } = await import('node:fs/promises');
+        const base = captureOut.replace(/\.png$/, '');
+        const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+        await wait(INITIAL_SETTLE_MS);
+
+        const pickingImg = await win.webContents.capturePage();
+        await writeFile(`${base}-picking.png`, pickingImg.toPNG());
+
+        if (process.env['RICE_CAPTURE_ALL']) {
+          for (const name of ['preview'] as const) {
+            const clicked = await clickStageToNext();
+            if (!clicked) throw new Error('capture: stage element not found');
+            await wait(MORPH_SETTLE_MS);
+            const img = await win.webContents.capturePage();
+            await writeFile(`${base}-${name}.png`, img.toPNG());
+          }
+          if (process.env['RICE_CAPTURE_PREVIEW_OPTIONS']) {
+            for (const name of ['dots', 'leave'] as const) {
+              if (!(await pressKey('ArrowDown'))) throw new Error('capture: key dispatch failed');
+              await wait(MORPH_SETTLE_MS);
+              const img = await win.webContents.capturePage();
+              await writeFile(`${base}-preview-${name}.png`, img.toPNG());
+            }
+          }
+        }
+
+        if (process.env['RICE_CAPTURE_THEMES']) {
+          // Cycle back to picking and click the theme knob (sprout) to
+          // advance through t2 → t1 → t3 → t2 via a dedicated capture hook.
+          const clickKnob = () =>
+            win.webContents.executeJavaScript(
+              `(() => {
+                 const el = document.querySelector('[data-capture-theme-knob]');
+                 if (!el) return false;
+                 el.click();
+                 return true;
+               })()`,
+            );
+          while (captureView !== 'picking') {
+            const clicked = await clickStageToNext();
+            if (!clicked) throw new Error('capture: stage element not found');
+            await wait(MORPH_SETTLE_MS);
+          }
+          // The cycle is t2 (0) → t1 (1) → t2 (2) → t3 (3). Walk
+          // sequentially from the initial t2, capturing t1 after 1 click
+          // and t3 after 2 further clicks.
+          const steps: { label: 't1' | 't3'; advance: number }[] = [
+            { label: 't1', advance: 1 },
+            { label: 't3', advance: 2 },
+          ];
+          for (const { label, advance } of steps) {
+            for (let i = 0; i < advance; i++) {
+              const clicked = await clickKnob();
+              if (!clicked) throw new Error('capture: knob not found');
+              await wait(MORPH_SETTLE_MS);
+            }
+            const img = await win.webContents.capturePage();
+            await writeFile(`${base}-theme-${label}.png`, img.toPNG());
+          }
+        }
+
+        app.exit(0);
+      } catch (err) {
+        console.error('[rice-cooker] capture failed:', err);
+        app.exit(1);
+      }
     });
   }
 
@@ -185,21 +200,28 @@ function createWindow(): void {
     // (file:, javascript:, chrome:, data:, etc.) could be abused to reach
     // outside the app's trust boundary, so refuse outright.
     try {
-      const { protocol } = new URL(url);
+      const { origin, pathname, protocol } = new URL(url);
       if (protocol === 'http:' || protocol === 'https:') {
-        shell.openExternal(url);
+        const safeUrl = `${origin}${pathname}`;
+        void shell.openExternal(url).catch((err) => {
+          console.warn('[rice-cooker] openExternal failed:', safeUrl, err);
+        });
       }
     } catch {
-      // Malformed URL — just deny.
+      return { action: 'deny' };
     }
     return { action: 'deny' };
   });
 
   const devUrl = process.env['ELECTRON_RENDERER_URL'];
+  const failLoad = (kind: 'loadURL' | 'loadFile', err: unknown) => {
+    console.error(`[rice-cooker] ${kind} failed:`, err);
+    app.exit(1);
+  };
   if (devUrl) {
-    win.loadURL(devUrl);
+    void win.loadURL(devUrl).catch((err) => failLoad('loadURL', err));
   } else {
-    win.loadFile(join(__dirname, '../renderer/index.html'));
+    void win.loadFile(join(__dirname, '../renderer/index.html')).catch((err) => failLoad('loadFile', err));
   }
 }
 
@@ -220,13 +242,18 @@ ipcMain.on('window:close', (event) => {
   win.close();
 });
 
-app.whenReady().then(async () => {
-  await injectCompositorRules();
-  createWindow();
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+app.whenReady()
+  .then(async () => {
+    await injectCompositorRules();
+    createWindow();
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
+  })
+  .catch((err) => {
+    console.error('[rice-cooker] startup failed:', err);
+    app.exit(1);
   });
-});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

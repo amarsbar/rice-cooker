@@ -1,6 +1,8 @@
 import { createContext, useContext, type ReactNode } from 'react';
 
-export type View = 'picking' | 'preview' | 'post-install';
+export type View = 'picking' | 'preview';
+export const PREVIEW_OPTIONS = ['leave', 'install', 'dots'] as const;
+export type PreviewOption = (typeof PREVIEW_OPTIONS)[number];
 
 const ViewContext = createContext<View>('picking');
 
@@ -30,6 +32,22 @@ export function useScroll() {
 
 export function ScrollProvider({ value, children }: { value: ScrollState; children: ReactNode }) {
   return <ScrollContext.Provider value={value}>{children}</ScrollContext.Provider>;
+}
+
+const PreviewOptionContext = createContext<PreviewOption>('install');
+
+export function usePreviewOption() {
+  return useContext(PreviewOptionContext);
+}
+
+export function PreviewOptionProvider({
+  value,
+  children,
+}: {
+  value: PreviewOption;
+  children: ReactNode;
+}) {
+  return <PreviewOptionContext.Provider value={value}>{children}</PreviewOptionContext.Provider>;
 }
 
 /** Palette / colour theme. Three fixed variants; <ThemeKnob> is the picker.
@@ -90,7 +108,6 @@ export const POSITIONS = {
     scrollWheel: { left: 466, top: 374 },
   },
   preview: SHRUNKEN,
-  'post-install': SHRUNKEN,
 } as const;
 
 export const MORPH_TRANSITION = { duration: 0.3, ease: [0.4, 0.0, 0.2, 1] as const } as const;

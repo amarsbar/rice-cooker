@@ -4,12 +4,12 @@
   top: 13px;
   width: 19.999px;
   height: 19.999px;
-  --c-primary: var(--c-screen-text);
+  --c-primary: var(--c-header-accent);
 }
 
 .label {
   position: absolute;
-  top: 18px;
+  top: 19px;
   font-family: var(--font-pill);
   font-size: 14px;
   font-weight: 400;
@@ -20,18 +20,27 @@
 
 .menuLabel {
   left: 50px;
+  color: var(--c-header-accent);
 }
 
-.nextLabel {
-  left: 298.5px;
-  width: 34px;
+.navLabel {
+  color: var(--c-header-accent);
   text-align: center;
+  transform: translateX(-50%);
+  transition: color 80ms ease-out, transform 80ms ease-out;
 }
 
 .prevLabel {
-  left: 351px;
-  width: 31px;
-  text-align: center;
+  left: 315.5px;
+}
+
+.nextLabel {
+  left: 369px;
+}
+
+.navPressed {
+  color: var(--c-screen-text);
+  transform: translate(-50%, 3px);
 }
 
 .applyCluster {

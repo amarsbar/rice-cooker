@@ -1,121 +1,203 @@
-/* Fading wrapper — pointer-events toggled inline on the motion.div so
-   the hidden variant doesn't absorb clicks meant for the underlying
-   picking view. Children are in the 405×229 card's content box
-   (outer-card coords minus the 9px mint border). */
 .wrap {
   position: absolute;
-  inset: 0;
+  inset: calc(-1 * var(--card-border-width));
 }
 
-/* PREPPING loader overlay — covers the preview card's content area while
-   the Planck chop animation plays. Lime tint matches Figma 367:11764.
-   No z-index: an explicit stacking-context escape would leak above the
-   ScrollWheel rendered after the card in stage order. The loader
-   and preview UI are mutually exclusive in `.wrap` so within-wrap stacking
-   isn't needed. */
-.loaderOverlay {
+.navLabel {
   position: absolute;
-  inset: 0;
+  top: 11px;
+  transform: translateX(-50%);
+  font-family: var(--font-pill);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--color-yellow);
+  line-height: normal;
+  letter-spacing: -0.28px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.prevLabel {
+  left: 180.91px;
+}
+
+.nextLabel {
+  left: 237.91px;
+}
+
+.confirmLabel {
+  left: 321.91px;
+}
+
+.actionBtn {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  padding: 10px;
+  border-radius: 200px;
+  background: var(--color-yellow);
+  color: var(--color-brown);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(232, 255, 118, 0.4);
-  pointer-events: none;
-  overflow: hidden;
-  border-radius: inherit;
+  transition:
+    left 140ms ease-out,
+    top 140ms ease-out,
+    width 140ms ease-out,
+    height 140ms ease-out,
+    background-color 100ms ease-out,
+    color 100ms ease-out;
 }
 
-/* Theme name / creator name labels — Madimi One 15px yellow, centered
-   horizontally. One sits above the APPLY pill, the other below it. */
-.label {
+.actionIcon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  --fill-0: currentcolor;
+  --stroke-0: currentcolor;
+}
+
+.actionActive {
+  width: 48px;
+  height: 48px;
+  padding: 12px;
+  background: var(--color-green);
+  color: var(--color-lime);
+}
+
+.action_leave {
+  left: 18px;
+  top: 19px;
+}
+
+.action_leave.actionActive {
+  left: 31px;
+  top: 24px;
+}
+
+.action_install {
+  left: 20px;
+  top: 94px;
+}
+
+.action_install.actionActive {
+  left: 30px;
+  top: 90px;
+}
+
+.action_dots {
+  left: 20px;
+  top: 167px;
+}
+
+.action_dots.actionActive {
+  left: 31px;
+  top: 156px;
+}
+
+.pointer {
   position: absolute;
-  left: 50%;
+  pointer-events: none;
+}
+
+.pointerLeave {
+  left: 42.69px;
+  top: 75.06px;
+  width: 9.535px;
+  height: 8.921px;
+}
+
+.pointerInstallTop {
+  left: 42px;
+  top: 78px;
+  width: 9.66px;
+  height: 9.075px;
+}
+
+.pointerInstallBottom {
+  left: 42px;
+  top: 140px;
+  width: 9.533px;
+  height: 8.919px;
+}
+
+.pointerDots {
+  left: 42px;
+  top: 145px;
+  width: 9.533px;
+  height: 8.919px;
+}
+
+.wordPill {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 10px;
+  border: 0;
+  border-radius: 130px;
+  background: var(--color-green);
+  color: var(--color-brown);
+  cursor: pointer;
+  font: inherit;
+  transition: left 140ms ease-out, top 140ms ease-out;
+}
+
+.word_leave {
+  left: calc(50% - 33.5px);
+  top: calc(50% - 38.5px);
+}
+
+.word_install {
+  left: calc(50% + 0.5px);
+  top: calc(50% - 0.5px);
+}
+
+.word_dots {
+  left: calc(50% - 50.5px);
+  top: calc(50% + 38.5px);
+}
+
+.wordCluster {
+  display: flex;
+  align-items: center;
+  padding-right: 10px;
+}
+
+.wordLetter {
+  width: 44px;
+  height: 44px;
+  margin-right: -10px;
+  border-radius: 100px;
+  background: var(--color-lime);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-family: var(--font-pill);
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--color-brown);
+  line-height: 1;
+  text-align: center;
+}
+
+.metaLabel {
+  position: absolute;
+  left: calc(50% + 1px);
+  top: calc(50% + 77.5px);
   transform: translateX(-50%);
   font-family: var(--font-display);
   font-size: 15px;
   font-weight: 400;
-  color: var(--c-primary);
+  color: var(--c-card-border);
   line-height: normal;
   text-align: center;
   white-space: nowrap;
 }
 
-.themeName {
-  top: 9px;
-}
-
-.creatorName {
-  top: 183px;
-}
-
-/* Back (350:7160 button column top) — position places the SVG's main
-   circle (rendered at svg coord (0, 1)) at card (9, 10). */
-.backBtn {
-  composes: iconBtn from global;
-  left: 9px;
-  top: 9px;
-}
-
-/* GitHub (350:7160 button column bottom) — main circle at card (11, 158). */
-.githubBtn {
-  composes: iconBtn from global;
-  left: 9px;
-  top: 157px;
-}
-
-/* APPLY button (350:7174) — dark-green pill centered on card. Wraps a
-   horizontal cluster of five overlapping 52px circles for A-P-P-L-Y. */
-.applyBtn {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  padding: 10px;
-  background: var(--c-pill-bg);
-  border: none;
-  border-radius: 130px;
-  font: inherit;
-  color: inherit;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  cursor: pointer;
-  transition: background-color 100ms ease-out;
-}
-
-/* Hover inverts the palette: pill goes yellow, letter circles go brown,
-   letter glyphs go light-yellow-green. Matches Figma 350:7589. */
-.applyBtn:hover {
-  background: var(--c-pill-hover-bg);
-}
-
-.applyCluster {
-  display: flex;
-  align-items: center;
-  padding-right: 16px;
-  flex-shrink: 0;
-}
-
-.applyLetter {
-  width: 52px;
-  height: 52px;
-  margin-right: -16px;
-  background: var(--c-pill-letter-bg);
-  border-radius: 100px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-pill);
-  font-size: 28px;
-  font-weight: 400;
-  color: var(--c-pill-letter-text);
-  line-height: normal;
-  text-align: center;
-  transition: background-color 100ms ease-out, color 100ms ease-out;
-}
-
-.applyBtn:hover .applyLetter {
-  background: var(--c-pill-hover-letter-bg);
-  color: var(--c-pill-hover-letter-text);
+@media (prefers-reduced-motion: reduce) {
+  .actionBtn,
+  .wordPill {
+    transition: none;
+  }
 }

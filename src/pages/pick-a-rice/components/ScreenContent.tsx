@@ -3,23 +3,26 @@ import styles from './ScreenContent.module.css';
 import { POSITIONS, SCREEN_FADE_TRANSITION, useView } from '../view';
 import { CardHeader } from './CardHeader';
 import { RiceList, type RiceNavRequest } from './RiceList';
+import type { PhysicalControl } from './PhysicalControls';
 
 const CENTER_OFFSET_X =
-  -(POSITIONS.picking.card.width - POSITIONS['post-install'].card.width) / 2;
+  -(POSITIONS.picking.card.width - POSITIONS.preview.card.width) / 2;
 const CENTER_OFFSET_Y =
-  -(POSITIONS.picking.card.height - POSITIONS['post-install'].card.height) / 2;
+  -(POSITIONS.picking.card.height - POSITIONS.preview.card.height) / 2;
 
 /** Picking-state card content: header on top, focused rice preview below.
  *  Fades + translates to stay centered while the card shrinks. */
 interface ScreenContentProps {
   holdDirection: -1 | 0 | 1;
   navRequest: RiceNavRequest;
+  pressedControls: ReadonlySet<PhysicalControl>;
   onScrollOffsetChange: (offset: number) => void;
 }
 
 export function ScreenContent({
   holdDirection,
   navRequest,
+  pressedControls,
   onScrollOffsetChange,
 }: ScreenContentProps) {
   const view = useView();
@@ -36,7 +39,7 @@ export function ScreenContent({
       transition={SCREEN_FADE_TRANSITION}
       style={{ pointerEvents: shrunken ? 'none' : 'auto' }}
     >
-      <CardHeader />
+      <CardHeader pressedControls={pressedControls} />
       <RiceList
         active={!shrunken}
         holdDirection={holdDirection}

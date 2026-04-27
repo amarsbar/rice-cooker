@@ -147,60 +147,44 @@
   top: 160px;
 }
 
-/* ---- Preview content ("previewing" label tilted -14.18°) ---- */
-
-/* 350:7243 — "previewing" Madimi One 28px dark ink, centered in the cream
-   circle and tilted. Figma wraps the text in a 141.889 × 69.424 flex box
-   at left=(50% - 71.39), top=(50% - 34.55); inside the box a rotated
-   flex-none container holds the text. Reproducing that visually: anchor
-   the text to the box center and apply the rotation on the text itself. */
-.previewing {
+.previewDots {
   position: absolute;
-  left: calc(50% - 71.39px + 141.889px / 2);
-  top: calc(50% - 34.55px + 69.424px / 2);
-  transform: translate(-50%, -50%) rotate(-14.18deg);
-  font-family: var(--font-display);
-  font-size: 28px;
-  font-weight: 400;
-  color: var(--color-frame-inner);
-  line-height: normal;
-  white-space: nowrap;
-  margin: 0;
-  --outline-color: var(--c-accent);
-  --outline-width: 6px;
+  inset: 0;
+  pointer-events: none;
 }
 
-/* ---- Post-install content (rice installed !) ---- */
-
-/* "rice installed !" lettering — Madimi One 31.392px, dark ink. */
-.installText {
+.previewDot {
   position: absolute;
-  font-family: var(--font-display);
-  font-size: 31.392px;
-  font-weight: 400;
-  color: var(--color-frame-inner);
-  line-height: normal;
-  white-space: nowrap;
-  --outline-color: var(--c-accent);
-  --outline-width: 6px;
+  border-radius: 50%;
+  background: var(--color-yellow);
 }
 
-.installRice {
-  left: 43.03px;
-  top: 53.2px;
+.previewGraphic {
+  position: absolute;
+  display: block;
+  transform: translate(-50%, -50%);
+  overflow: visible;
+  pointer-events: none;
 }
 
-.installInstalled {
-  left: 29.03px;
-  top: 81.2px;
+.previewGraphic_install {
+  left: calc(50% + 0.09px);
+  top: calc(50% + 0.09px);
+  width: 127px;
+  height: 71px;
 }
 
-/* "!" sits to the right of "rice", tilted slightly. The transform
-   rotates around the glyph's center for the hand-drawn feel. */
-.installBang {
-  left: 117.03px;
-  top: 55.2px;
-  transform-origin: center;
-  transform: rotate(-18.79deg);
+.previewGraphic_leave {
+  left: calc(50% + 0.09px);
+  top: calc(50% - 0.25px);
+  width: 119px;
+  height: 75px;
+}
+
+.previewGraphic_dots {
+  left: calc(50% - 0.41px);
+  top: calc(50% - 0.41px);
+  width: 114px;
+  height: 75px;
 }
 

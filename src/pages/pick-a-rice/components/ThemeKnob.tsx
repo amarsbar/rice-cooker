@@ -32,6 +32,7 @@ export function ThemeKnob() {
       animate={POSITIONS[view].themeKnob}
       transition={MORPH_TRANSITION}
       style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+      data-capture-theme-knob
       onClick={advance}
     >
       <KnobBaseSvg className={styles.base} />

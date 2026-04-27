@@ -4,35 +4,42 @@ import {
   RICE_ITEM_COUNT,
   RICE_ITEM_PITCH,
   ViewProvider,
+  PreviewOptionProvider,
   ScrollProvider,
   ThemeProvider,
+  PREVIEW_OPTIONS,
   THEME_CYCLE,
+  type PreviewOption,
   type View,
 } from './view';
 import { GreenTab } from './components/GreenTab';
 import { RiceCard } from './components/RiceCard';
 import { ScreenContent } from './components/ScreenContent';
 import { PreviewContent } from './components/PreviewContent';
-import { PostInstallContent } from './components/PostInstallContent';
 import { ClosePin } from './components/ClosePin';
 import { SoundButton } from './components/SoundButton';
 import { ThemeKnob } from './components/ThemeKnob';
 import { ScrollWheel } from './components/ScrollWheel';
-import { PhysicalControls } from './components/PhysicalControls';
+import { PhysicalControls, type PhysicalControl } from './components/PhysicalControls';
 
-const CYCLE: View[] = ['picking', 'preview', 'post-install'];
 const clampRiceIndex = (index: number) => Math.max(0, Math.min(RICE_ITEM_COUNT - 1, index));
 type HoldDirection = -1 | 0 | 1;
+const cyclePreviewOption = (option: PreviewOption, delta: -1 | 1) => {
+  const index = PREVIEW_OPTIONS.indexOf(option);
+  return PREVIEW_OPTIONS[(index + delta + PREVIEW_OPTIONS.length) % PREVIEW_OPTIONS.length];
+};
 
 export function PickARice() {
   const [view, setView] = useState<View>('picking');
+  const [previewOption, setPreviewOption] = useState<PreviewOption>('install');
   const [focusedRiceIndex, setFocusedRiceIndex] = useState(0);
   const [riceScrollOffset, setRiceScrollOffset] = useState(0);
   const [riceNavRequest, setRiceNavRequest] = useState({ index: 0, version: 0 });
   const [riceHoldDirection, setRiceHoldDirection] = useState<HoldDirection>(0);
+  const [pressedControls, setPressedControls] = useState<ReadonlySet<PhysicalControl>>(new Set());
   const requestedRiceIndexRef = useRef(0);
   const [cycleIdx, setCycleIdx] = useState(0);
-  const theme = THEME_CYCLE[cycleIdx]!;
+  const theme = THEME_CYCLE[cycleIdx];
   const advance = useCallback(() => setCycleIdx((i) => (i + 1) % THEME_CYCLE.length), []);
   const themeValue = useMemo(() => ({ theme, advance }), [advance, theme]);
   const scroll = useMemo(
@@ -51,12 +58,18 @@ export function PickARice() {
   }, []);
 
   const focusPreviousRice = useCallback(() => {
-    if (view !== 'picking') return;
+    if (view === 'preview') {
+      setPreviewOption((option) => cyclePreviewOption(option, -1));
+      return;
+    }
     requestFocusedRice(requestedRiceIndexRef.current - 1);
   }, [requestFocusedRice, view]);
 
   const focusNextRice = useCallback(() => {
-    if (view !== 'picking') return;
+    if (view === 'preview') {
+      setPreviewOption((option) => cyclePreviewOption(option, 1));
+      return;
+    }
     requestFocusedRice(requestedRiceIndexRef.current + 1);
   }, [requestFocusedRice, view]);
 
@@ -78,50 +91,56 @@ export function PickARice() {
   }, [view]);
 
   const applyFocusedRice = useCallback(() => {
-    setView((current) => {
-      if (current === 'picking') return 'preview';
-      if (current === 'preview') return 'post-install';
-      return 'picking';
-    });
+    setPreviewOption('install');
+    setView((current) => (current === 'picking' ? 'preview' : 'picking'));
   }, []);
 
   const cycleOnBareStage = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target !== e.currentTarget) return;
-    setView((v) => CYCLE[(CYCLE.indexOf(v) + 1) % CYCLE.length]!);
+    setPreviewOption('install');
+    setView((current) => (current === 'picking' ? 'preview' : 'picking'));
   };
 
   return (
     <ThemeProvider value={themeValue}>
       <ViewProvider view={view}>
-        <ScrollProvider value={scroll}>
-          <div className={styles.stage} data-theme={theme} onClick={cycleOnBareStage}>
-            <PhysicalControls
-              onPrevious={focusPreviousRice}
-              onNext={focusNextRice}
-              onApply={applyFocusedRice}
-              onHoldStart={startRiceHold}
-              onHoldEnd={stopRiceHold}
-            />
-            <GreenTab />
-            <RiceCard>
-              <ScreenContent
-                holdDirection={riceHoldDirection}
-                navRequest={riceNavRequest}
-                onScrollOffsetChange={syncRiceScroll}
-              />
-              <PreviewContent
-                themeName="theme name"
-                creatorName="by creator name"
+        <PreviewOptionProvider value={previewOption}>
+          <ScrollProvider value={scroll}>
+            <div
+              className={styles.stage}
+              data-theme={theme}
+              data-preview-option={previewOption}
+              onClick={cycleOnBareStage}
+            >
+              <PhysicalControls
+                onPrevious={focusPreviousRice}
+                onNext={focusNextRice}
                 onApply={applyFocusedRice}
+                onHoldStart={startRiceHold}
+                onHoldEnd={stopRiceHold}
+                onPressedChange={setPressedControls}
               />
-              <PostInstallContent themeName="theme name" onApply={applyFocusedRice} />
-            </RiceCard>
-            <ClosePin />
-            <SoundButton />
-            <ThemeKnob />
-            <ScrollWheel />
-          </div>
-        </ScrollProvider>
+              <GreenTab />
+              <RiceCard>
+                <ScreenContent
+                  holdDirection={riceHoldDirection}
+                  navRequest={riceNavRequest}
+                  pressedControls={pressedControls}
+                  onScrollOffsetChange={syncRiceScroll}
+                />
+                <PreviewContent
+                  themeName="themename"
+                  creatorName="creatorname"
+                  onApply={applyFocusedRice}
+                />
+              </RiceCard>
+              <ClosePin />
+              <SoundButton />
+              <ThemeKnob />
+              <ScrollWheel />
+            </div>
+          </ScrollProvider>
+        </PreviewOptionProvider>
       </ViewProvider>
     </ThemeProvider>
   );

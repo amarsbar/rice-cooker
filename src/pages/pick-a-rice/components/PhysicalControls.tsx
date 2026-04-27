@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import styles from './PhysicalControls.module.css';
-import downButton from '@/assets/physical-controls/down.svg';
-import upButton from '@/assets/physical-controls/up.svg';
+import DownButton from '@/assets/physical-controls/down.svg?react';
+import UpButton from '@/assets/physical-controls/up.svg?react';
 import enterIcon from '@/assets/physical-controls/enter.svg';
 import { MORPH_TRANSITION, POSITIONS, useView } from '../view';
 
-type Control = 'down' | 'up' | 'enter';
+export type PhysicalControl = 'down' | 'up' | 'enter';
+type Control = PhysicalControl;
 type ControlAction = () => void;
 type HoldDirection = -1 | 1;
 
@@ -16,6 +17,7 @@ interface PhysicalControlsProps {
   onApply: ControlAction;
   onHoldStart: (direction: HoldDirection) => void;
   onHoldEnd: () => void;
+  onPressedChange: (pressed: ReadonlySet<PhysicalControl>) => void;
 }
 
 const KEY_TO_CONTROL: Record<string, Control> = {
@@ -44,6 +46,7 @@ export function PhysicalControls({
   onApply,
   onHoldStart,
   onHoldEnd,
+  onPressedChange,
 }: PhysicalControlsProps) {
   const view = useView();
   const cardPosition = POSITIONS[view].card;
@@ -94,6 +97,10 @@ export function PhysicalControls({
   }, [onHoldStart, stopHold]);
 
   useEffect(() => {
+    onPressedChange(pressed);
+  }, [onPressedChange, pressed]);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const control = keyToControl(event.key);
       if (!control) return;
@@ -131,6 +138,9 @@ export function PhysicalControls({
   const buttonClass = (control: Control, positionClass: string) =>
     `${styles.button} ${positionClass} ${pressed.has(control) ? styles.pressed : ''}`;
 
+  const stemClass = (control: Control, positionClass: string) =>
+    `${styles.stem} ${positionClass} ${pressed.has(control) ? styles.stemPressed : ''}`;
+
   const pointerDown = (control: Control) => (event: React.PointerEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -167,35 +177,19 @@ export function PhysicalControls({
       className={styles.controls}
       initial={false}
       animate={{
-        left: cardPosition.left + cardPosition.width - 250,
+        left: cardPosition.left + cardPosition.width - 241,
         top: cardPosition.top,
       }}
       transition={MORPH_TRANSITION}
     >
-      <span className={`${styles.stem} ${styles.downStem}`} />
-      <span className={`${styles.stem} ${styles.upStem}`} />
-      <span className={`${styles.stem} ${styles.enterStem}`} />
-
-      <button
-        type="button"
-        className={buttonClass('down', styles.downButton)}
-        aria-label="Down"
-        onPointerDown={pointerDown('down')}
-        onPointerUp={pointerUp('down')}
-        onPointerCancel={pointerUp('down')}
-        onKeyDown={buttonKey('down', true)}
-        onKeyUp={buttonKey('down', false)}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <span className={styles.cap}>
-          <img src={downButton} alt="" className={styles.controlImage} />
-        </span>
-      </button>
+      <span className={stemClass('up', styles.upStem)} />
+      <span className={stemClass('down', styles.downStem)} />
+      <span className={stemClass('enter', styles.enterStem)} />
 
       <button
         type="button"
         className={buttonClass('up', styles.upButton)}
-        aria-label="Up"
+        aria-label="Previous"
         onPointerDown={pointerDown('up')}
         onPointerUp={pointerUp('up')}
         onPointerCancel={pointerUp('up')}
@@ -204,7 +198,23 @@ export function PhysicalControls({
         onClick={(event) => event.stopPropagation()}
       >
         <span className={styles.cap}>
-          <img src={upButton} alt="" className={styles.controlImage} />
+          <UpButton aria-hidden="true" className={styles.controlImage} />
+        </span>
+      </button>
+
+      <button
+        type="button"
+        className={buttonClass('down', styles.downButton)}
+        aria-label="Next"
+        onPointerDown={pointerDown('down')}
+        onPointerUp={pointerUp('down')}
+        onPointerCancel={pointerUp('down')}
+        onKeyDown={buttonKey('down', true)}
+        onKeyUp={buttonKey('down', false)}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <span className={styles.cap}>
+          <DownButton aria-hidden="true" className={styles.controlImage} />
         </span>
       </button>
 
