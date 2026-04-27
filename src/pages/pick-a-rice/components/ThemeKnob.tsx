@@ -3,6 +3,7 @@ import styles from './ThemeKnob.module.css';
 import KnobBaseSvg from '@/assets/theme-knob/base.svg?react';
 import KnobBodySvg from '@/assets/theme-knob/body.svg?react';
 import KnobHandleSvg from '@/assets/theme-knob/handle.svg?react';
+import { playRiceSound } from '../sounds';
 import {
   MORPH_TRANSITION,
   POSITIONS,
@@ -33,7 +34,10 @@ export function ThemeKnob() {
       transition={MORPH_TRANSITION}
       style={{ pointerEvents: 'auto', cursor: 'pointer' }}
       data-capture-theme-knob
-      onClick={advance}
+      onClick={() => {
+        playRiceSound('themeClick');
+        advance();
+      }}
     >
       <KnobBaseSvg className={styles.base} />
       <KnobBodySvg className={styles.body} />
