@@ -45,6 +45,8 @@ export function PickARice() {
   const advance = useCallback(() => setCycleIdx((i) => (i + 1) % THEME_CYCLE.length), []);
   const themeValue = useMemo(() => ({ theme, advance }), [advance, theme]);
   const selectedRice = rices[focusedRiceIndex];
+  const latestApplyStateRef = useRef({ backendRunning, previewOption, selectedRice, view });
+  latestApplyStateRef.current = { backendRunning, previewOption, selectedRice, view };
   const scroll = useMemo(
     () => ({
       offset: riceScrollOffset,
@@ -127,6 +129,7 @@ export function PickARice() {
   }, [view]);
 
   const applyFocusedRice = useCallback(() => {
+    const { backendRunning, previewOption, selectedRice, view } = latestApplyStateRef.current;
     if (backendRunning || !selectedRice) return;
 
     if (view === 'picking') {
@@ -143,7 +146,7 @@ export function PickARice() {
     } else if (previewOption === 'dots') {
       window.open(selectedRice.repo, '_blank', 'noopener,noreferrer');
     }
-  }, [backendRunning, previewOption, runBackend, selectedRice, view]);
+  }, [runBackend]);
 
   const cycleOnBareStage = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target !== e.currentTarget) return;
