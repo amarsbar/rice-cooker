@@ -7,6 +7,7 @@ expression: stdout
     "name": "one",
     "display_name": "One",
     "description": "first rice",
+    "install_supported": true,
     "installed": false,
     "documented_system_effects": [
       "writes /etc/thing"
@@ -16,6 +17,7 @@ expression: stdout
     "name": "two",
     "display_name": "Two",
     "description": "",
+    "install_supported": false,
     "installed": false,
     "documented_system_effects": []
   }

@@ -1,4 +1,4 @@
-# rice-cooker catalog — one file, keyed by rice name.
+# rice-cooker catalog: one file keyed by rice name.
 # Filename stem of each [table] is the CLI id: `rice-cooker install <stem>`.
 #
 # `commit` is a hex SHA (min 7 chars, all hex); full 40-char SHAs
@@ -6,10 +6,10 @@
 # any commit string containing the literal "PLACEHOLDER" substring
 # is treated as a placeholder.
 #
-# Install = clone rice at `commit` → paru installs `pacman_deps ∪ aur_deps`
-# via pkexec → `ln -sfnT <clone>/<symlink_src> <symlink_dst>`. That's it.
+# Preview = clone, install `preview_*_deps`, symlink, launch Quickshell.
+# Install requires `install_supported = true`.
 #
-# paru resolves transitive AUR deps — aur_deps lists top-level names only,
+# paru resolves transitive AUR deps; aur_deps lists top-level names only,
 # no commit pins.
 
 [caelestia]
@@ -19,7 +19,21 @@ repo = "https://github.com/caelestia-dots/caelestia"
 commit = "0283b44960791ab12cde19c9797d70976a0b96a4"
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/caelestia"
+pacman_deps = [
+  "hyprland",
+  "xdg-desktop-portal-hyprland",
+  "xdg-desktop-portal-gtk",
+  "hyprpicker",
+  "wl-clipboard",
+  "cliphist",
+  "wireplumber",
+  "trash-cli",
+  "foot",
+  "fish",
+  "jq",
+]
 aur_deps = ["caelestia-shell-git"]
+preview_aur_deps = ["caelestia-shell-git"]
 
 [noctalia]
 display_name = "Noctalia"
@@ -28,6 +42,16 @@ repo = "https://github.com/noctalia-dev/noctalia-shell"
 commit = "d7b68652e79bce5813dc4fea7e51636a5da3e1b7"
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/noctalia"
+install_supported = true
+pacman_deps = [
+  "noctalia-shell",
+  "cliphist",
+  "wlsunset",
+  "power-profiles-daemon",
+  "ddcutil",
+  "wl-clipboard",
+  "wtype",
+]
 
 [dms]
 display_name = "DankMaterialShell"
@@ -36,53 +60,17 @@ repo = "https://github.com/AvengeMedia/DankMaterialShell"
 commit = "c6ed64b24e414cd4b9588b645a6345b15fa697f4"
 symlink_src = "quickshell"
 symlink_dst = "~/.config/quickshell/dms"
-
-[end-4]
-display_name = "illogical-impulse (end-4 dots-hyprland)"
-description = "End-4's Quickshell"
-repo = "https://github.com/end-4/dots-hyprland"
-commit = "a2c164109061554ee11e6ee6806b29e7e8e89417"
-symlink_src = "dots/.config/quickshell/ii"
-symlink_dst = "~/.config/quickshell/end-4"
-pacman_deps = ["qt6-positioning"]
-documented_system_effects = [
-  "upstream installer modifies waybar/hypr/gtk configs (we do not run it)",
+pacman_deps = [
+  "dms-shell",
+  "cava",
+  "matugen",
+  "networkmanager",
+  "power-profiles-daemon",
+  "qt6-multimedia",
+  "qt6ct",
+  "wtype",
 ]
-
-[Ambxst]
-display_name = "Ambxst"
-description = "Axenide's Quickshell"
-repo = "https://github.com/Axenide/Ambxst"
-commit = "844cb9d3fc465ff13b504c99469fb6c4d695e399"
-symlink_src = "."
-symlink_dst = "~/.config/quickshell/Ambxst"
-pacman_deps = ["syntax-highlighting"]
-
-[iNiR]
-display_name = "iNiR"
-description = "Snowarch's Quickshell"
-repo = "https://github.com/snowarch/iNiR"
-commit = "a69d17fe6c919cdcedd4802b4ee56535b02449be"
-symlink_src = "."
-symlink_dst = "~/.config/quickshell/iNiR"
-pacman_deps = ["kirigami", "syntax-highlighting"]
-
-[nucleus]
-display_name = "Nucleus"
-description = "Nucleus HQ's Quickshell"
-repo = "https://github.com/nucleus-hq/nucleus-shell"
-commit = "2db58fc9d8c4ffc8c6b3b063692febf6c0686201"
-symlink_src = "quickshell/nucleus-shell"
-symlink_dst = "~/.config/quickshell/nucleus"
-
-[NibrasShell]
-display_name = "NibrasShell"
-description = "Ahmed Saadi's Quickshell"
-repo = "https://github.com/AhmedSaadi0/NibrasShell"
-commit = "9760442e925981f74d2129d1f74ec93b2e5293d7"
-symlink_src = "config/quickshell"
-symlink_dst = "~/.config/quickshell/NibrasShell"
-pacman_deps = ["kirigami"]
+aur_deps = ["dsearch-bin"]
 
 [linux-retroism]
 display_name = "linux-retroism"
@@ -91,30 +79,24 @@ repo = "https://github.com/diinki/linux-retroism"
 commit = "255eb6a7b5a0d26413eea8dc5f47e8d67bb4b1ff"
 symlink_src = "configs/quickshell"
 symlink_dst = "~/.config/quickshell/linux-retroism"
-
-[Zaphkiel]
-display_name = "Zaphkiel"
-description = "Rexcrazy's Quickshell (KuruKuruBar)"
-repo = "https://github.com/Rexcrazy804/Zaphkiel"
-commit = "6029924d393940d1f34a8e93dc7b89e24d797ff9"
-symlink_src = "dots/quickshell/kurukurubar"
-symlink_dst = "~/.config/quickshell/Zaphkiel"
-
-[eqsh]
-display_name = "eqsh"
-description = "eq-desktop's Quickshell"
-repo = "https://github.com/eq-desktop/eqsh"
-commit = "2eea698ec832a1b3dacb8cd5d566a5416cb11dff"
-symlink_src = "eqsh"
-symlink_dst = "~/.config/quickshell/eqsh"
-
-[dotfiles-hyprland]
-display_name = "dotfiles-hyprland"
-description = "cxOrz's dotfiles-hyprland Quickshell"
-repo = "https://github.com/cxOrz/dotfiles-hyprland"
-commit = "1a1bfc247de5137a4c084667cfb45f5b19415e42"
-symlink_src = ".config/quickshell"
-symlink_dst = "~/.config/quickshell/dotfiles-hyprland"
+pacman_deps = [
+  "hyprland",
+  "hyprpaper",
+  "swaybg",
+  "nemo",
+  "kitty",
+  "nwg-look",
+  "grim",
+  "slurp",
+  "swappy",
+  "hyprshot",
+  "wl-clipboard",
+  "mako",
+  "dconf",
+  "jq",
+  "socat",
+  "qt6-5compat",
+]
 
 [whisker]
 display_name = "whisker"
@@ -123,19 +105,82 @@ repo = "https://github.com/corecathx/whisker"
 commit = "ab1edb84b7b8cf1c0514d12f1c639f8c863e3900"
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/whisker"
+install_supported = true
+pacman_deps = [
+  "cliphist",
+  "wl-clipboard",
+  "ffmpeg",
+  "gpu-screen-recorder",
+  "pipewire",
+]
+aur_deps = ["whisker-shell-git"]
 
-[dhrruvsharma-shell]
-display_name = "dhrruvsharma-shell"
-description = "dhrruvsharma's shell"
-repo = "https://github.com/dhrruvsharma/shell"
-commit = "7a69584217a009ee9eea8e180ecb2471569a3187"
+[nandoroid]
+display_name = "Nandoroid"
+description = "na-ive's Android-inspired Quickshell shell"
+repo = "https://github.com/na-ive/nandoroid-shell"
+commit = "c24bda36581fe7a34c692f2798a9296dcfca6f93"
+symlink_src = "dotfiles/.config/quickshell/nandoroid"
+symlink_dst = "~/.config/quickshell/nandoroid"
+pacman_deps = [
+  "hyprland",
+  "qt6-declarative",
+  "qt6-svg",
+  "qt6-wayland",
+  "python",
+  "jq",
+  "dgop",
+  "pipewire",
+  "networkmanager",
+  "bluez",
+  "libnotify",
+  "polkit",
+  "brightnessctl",
+  "playerctl",
+  "xdg-desktop-portal-hyprland",
+  "xdg-desktop-portal-gtk",
+  "grim",
+  "slurp",
+  "wf-recorder",
+  "imagemagick",
+  "ffmpeg",
+  "songrec",
+  "cava",
+  "easyeffects",
+  "hyprpicker",
+  "hyprlock",
+  "hyprsunset",
+  "wl-clipboard",
+  "cliphist",
+  "zenity",
+  "ttf-jetbrains-mono-nerd",
+  "ttf-material-symbols-variable",
+  "noto-fonts-emoji",
+  "noto-fonts-cjk",
+]
+aur_deps = [
+  "quickshell-git",
+  "matugen-bin",
+]
+documented_system_effects = [
+  "only the Quickshell config is installed; matugen templates, Hyprland source block/keybinds, terminal/fish/starship injection, Google Sans Flex, and Nandoroid CLI are not installed",
+]
+
+[zephyr]
+display_name = "Zephyr (flicko)"
+description = "flickowoa's Zephyr Quickshell"
+repo = "https://github.com/flickowoa/dotfiles"
+commit = "92a33e776a844070bab67cd4a4a1a688b3ea6730"
 symlink_src = "quickshell"
-symlink_dst = "~/.config/quickshell/dhrruvsharma-shell"
-
-[Moonveil]
-display_name = "Moonveil"
-description = "notcandy001's Quickshell (CrescentShell)"
-repo = "https://github.com/notcandy001/Moonveil"
-commit = "e421611fbd9406f8cea3447849064e030f068cce"
-symlink_src = "dots/.config/quickshell/CrescentShell"
-symlink_dst = "~/.config/quickshell/Moonveil"
+symlink_dst = "~/.config/quickshell/zephyr"
+pacman_deps = [
+  "qt6-multimedia",
+  "qt6-multimedia-ffmpeg",
+  "qt6-5compat",
+  "cava",
+  "ffmpeg",
+  "matugen",
+]
+documented_system_effects = [
+  "only the Quickshell config is installed; Hyprland, terminal, shell, and theme glue are not installed",
+]
