@@ -7,17 +7,24 @@ import GridSvg from '@/assets/scroll-wheel/grid.svg?react';
 import installRiceSvg from '@/assets/scroll-wheel/install-rice.svg';
 import dotfilesSvg from '@/assets/scroll-wheel/dotfiles.svg';
 import tryAnotherSvg from '@/assets/scroll-wheel/try-another.svg';
+import BootEnterMessage from '@/assets/scroll-wheel/boot-enter.svg?react';
+import BootCloseMessage from '@/assets/scroll-wheel/boot-close.svg?react';
+import BootGithubMessage from '@/assets/scroll-wheel/boot-github.svg?react';
 import {
   MORPH_TRANSITION,
   POSITIONS,
   PREVIEW_OPTIONS,
+  RICE_ITEM_PITCH,
   type PreviewOption,
+  type ScrollState,
   SCREEN_FADE_TRANSITION,
   SHRUNKEN_TEXT_VARIANTS,
   usePreviewOption,
   useScroll,
   useView,
 } from '../view';
+import { MENU_ITEMS, type MenuItem } from '../menuOptions';
+import type { BootItem } from './BootScreen';
 
 const MotionRim = motion.create(RimSvg);
 
@@ -42,13 +49,49 @@ const CREAM_CENTER = 88;
  *  Re-enable with STEP > 0 to get the Figma-exact offset back. */
 const PILL_Y_BASE = 18.5;
 const PILL_Y_STEP = 0;
-const RIM_ROTATE_PER_PX = 0.2;
+const RIM_ROTATE_PER_PX = 0.1;
+const BOOT_WHEEL_ITEMS: BootItem[] = ['enter', 'close', 'github'];
+const BOOT_DOT_OPTION: Record<BootItem, PreviewOption> = {
+  enter: 'leave',
+  close: 'install',
+  github: 'dots',
+};
+const BOOT_MESSAGES = {
+  enter: BootEnterMessage,
+  close: BootCloseMessage,
+  github: BootGithubMessage,
+} as const;
 
-export function ScrollWheel() {
+export function ScrollWheel({
+  menuItem = null,
+  bootItem = null,
+}: {
+  menuItem?: MenuItem | null;
+  bootItem?: BootItem | null;
+}) {
   const view = useView();
   const previewOption = usePreviewOption();
   const scroll = useScroll();
   const pressed = usePressedDirections();
+  const menuIndex = menuItem ? MENU_ITEMS.indexOf(menuItem) : -1;
+  const bootIndex = bootItem ? BOOT_WHEEL_ITEMS.indexOf(bootItem) : -1;
+  const previewIndex = view === 'preview' ? PREVIEW_OPTIONS.indexOf(previewOption) : -1;
+  const menuActive = menuIndex >= 0;
+  const bootActive = bootIndex >= 0;
+  const previewActive = previewIndex >= 0 && !menuActive && !bootActive;
+  const activeScroll = menuActive
+    ? { offset: menuIndex * RICE_ITEM_PITCH, index: menuIndex, total: MENU_ITEMS.length }
+    : bootActive
+      ? { offset: bootIndex * RICE_ITEM_PITCH, index: bootIndex, total: BOOT_WHEEL_ITEMS.length }
+      : previewActive
+        ? { offset: previewIndex * RICE_ITEM_PITCH, index: previewIndex, total: PREVIEW_OPTIONS.length }
+        : scroll;
+  const controlledWheel = menuActive || bootActive || previewActive;
+  const pickingContentVisible = menuActive || (!bootActive && view === 'picking');
+  const bootContentVisible = bootActive;
+  const previewContentVisible = previewActive;
+  const dotsVisible = previewContentVisible || bootContentVisible;
+  const dotOption = bootItem ? BOOT_DOT_OPTION[bootItem] : previewOption;
 
   return (
     <motion.div
@@ -59,7 +102,9 @@ export function ScrollWheel() {
     >
       <MotionRim
         className={styles.rim}
-        style={{ rotate: scroll.offset * RIM_ROTATE_PER_PX }}
+        style={controlledWheel ? undefined : { rotate: activeScroll.offset * RIM_ROTATE_PER_PX }}
+        animate={controlledWheel ? { rotate: activeScroll.offset * RIM_ROTATE_PER_PX } : undefined}
+        transition={MORPH_TRANSITION}
       />
 
       <div className={styles.inner}>
@@ -72,10 +117,10 @@ export function ScrollWheel() {
         <motion.div
           className={styles.content}
           initial={false}
-          animate={{ opacity: view === 'picking' ? 1 : 0 }}
+          animate={{ opacity: pickingContentVisible ? 1 : 0 }}
           transition={SCREEN_FADE_TRANSITION}
         >
-          <BeadIndicator />
+          <BeadIndicator scroll={activeScroll} />
           <OutlinedText className={`${styles.tag} ${styles.tagTop}`}>niri</OutlinedText>
           <OutlinedText className={`${styles.tag} ${styles.tagBottom}`}>dms</OutlinedText>
           <OutlinedText className={`${styles.tag} ${styles.tagPlus}`}>+</OutlinedText>
@@ -85,23 +130,38 @@ export function ScrollWheel() {
         <motion.div
           className={styles.content}
           initial={false}
-          animate={view === 'preview' ? 'visible' : 'hidden'}
+          animate={previewContentVisible ? 'visible' : 'hidden'}
           variants={SHRUNKEN_TEXT_VARIANTS}
         >
           <PreviewWheelGraphic option={previewOption} />
+        </motion.div>
+
+        <motion.div
+          className={styles.content}
+          initial={false}
+          animate={bootContentVisible ? 'visible' : 'hidden'}
+          variants={SHRUNKEN_TEXT_VARIANTS}
+        >
+          {bootItem && <BootWheelGraphic item={bootItem} />}
         </motion.div>
       </div>
 
       <motion.div
         className={styles.previewDots}
         initial={false}
-        animate={view === 'preview' ? 'visible' : 'hidden'}
+        animate={dotsVisible ? 'visible' : 'hidden'}
         variants={SHRUNKEN_TEXT_VARIANTS}
       >
-        <PreviewDots option={previewOption} />
+        <PreviewDots option={dotOption} />
       </motion.div>
     </motion.div>
   );
+}
+
+function BootWheelGraphic({ item }: { item: BootItem }) {
+  const cls = `${styles.bootGraphic} ${styles[`bootGraphic_${item}`]}`;
+  const Message = BOOT_MESSAGES[item];
+  return <Message className={cls} aria-hidden="true" />;
 }
 
 function PreviewWheelGraphic({ option }: { option: PreviewOption }) {
@@ -155,8 +215,8 @@ function PreviewDots({ option }: { option: PreviewOption }) {
   );
 }
 
-function BeadIndicator() {
-  const { index, total } = useScroll();
+function BeadIndicator({ scroll }: { scroll: ScrollState }) {
+  const { index, total } = scroll;
   const leftCount = Math.min(index, 3);
   const pillY = PILL_Y_BASE + leftCount * PILL_Y_STEP;
   return (

@@ -9,13 +9,14 @@
 
 .label {
   position: absolute;
-  top: 19px;
+  top: 15px;
   font-family: var(--font-pill);
   font-size: 14px;
   font-weight: 400;
   color: var(--c-screen-text);
   line-height: normal;
   white-space: nowrap;
+  transition: color var(--theme-color-transition);
 }
 
 .menuLabel {
@@ -27,15 +28,21 @@
   color: var(--c-header-accent);
   text-align: center;
   transform: translateX(-50%);
-  transition: color 80ms ease-out, transform 80ms ease-out;
+  transition:
+    color var(--theme-color-transition),
+    transform 400ms cubic-bezier(0.16, 0.885, 0.25, 1.14);
 }
 
 .prevLabel {
-  left: 315.5px;
+  left: 324px;
 }
 
 .nextLabel {
-  left: 369px;
+  left: 380px;
+}
+
+.navMenuOpen {
+  transform: translate(-50%, -4px);
 }
 
 .navPressed {
@@ -45,7 +52,7 @@
 
 .applyCluster {
   position: absolute;
-  left: 398px;
+  left: 408px;
   top: 9px;
   display: flex;
   align-items: center;
@@ -68,6 +75,9 @@
   color: var(--c-screen-text-on-pill);
   line-height: 1;
   text-align: center;
+  transition:
+    background-color var(--theme-color-transition),
+    color var(--theme-color-transition);
 }
 
 .divider {

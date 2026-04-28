@@ -24,6 +24,8 @@
   --color-pink: #fc6984;
   --color-rose: #f66ea2;
   --color-rose-light: #ffafce;
+  --color-antenna: #fd9bb3;
+  --color-closing-ring: #ff94bf;
   --color-sky-soft: #7e92c4;
   --color-blue-grey: #9eabc5;
   --color-slate: #737d91;
@@ -49,10 +51,15 @@
      same names — components only reference role tokens, never raw
      palette. */
   --c-card-bg: #000001;                              /* opaque card bg in picking state */
+  --c-menu-card-bg: #151014;
   --c-card-bg-shrunken: rgba(26, 20, 25, 0.8);       /* semi-transparent in preview */
   --c-card-border: var(--color-mint);                /* card border + green tab + theme knob base */
-  --c-sound-body: var(--color-teal);                 /* sound ring stroke + inner disc */
-  --c-sound-icon: var(--color-mint);                 /* speaker glyph */
+  --c-sound-on-body: var(--color-navy);              /* sound on ring + inner disc */
+  --c-sound-off-body: #8796a5;                       /* sound off ring + inner disc */
+  --c-sound-body: var(--c-sound-on-body);            /* legacy SVG sound fill/stroke */
+  --c-sound-on-icon: var(--color-ice);               /* sound on speaker glyph */
+  --c-sound-icon: var(--c-sound-on-icon);            /* legacy SVG speaker glyph */
+  --c-sound-off-icon: var(--color-ice);              /* sound off speaker glyph */
   --c-close-pin: var(--color-orange);
   --c-primary: var(--color-yellow);                  /* letter pills, menu dots, logo fill, button default bg */
   --c-primary-text: var(--color-counter-text);       /* letter pill text */
@@ -73,6 +80,10 @@
   --c-btn-hover-icon: var(--color-lime);
   --c-screen-text: var(--color-lime);
   --c-screen-text-on-pill: var(--color-brown);
+  --c-antenna: var(--color-antenna);
+  --c-closing-ring: var(--color-closing-ring);
+  --c-closing-bg: var(--color-frame-inner);
+  --theme-color-transition: 300ms ease-out;
 
   /* Card dimensions */
   --card-radius: 26px;
@@ -97,8 +108,12 @@
   --c-card-bg: var(--color-near-black);
   --c-card-bg-shrunken: rgba(15, 15, 21, 0.8);
   --c-card-border: var(--color-ice);
-  --c-sound-body: var(--color-navy);
-  --c-sound-icon: var(--color-ice);
+  --c-sound-on-body: var(--color-navy);
+  --c-sound-off-body: #8796a5;
+  --c-sound-body: var(--c-sound-on-body);
+  --c-sound-on-icon: var(--color-ice);
+  --c-sound-icon: var(--c-sound-on-icon);
+  --c-sound-off-icon: var(--color-ice);
   --c-close-pin: var(--color-pink);
   --c-primary: var(--color-light-blue);
   --c-primary-text: var(--color-near-black);
@@ -116,6 +131,7 @@
   --c-btn-default-icon: var(--color-navy);
   --c-btn-hover-bg: var(--color-light-pink);
   --c-btn-hover-icon: var(--color-brown);          /* t1 hover arrow is brown, not lime */
+  --c-closing-bg: var(--color-near-black);
 }
 
 /* ----- Theme 3 (knob bottom, dark-blue/lime) ----- */
@@ -123,8 +139,12 @@
   --c-card-bg: var(--color-near-black);
   --c-card-bg-shrunken: rgba(15, 15, 21, 0.8);
   --c-card-border: var(--color-navy-deep);
-  --c-sound-body: var(--color-slate);
-  --c-sound-icon: var(--color-mute);
+  --c-sound-on-body: #4c628f;
+  --c-sound-off-body: #525e76;
+  --c-sound-body: var(--c-sound-on-body);
+  --c-sound-on-icon: var(--color-ice);
+  --c-sound-icon: var(--c-sound-on-icon);
+  --c-sound-off-icon: var(--color-slate);
   --c-close-pin: var(--color-red);
   --c-primary: var(--color-lime);
   --c-primary-text: var(--color-brown);
@@ -144,4 +164,11 @@
   --c-btn-default-icon: var(--color-brown);
   --c-btn-hover-bg: var(--color-light-blue);
   --c-btn-hover-icon: var(--color-navy);
+  --c-closing-bg: var(--color-near-black);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --theme-color-transition: 0ms linear;
+  }
 }

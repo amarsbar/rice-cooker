@@ -19,6 +19,7 @@ interface ScreenContentProps {
   navRequest: RiceNavRequest;
   pressedControls: ReadonlySet<PhysicalControl>;
   onScrollOffsetChange: (offset: number) => void;
+  onRiceStepStart: (index: number) => void;
 }
 
 export function ScreenContent({
@@ -27,6 +28,7 @@ export function ScreenContent({
   navRequest,
   pressedControls,
   onScrollOffsetChange,
+  onRiceStepStart,
 }: ScreenContentProps) {
   const view = useView();
   const shrunken = view !== 'picking';
@@ -49,6 +51,7 @@ export function ScreenContent({
         holdDirection={holdDirection}
         navRequest={navRequest}
         onScrollOffsetChange={onScrollOffsetChange}
+        onRiceStepStart={onRiceStepStart}
       />
     </motion.div>
   );

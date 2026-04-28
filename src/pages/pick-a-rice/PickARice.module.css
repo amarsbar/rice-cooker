@@ -5,3 +5,23 @@
   height: 574px;
   margin: 0 auto;
 }
+
+.pickerContent {
+  opacity: 1;
+  transition: opacity 100ms linear;
+}
+
+.pickerContentHidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.menuContent {
+  opacity: 1;
+  transition: opacity 100ms linear;
+}
+
+.menuContentExiting {
+  opacity: 0;
+  pointer-events: none;
+}

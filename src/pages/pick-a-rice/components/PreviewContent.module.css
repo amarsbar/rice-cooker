@@ -104,6 +104,7 @@
 .pointer {
   position: absolute;
   pointer-events: none;
+  transform-origin: center;
 }
 
 .pointerLeave {
@@ -111,6 +112,7 @@
   top: 75.06px;
   width: 9.535px;
   height: 8.921px;
+  transform: rotate(195.03deg);
 }
 
 .pointerInstallTop {
@@ -118,6 +120,7 @@
   top: 78px;
   width: 9.66px;
   height: 9.075px;
+  transform: rotate(-16.56deg);
 }
 
 .pointerInstallBottom {
@@ -125,6 +128,7 @@
   top: 140px;
   width: 9.533px;
   height: 8.919px;
+  transform: rotate(195deg);
 }
 
 .pointerDots {
@@ -132,6 +136,7 @@
   top: 145px;
   width: 9.533px;
   height: 8.919px;
+  transform: rotate(-15deg);
 }
 
 .wordPill {
@@ -220,6 +225,7 @@
   line-height: normal;
   text-align: center;
   white-space: nowrap;
+  transition: color var(--theme-color-transition);
 }
 
 @media (prefers-reduced-motion: reduce) {

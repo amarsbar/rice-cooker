@@ -1,0 +1,486 @@
+.menu {
+  position: absolute;
+  left: calc(-1 * var(--card-border-width));
+  top: calc(-1 * var(--card-border-width));
+  z-index: 80;
+  width: 550px;
+  height: 399px;
+  overflow: hidden;
+  border: 9px solid #dfecdb;
+  border-radius: 26px;
+  background: transparent;
+  font-family: var(--font-pill);
+  color: #e8ff76;
+}
+
+.version {
+  position: absolute;
+  left: 154px;
+  top: 66px;
+  padding: 6px;
+  border: 1px solid #7d6e64;
+  border-radius: 110px;
+  color: #7d6e64;
+  font-size: 12px;
+  letter-spacing: -0.24px;
+  line-height: 1;
+  animation:
+    left-float-in 400ms cubic-bezier(0.16, 0.885, 0.25, 1.14) both,
+    guide-fade-in 100ms linear both;
+}
+
+.logoImage {
+  position: absolute;
+  left: 14px;
+  top: 4px;
+  display: block;
+  width: 131px;
+  height: 100px;
+  max-width: none;
+  animation:
+    left-float-in 400ms cubic-bezier(0.16, 0.885, 0.25, 1.14) both,
+    guide-fade-in 100ms linear both;
+}
+
+.backGroup {
+  position: absolute;
+  left: 12px;
+  top: 115px;
+  height: 40px;
+}
+
+.backCircle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(232, 255, 118, 0.2);
+  border-radius: 200px;
+  background: #414727;
+  background-clip: padding-box;
+  transition: background-color 180ms ease, border-color 180ms ease;
+}
+
+.backCircleActive {
+  outline: 1px solid rgba(232, 255, 118, 0.2);
+  border-radius: 200px;
+  background: var(--Lime, #E8FF76);
+}
+
+.backIcon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  background: #e8ff76;
+  mask: var(--back-icon) center / contain no-repeat;
+  transition: background-color 180ms ease;
+  -webkit-mask: var(--back-icon) center / contain no-repeat;
+}
+
+.backCircleActive .backIcon {
+  background: #3f3833;
+}
+
+.letters {
+  position: absolute;
+  left: 44px;
+  top: 0;
+  display: flex;
+  padding-right: 10px;
+}
+
+.row .letters {
+  left: 12px;
+  top: 70px;
+}
+
+.letter {
+  position: relative;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  margin-right: -10px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 100px;
+  background: #3f3833;
+  color: #e8ff76;
+  font-size: 18px;
+  line-height: normal;
+}
+
+.backGroup .letter {
+  background: #e8ff76;
+  color: #3f3833;
+}
+
+.letterGhost {
+  background: #859631;
+}
+
+.letterBubbleShow {
+  visibility: hidden;
+  animation: bubble-show 1ms steps(1, end) forwards;
+  animation-delay: var(--bubble-delay);
+}
+
+.letterBubbleHide {
+  animation: bubble-hide 1ms steps(1, end) forwards;
+  animation-delay: var(--bubble-delay);
+}
+
+.letterBubbleHidden {
+  visibility: hidden;
+}
+
+@keyframes bubble-show {
+  to {
+    visibility: visible;
+  }
+}
+
+@keyframes bubble-hide {
+  to {
+    visibility: hidden;
+  }
+}
+
+.row {
+  position: absolute;
+  left: 12px;
+  width: 229px;
+  height: 34px;
+  overflow: hidden;
+  border: 1px solid rgba(232, 255, 118, 0.2);
+  border-radius: 16px;
+  background: #414727;
+  background-clip: padding-box;
+  transition:
+    top 400ms ease,
+    height 400ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease;
+  animation:
+    left-float-in 400ms cubic-bezier(0.16, 0.885, 0.25, 1.14) both,
+    guide-fade-in 100ms linear both;
+}
+
+.rowExpanded {
+  height: 122px;
+}
+
+.rowActive {
+  border-color: transparent;
+  background: #e8ff76;
+}
+
+.rowLabel {
+  position: absolute;
+  left: 12px;
+  top: calc(50% - 8px);
+  color: #e8ff76;
+  font-size: 14px;
+  letter-spacing: -0.28px;
+  line-height: normal;
+}
+
+.expandedTitle {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  color: #e8ff76;
+  font-size: 16px;
+  letter-spacing: -0.32px;
+  line-height: normal;
+  transition: color 180ms ease;
+}
+
+.expandedDescription {
+  position: absolute;
+  left: 12px;
+  top: 32px;
+  width: 201px;
+  color: #e8ff76;
+  font-size: 14px;
+  letter-spacing: -0.28px;
+  line-height: normal;
+  opacity: 0.5;
+  transition: color 180ms ease;
+}
+
+.rowActive .expandedTitle {
+  color: #3f3833;
+}
+
+.rowActive .expandedDescription {
+  color: #1b161a;
+}
+
+.externalIcon {
+  position: absolute;
+  left: 203px;
+  top: 11px;
+  width: 12.75px;
+  height: 12.75px;
+}
+
+.externalIconRevert {
+  left: 203px;
+}
+
+.holdLabel {
+  position: absolute;
+  left: 166px;
+  top: 13px;
+  color: #3f3833;
+  font-size: 12px;
+  letter-spacing: -0.24px;
+  line-height: 1;
+}
+
+.creditLinks {
+  position: absolute;
+  left: 12px;
+  top: 70px;
+  height: 40px;
+}
+
+.creditLink {
+  position: absolute;
+  top: 0;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 100px;
+  background: rgba(63, 56, 51, 0.2);
+  --fill-0: #3f3833;
+
+  transition: background-color 180ms ease;
+}
+
+.creditLinkActive {
+  background: #3f3833;
+  --fill-0: #e8ff76;
+}
+
+.creditLink:nth-child(2) {
+  left: 48px;
+}
+
+.creditLink:nth-child(3) {
+  left: 96px;
+}
+
+.creditLink:nth-child(4) {
+  left: 144px;
+}
+
+.creditIconWeb {
+  width: 18px;
+  height: 18px;
+}
+
+.creditIconLarge {
+  width: 24px;
+  height: 24px;
+}
+
+.creditIconGithub {
+  width: 40px;
+  height: 40px;
+}
+
+.creditIconGithub rect {
+  fill: transparent;
+  fill-opacity: 0;
+}
+
+.guideAssets {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  animation:
+    guide-float-in 400ms cubic-bezier(0.16, 0.885, 0.25, 1.14) both,
+    guide-fade-in 100ms linear both;
+}
+
+@keyframes guide-float-in {
+  from {
+    transform: translateY(15px);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes left-float-in {
+  from {
+    transform: translateX(-10px);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes guide-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.keyHint {
+  position: absolute;
+  left: 376px;
+  top: 221px;
+  width: 44px;
+  margin: 0;
+  color: #7d6e64;
+  font-size: 14px;
+  letter-spacing: -0.28px;
+  line-height: normal;
+}
+
+.asset {
+  position: absolute;
+  display: block;
+  max-width: none;
+  pointer-events: none;
+}
+
+.topRightItems {
+  left: 309px;
+  top: 37px;
+  width: 201px;
+  height: 137px;
+}
+
+.keyUp {
+  left: 363px;
+  top: 156px;
+  width: 57.147px;
+  height: 50.975px;
+}
+
+.keyDown {
+  left: 438px;
+  top: 216px;
+  width: 57.147px;
+  height: 50.975px;
+}
+
+.arrowKeySvg {
+  --key-fill: #1b161a;
+  --key-stroke: #7d6e64;
+  --key-symbol: #7d6e64;
+}
+
+.arrowKeySvg [id='Bottom'] {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  transition: transform 120ms ease-out;
+}
+
+.arrowKeySvg [id='Top'] {
+  transform: translate(-0.41px, 0);
+  transition: transform 120ms ease-out;
+}
+
+.arrowKeySvg [id='Face'],
+.arrowKeySvg [id='Arrow'] {
+  transition:
+    fill 120ms ease-out,
+    stroke 120ms ease-out,
+    transform 120ms ease-out;
+}
+
+.arrowKeyDownSvg [id='Arrow'] {
+  transform: rotate(180deg);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.keyPressed.arrowKeySvg {
+  --key-stroke: #e8ff76;
+  --key-symbol: #e8ff76;
+}
+
+.keyPressed.arrowKeySvg [id='Bottom'] {
+  transform: scaleY(0.863);
+}
+
+.keyPressed.arrowKeySvg [id='Top'] {
+  transform: translate(-0.41px, 10.54px);
+}
+
+.enterKey {
+  left: 302px;
+  top: 241px;
+  width: 96.776px;
+  height: 110.03px;
+  --enter-fill: #1b161a;
+  --enter-stroke: #7d6e64;
+  --enter-symbol: #7d6e64;
+}
+
+.enterKey [id='BottomPressed'] {
+  opacity: 0;
+}
+
+.enterKey [id='BottomIdle'],
+.enterKey [id='BottomPressed'],
+.enterKey [id='Top'] {
+  transition:
+    stroke 120ms ease-out,
+    transform 120ms ease-out;
+}
+
+.keyPressed.enterKey {
+  --enter-stroke: #e8ff76;
+  --enter-symbol: #e8ff76;
+}
+
+.keyPressed.enterKey [id='BottomIdle'] {
+  opacity: 0;
+}
+
+.keyPressed.enterKey [id='BottomPressed'] {
+  opacity: 1;
+}
+
+.keyPressed.enterKey [id='Top'] {
+  transform: translateY(16.39px);
+}
+
+.verticalArrow1,
+.verticalArrow2,
+.verticalArrow3 {
+  width: 9px;
+  height: 32px;
+}
+
+.verticalArrow1 {
+  left: 353px;
+  top: 167px;
+}
+
+.verticalArrow2 {
+  left: 500px;
+  top: 225px;
+}
+
+.verticalArrow3 {
+  left: 401px;
+  top: 304px;
+}

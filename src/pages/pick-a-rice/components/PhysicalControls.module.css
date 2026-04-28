@@ -45,6 +45,11 @@
   pointer-events: none;
 }
 
+.controlImageDown {
+  transform: rotate(180deg);
+  transform-origin: center;
+}
+
 .controlImage :global(.physicalControlFace) {
   fill: var(--button-bg);
 }

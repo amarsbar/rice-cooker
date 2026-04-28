@@ -1,0 +1,33 @@
+.antenna {
+  position: absolute;
+  z-index: 1;
+  width: 16px;
+  height: 152px;
+  pointer-events: none;
+}
+
+.base,
+.stem {
+  position: absolute;
+  display: block;
+  background: var(--c-antenna);
+  transition: background-color var(--theme-color-transition);
+}
+
+.base {
+  left: 0;
+  top: 116px;
+  width: 16px;
+  height: 36px;
+  border-radius: 4px 0 0 4px;
+  transform-origin: right center;
+}
+
+.stem {
+  left: 5px;
+  top: 0;
+  width: 8px;
+  height: 116px;
+  border-radius: 4px 4px 0 0;
+  transform-origin: bottom center;
+}

@@ -1,11 +1,8 @@
 import { motion } from 'framer-motion';
-import BackIcon from '@/assets/preview-actions/back.svg?react';
+import BackIcon from '@/assets/icons/back.svg?react';
 import DownloadIcon from '@/assets/preview-actions/download.svg?react';
-import GithubIcon from '@/assets/preview-actions/github.svg?react';
-import pointerDots from '@/assets/preview-actions/pointer-dots.svg';
-import pointerInstallBottom from '@/assets/preview-actions/pointer-install-bottom.svg';
-import pointerInstallTop from '@/assets/preview-actions/pointer-install-top.svg';
-import pointerLeave from '@/assets/preview-actions/pointer-leave.svg';
+import GithubIcon from '@/assets/icons/github.svg?react';
+import pointer from '@/assets/icons/pointer.svg';
 import styles from './PreviewContent.module.css';
 import { SHRUNKEN_TEXT_VARIANTS, usePreviewOption, useView, type PreviewOption } from '../view';
 
@@ -61,9 +58,11 @@ export function PreviewContent({
 
       <button
         type="button"
+        tabIndex={-1}
         className={`${styles.wordPill} ${styles[`word_${option}`]} ${
           installUnavailable ? styles.wordUnavailable : ''
         }`}
+        onMouseDown={(event) => event.preventDefault()}
         onClick={(event) => {
           event.stopPropagation();
           onApply();
@@ -115,12 +114,12 @@ function OptionPointers({ option }: { option: PreviewOption }) {
       <>
         <img
           alt=""
-          src={pointerInstallTop}
+          src={pointer}
           className={`${styles.pointer} ${styles.pointerInstallTop}`}
         />
         <img
           alt=""
-          src={pointerInstallBottom}
+          src={pointer}
           className={`${styles.pointer} ${styles.pointerInstallBottom}`}
         />
       </>
@@ -129,7 +128,7 @@ function OptionPointers({ option }: { option: PreviewOption }) {
   return (
     <img
       alt=""
-      src={option === 'leave' ? pointerLeave : pointerDots}
+      src={pointer}
       className={`${styles.pointer} ${
         option === 'leave' ? styles.pointerLeave : styles.pointerDots
       }`}

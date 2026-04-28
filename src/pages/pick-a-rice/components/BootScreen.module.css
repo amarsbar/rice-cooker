@@ -1,0 +1,259 @@
+.boot {
+  position: absolute;
+  left: calc(-1 * var(--card-border-width));
+  top: calc(-1 * var(--card-border-width));
+  z-index: 85;
+  width: 550px;
+  height: 399px;
+  overflow: hidden;
+  border: 9px solid #dfecdb;
+  border-radius: 26px;
+  background: transparent;
+  font-family: var(--font-pill);
+  color: #dfecdb;
+}
+
+.navLabel {
+  position: absolute;
+  top: 11px;
+  margin: 0;
+  transform: translateX(-50%);
+  color: #dfecdb;
+  font-size: 14px;
+  letter-spacing: -0.28px;
+  line-height: normal;
+  opacity: 0.5;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.prevLabel {
+  left: 314.5px;
+}
+
+.nextLabel {
+  left: 371.5px;
+}
+
+.confirmLabel {
+  left: 455.5px;
+}
+
+.hero {
+  position: absolute;
+  left: 39.88px;
+  top: 31.39px;
+  width: 338px;
+  height: 139px;
+}
+
+.sadMessage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 338px;
+  height: 139px;
+}
+
+.description {
+  position: absolute;
+  left: 165.57px;
+  top: 183.27px;
+  width: 212.074px;
+  margin: 0;
+  color: #dfecdb;
+  font-size: 14px;
+  letter-spacing: -0.28px;
+  line-height: normal;
+}
+
+.optionIcon {
+  position: absolute;
+  z-index: 1;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(232, 255, 118, 0.2);
+  border-radius: 200px;
+  background: #414727;
+  background-clip: padding-box;
+  cursor: pointer;
+  transition:
+    left 400ms ease,
+    top 400ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease;
+}
+
+.optionIconActive {
+  border-color: transparent;
+  border-radius: 133.333px;
+  background: #73a94a;
+}
+
+.optionIconImage {
+  display: block;
+  width: 20px;
+  height: 20px;
+  --fill-0: #e8ff76;
+  --stroke-0: #e8ff76;
+}
+
+.optionEnter .optionIconImage {
+  width: 20px;
+  height: 20.419px;
+}
+
+.wordPill {
+  position: absolute;
+  z-index: 1;
+  border: 0;
+  border-radius: 130px;
+  background: #73a94a;
+  color: #3f3833;
+  cursor: pointer;
+  font: inherit;
+  transition:
+    left 400ms ease,
+    top 400ms ease,
+    padding 400ms ease;
+}
+
+.wordCluster {
+  display: flex;
+  align-items: center;
+  padding-right: 7.5px;
+}
+
+.wordLetter {
+  position: relative;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  margin-right: -7.5px;
+  overflow: hidden;
+  border-radius: 75px;
+  background: #e8ff76;
+  color: #3f3833;
+  font-size: 13.5px;
+  letter-spacing: 0;
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.wordLetterHeld {
+  z-index: 1;
+  background: #fdb1e5;
+}
+
+.pointer {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  transition:
+    left 400ms ease,
+    top 400ms ease,
+    transform 400ms ease;
+}
+
+.decoArch,
+.decoHyprland,
+.decoQuickshell,
+.flower,
+.forceHint,
+.warningRisk {
+  position: absolute;
+  display: block;
+  max-width: none;
+  pointer-events: none;
+}
+
+.decoArch {
+  left: 242.13px;
+  top: 16.83px;
+  width: 46.744px;
+  height: 44.724px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.decoArch img {
+  width: 36.546px;
+  height: 32.441px;
+}
+
+.decoHyprland {
+  left: 361.06px;
+  top: 69.76px;
+  width: 39.052px;
+  height: 42.27px;
+}
+
+.decoQuickshell {
+  left: 44.88px;
+  top: 183.22px;
+  width: 39.788px;
+  height: 40.299px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.decoQuickshell img {
+  width: 31.303px;
+  height: 31.303px;
+}
+
+.forceHint {
+  position: absolute;
+  left: 351.6px;
+  top: 237.5px;
+  width: 70px;
+  height: 30px;
+}
+
+.warning {
+  position: absolute;
+  left: 300.51px;
+  top: 50.51px;
+  width: 79.324px;
+  height: 83.229px;
+}
+
+.warningRisk {
+  left: 0;
+  top: 0;
+  width: 79.324px;
+  height: 83.229px;
+}
+
+.flower {
+  width: 29.958px;
+  height: 29.955px;
+  transform: rotate(45deg);
+}
+
+.flowerPink {
+  left: 62.14px;
+  top: 210.68px;
+  color: #fdb1e5;
+}
+
+.flowerLime {
+  left: 441.55px;
+  top: 68.84px;
+  color: #e8ff76;
+}
+
+.flowerYellow {
+  left: 411.87px;
+  top: 249.62px;
+  color: #fade26;
+}

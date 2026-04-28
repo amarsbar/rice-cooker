@@ -61,13 +61,15 @@ img {
 
 .btnShape {
   fill: var(--c-primary);
-  transition: fill 100ms ease-out;
+  transition: fill var(--theme-color-transition);
 }
 
 .btnIcon {
   fill: var(--c-btn-default-icon);
   stroke: var(--c-btn-default-icon);
-  transition: fill 100ms ease-out, stroke 100ms ease-out;
+  transition:
+    fill var(--theme-color-transition),
+    stroke var(--theme-color-transition);
 }
 
 .iconBtn:hover .btnShape {
@@ -98,3 +100,24 @@ img {
 .fillKnobHandle { fill: var(--c-knob-handle); }
 .fillKnobHandleDot { fill: var(--c-knob-handle-dot); }
 .fillKnobBodyDot { fill: var(--c-knob-body-dot); }
+
+.fillPrimary,
+.fillCardBorder,
+.fillWheelRim,
+.fillClosePin,
+.fillSoundBody,
+.fillSoundIcon,
+.fillKnobDot,
+.fillKnobBody,
+.fillKnobHandle,
+.fillKnobHandleDot,
+.fillKnobBodyDot {
+  transition: fill var(--theme-color-transition);
+}
+
+.strokeLogo,
+.strokeGrid,
+.strokeClosePin,
+.strokeSoundBody {
+  transition: stroke var(--theme-color-transition);
+}

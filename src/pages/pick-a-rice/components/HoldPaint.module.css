@@ -1,0 +1,11 @@
+.holdPaint {
+  animation: hold-paint 1ms steps(1, end) forwards;
+  animation-delay: var(--hold-delay);
+}
+
+@keyframes hold-paint {
+  to {
+    background-color: #fdb1e5;
+    color: #3f3833;
+  }
+}
