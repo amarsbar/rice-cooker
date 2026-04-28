@@ -35,7 +35,7 @@
 }
 
 .ring circle {
-  stroke: currentColor;
+  stroke: currentcolor;
 }
 
 .disc {
@@ -63,6 +63,7 @@
   pointer-events: none;
 }
 
+/* stylelint-disable selector-pseudo-class-no-unknown */
 .glyph :global(.fillSoundBody) {
   fill: transparent;
 }
@@ -75,3 +76,4 @@
   fill: var(--sound-icon);
   transition: fill 55ms ease-out;
 }
+/* stylelint-enable selector-pseudo-class-no-unknown */

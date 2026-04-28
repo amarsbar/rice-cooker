@@ -17,7 +17,7 @@
   border: 26px solid var(--c-closing-ring);
   border-radius: 50%;
   transform: translate(-50%, -50%);
-  animation: closeCircle 8s linear var(--delay) infinite both;
+  animation: close-circle 8s linear var(--delay) infinite both;
   transition: border-color var(--theme-color-transition);
 }
 
@@ -43,7 +43,7 @@
   object-fit: cover;
 }
 
-@keyframes closeCircle {
+@keyframes close-circle {
   from {
     width: 1188px;
     height: 1188px;

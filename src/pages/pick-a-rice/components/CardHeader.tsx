@@ -25,16 +25,8 @@ export function CardHeader({
         <>
           <MenuDotsSvg className={styles.menuIcon} />
           <p className={`${styles.label} ${styles.menuLabel}`}>Menu</p>
-        </>
-      )}
-      {!navOnly && (
-        <>
           <p className={labelClass(styles.prevLabel, pressedControls.has('up'))}>Prev</p>
           <p className={labelClass(styles.nextLabel, pressedControls.has('down'))}>Next</p>
-        </>
-      )}
-      {!navOnly && (
-        <>
           <div className={styles.applyCluster}>
             {APPLY_LABEL.split('').map((char, index) => (
               <span key={index} className={styles.applyLetter}>
@@ -42,7 +34,7 @@ export function CardHeader({
               </span>
             ))}
           </div>
-          {!navOnly && <img src={screenDivider} alt="" className={styles.divider} />}
+          <img src={screenDivider} alt="" className={styles.divider} />
         </>
       )}
     </>
