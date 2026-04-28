@@ -25,6 +25,14 @@ import { ClosingCircles } from './components/ClosingCircles';
 import { Antenna } from './components/Antenna';
 import { PreviewStars } from './components/PreviewStars';
 import { MenuScreen } from './components/MenuScreen';
+import {
+  BootScreen,
+  BOOT_FORCE_HOLD_LETTERS,
+  BOOT_FORCE_HOLD_MS,
+  BOOT_FORCE_HOLD_STEP_MS,
+  BOOT_ITEMS,
+  type BootItem,
+} from './components/BootScreen';
 import { playRiceSound } from './sounds';
 import { MENU_ITEMS, type MenuItem } from './menuOptions';
 
@@ -53,9 +61,13 @@ export function PickARice() {
   const [pickerEntering, setPickerEntering] = useState(false);
   const [menuExiting, setMenuExiting] = useState(false);
   const [menuItem, setMenuItem] = useState<MenuItem>(MENU_ITEMS[0]);
+  const [bootOpen, setBootOpen] = useState(true);
+  const [bootItem, setBootItem] = useState<BootItem>('close');
+  const [bootEnterHoldLetters, setBootEnterHoldLetters] = useState(0);
   const requestedRiceIndexRef = useRef(0);
   const lastRiceSoundTargetRef = useRef(0);
   const menuTransitionTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const bootEnterHoldTimeoutRefs = useRef<Array<ReturnType<typeof window.setTimeout>>>([]);
   const [cycleIdx, setCycleIdx] = useState(0);
   const theme = THEME_CYCLE[cycleIdx];
   const advance = useCallback(() => setCycleIdx((i) => (i + 1) % THEME_CYCLE.length), []);
@@ -88,6 +100,53 @@ export function PickARice() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  const moveBootItem = useCallback((direction: -1 | 1) => {
+    const currentIndex = BOOT_ITEMS.indexOf(bootItem);
+    const next = BOOT_ITEMS[(currentIndex + direction + BOOT_ITEMS.length) % BOOT_ITEMS.length];
+    if (next === bootItem) return;
+    playRiceSound(direction > 0 ? 'moveDown' : 'moveUp');
+    setBootItem(next);
+  }, [bootItem]);
+
+  const applyBootItem = useCallback(() => {
+    if (bootItem === 'enter') {
+      return;
+    }
+
+    if (bootItem === 'close') {
+      window.rice?.closeWindow?.();
+      return;
+    }
+
+    window.open('https://github.com/amarsbar/rice-cooker/', '_blank', 'noopener,noreferrer');
+  }, [bootItem]);
+
+  const stopBootEnterHold = useCallback(() => {
+    bootEnterHoldTimeoutRefs.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+    bootEnterHoldTimeoutRefs.current = [];
+    setBootEnterHoldLetters(0);
+  }, []);
+
+  const startBootEnterHold = useCallback(() => {
+    if (bootEnterHoldTimeoutRefs.current.length) return;
+    setBootEnterHoldLetters(1);
+
+    const timeouts: Array<ReturnType<typeof window.setTimeout>> = [];
+    for (let count = 2; count <= BOOT_FORCE_HOLD_LETTERS; count += 1) {
+      timeouts.push(
+        window.setTimeout(() => setBootEnterHoldLetters(count), (count - 1) * BOOT_FORCE_HOLD_STEP_MS),
+      );
+    }
+
+    timeouts.push(window.setTimeout(() => {
+      bootEnterHoldTimeoutRefs.current = [];
+      setBootEnterHoldLetters(0);
+      playRiceSound('forcedBoot');
+      setBootOpen(false);
+    }, BOOT_FORCE_HOLD_MS));
+    bootEnterHoldTimeoutRefs.current = timeouts;
   }, []);
 
   const playMoveForTarget = useCallback((nextIndex: number) => {
@@ -125,6 +184,10 @@ export function PickARice() {
   }, [playMoveForTarget]);
 
   const focusPreviousRice = useCallback(() => {
+    if (bootOpen) {
+      moveBootItem(-1);
+      return;
+    }
     if (menuOpen || pickerTransitioning) return;
     if (view === 'preview') {
       playRiceSound('moveUp');
@@ -133,9 +196,13 @@ export function PickARice() {
     }
     if (view === 'downloading') return;
     requestFocusedRice(requestedRiceIndexRef.current - 1);
-  }, [menuOpen, pickerTransitioning, requestFocusedRice, view]);
+  }, [bootOpen, menuOpen, moveBootItem, pickerTransitioning, requestFocusedRice, view]);
 
   const focusNextRice = useCallback(() => {
+    if (bootOpen) {
+      moveBootItem(1);
+      return;
+    }
     if (menuOpen || pickerTransitioning) return;
     if (view === 'preview') {
       playRiceSound('moveDown');
@@ -144,7 +211,7 @@ export function PickARice() {
     }
     if (view === 'downloading') return;
     requestFocusedRice(requestedRiceIndexRef.current + 1);
-  }, [menuOpen, pickerTransitioning, requestFocusedRice, view]);
+  }, [bootOpen, menuOpen, moveBootItem, pickerTransitioning, requestFocusedRice, view]);
 
   const syncRiceScroll = useCallback((offset: number) => {
     const index = clampRiceIndex(Math.round(offset / RICE_ITEM_PITCH), rices.length);
@@ -154,9 +221,10 @@ export function PickARice() {
   }, [rices.length]);
 
   const startRiceHold = useCallback((direction: -1 | 1) => {
+    if (bootOpen) return;
     if (menuOpen || pickerTransitioning) return;
     if (view === 'picking') setRiceHoldDirection(direction);
-  }, [menuOpen, pickerTransitioning, view]);
+  }, [bootOpen, menuOpen, pickerTransitioning, view]);
 
   const stopRiceHold = useCallback(() => setRiceHoldDirection(0), []);
 
@@ -180,11 +248,13 @@ export function PickARice() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
+      if (bootOpen) return;
       if (menuOpen) {
         closeMenu();
         return;
       }
       if (pickerTransitioning) return;
+      if (view !== 'picking') return;
       setMenuItem(MENU_ITEMS[0]);
       setPickerExiting(true);
       if (menuTransitionTimeoutRef.current !== null) window.clearTimeout(menuTransitionTimeoutRef.current);
@@ -197,7 +267,7 @@ export function PickARice() {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [closeMenu, menuOpen, pickerTransitioning]);
+  }, [bootOpen, closeMenu, menuOpen, pickerTransitioning, view]);
 
   useEffect(() => {
     if (!pickerEntering || menuOpen) return;
@@ -207,7 +277,17 @@ export function PickARice() {
 
   useEffect(() => () => {
     if (menuTransitionTimeoutRef.current !== null) window.clearTimeout(menuTransitionTimeoutRef.current);
+    bootEnterHoldTimeoutRefs.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
   }, []);
+
+  useEffect(() => {
+    if (bootOpen && bootItem === 'enter' && pressedControls.has('enter')) {
+      startBootEnterHold();
+      return;
+    }
+
+    stopBootEnterHold();
+  }, [bootItem, bootOpen, pressedControls, startBootEnterHold, stopBootEnterHold]);
 
   useEffect(() => {
     if (view !== 'downloading') return;
@@ -227,6 +307,10 @@ export function PickARice() {
   }, []);
 
   const applyFocusedRice = useCallback(() => {
+    if (bootOpen) {
+      applyBootItem();
+      return;
+    }
     if (menuOpen || pickerTransitioning) return;
     const { backendRunning, previewOption, selectedRice, view } = latestApplyStateRef.current;
     if (backendRunning || !selectedRice) return;
@@ -256,9 +340,10 @@ export function PickARice() {
         window.open(selectedRice.repo, '_blank', 'noopener,noreferrer');
       }
     }
-  }, [menuOpen, pickerTransitioning, runBackend, startDownload]);
+  }, [applyBootItem, bootOpen, menuOpen, pickerTransitioning, runBackend, startDownload]);
 
   const cycleOnBareStage = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (bootOpen) return;
     if (menuOpen || pickerTransitioning) return;
     if (e.target !== e.currentTarget) return;
     applyFocusedRice();
@@ -285,8 +370,15 @@ export function PickARice() {
               />
               <GreenTab />
               <Antenna />
-              <RiceCard menuOpen={menuOpen}>
-                {menuOpen ? (
+              <RiceCard menuOpen={menuOpen || bootOpen}>
+                {bootOpen ? (
+                  <BootScreen
+                    active={bootItem}
+                    onActiveChange={setBootItem}
+                    onApply={applyBootItem}
+                    enterHoldLetters={bootEnterHoldLetters}
+                  />
+                ) : menuOpen ? (
                   <div className={`${styles.menuContent} ${menuExiting ? styles.menuContentExiting : ''}`}>
                     <MenuScreen
                       active={menuItem}
@@ -317,8 +409,8 @@ export function PickARice() {
               <ClosePin />
               <SoundButton />
               <ThemeKnob />
-              <ScrollWheel menuItem={menuOpen ? menuItem : null} />
-              <PreviewStars active={view === 'preview' && !menuOpen} />
+              <ScrollWheel menuItem={menuOpen ? menuItem : null} bootItem={bootOpen ? bootItem : null} />
+              <PreviewStars active={view === 'preview' && !menuOpen && !bootOpen} />
             </div>
           </ScrollProvider>
         </PreviewOptionProvider>

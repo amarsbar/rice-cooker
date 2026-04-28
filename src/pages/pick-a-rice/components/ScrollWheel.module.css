@@ -167,29 +167,50 @@
 .previewGraphic {
   position: absolute;
   display: block;
+  left: 50%;
+  top: 50%;
   transform: translate(-50%, -50%);
   overflow: visible;
   pointer-events: none;
 }
 
 .previewGraphic_install {
-  left: calc(50% + 0.09px);
-  top: calc(50% + 0.09px);
   width: 127px;
   height: 71px;
 }
 
 .previewGraphic_leave {
-  left: calc(50% + 0.09px);
-  top: calc(50% - 0.25px);
   width: 119px;
   height: 75px;
 }
 
 .previewGraphic_dots {
-  left: calc(50% - 0.41px);
-  top: calc(50% - 0.41px);
   width: 114px;
   height: 75px;
+}
+
+.bootGraphic {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: block;
+  max-width: none;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.bootGraphic_enter {
+  width: 91px;
+  height: 64px;
+}
+
+.bootGraphic_close {
+  width: 126px;
+  height: 93px;
+}
+
+.bootGraphic_github {
+  width: 92px;
+  height: 80px;
 }
 

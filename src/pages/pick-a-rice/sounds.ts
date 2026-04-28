@@ -1,14 +1,16 @@
 import applyRiceSoundUrl from '@/assets/sounds/apply-rice.wav?url';
+import forcedBootSoundUrl from '@/assets/sounds/forced-entry.mp3?url';
 import moveDownSoundUrl from '@/assets/sounds/move-down.wav?url';
 import moveUpSoundUrl from '@/assets/sounds/move-up.wav?url';
 import revertSoundUrl from '@/assets/sounds/revert.wav?url';
 import soundToggleSoundUrl from '@/assets/sounds/sound-toggle.wav?url';
 import themeClickSoundUrl from '@/assets/sounds/theme-click.wav?url';
 
-type RiceSound = 'applyRice' | 'moveDown' | 'moveUp' | 'revert' | 'soundToggle' | 'themeClick';
+type RiceSound = 'applyRice' | 'forcedBoot' | 'moveDown' | 'moveUp' | 'revert' | 'soundToggle' | 'themeClick';
 
 const SOUND_URLS: Record<RiceSound, string> = {
   applyRice: applyRiceSoundUrl,
+  forcedBoot: forcedBootSoundUrl,
   moveDown: moveDownSoundUrl,
   moveUp: moveUpSoundUrl,
   revert: revertSoundUrl,

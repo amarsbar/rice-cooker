@@ -1,0 +1,17 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 96.7763 110.03" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path id="BottomIdle" d="M8.27051 1H44.5625C48.5778 1 51.833 4.25516 51.833 8.27051V35.002C51.833 40.1218 55.9837 44.2724 61.1035 44.2725H88.5059C92.5211 44.2725 95.7762 47.5277 95.7764 51.543V101.76C95.7764 105.775 92.5212 109.03 88.5059 109.03H8.27051C4.25516 109.03 1 105.775 1 101.76V8.27051C1 4.25516 4.25516 1 8.27051 1Z" fill="var(--enter-fill, #1B161A)" stroke="var(--enter-stroke, #7D6E64)" stroke-width="2"/>
+<path id="BottomPressed" d="M12 14H40.833C46.9081 14 51.833 18.9249 51.833 25V51.002C51.833 56.1218 55.9837 60.2724 61.1035 60.2725H84.7764C90.8513 60.2725 95.7762 65.1975 95.7764 71.2725V98.0303C95.7764 104.105 90.8515 109.03 84.7764 109.03H12C5.92487 109.03 1 104.105 1 98.0303V25C1 18.9249 5.92487 14 12 14Z" fill="var(--enter-fill, #1B161A)" stroke="var(--enter-stroke, #7D6E64)" stroke-width="2"/>
+<g id="Top">
+<path id="Inner" d="M13.0205 1.61H40.4111C44.4265 1.61 47.6816 4.86516 47.6816 8.88051V35.9049C47.6817 43.0845 53.5021 48.9048 60.6816 48.9049H84.1826C88.198 48.9049 91.4531 52.1601 91.4531 56.1754V81.3336C91.453 85.3961 88.1244 88.6705 84.0625 88.6032L12.8994 87.4205C8.93196 87.3545 5.75023 84.12 5.75 80.152V8.88051C5.75 4.86516 9.00516 1.61 13.0205 1.61Z" fill="var(--enter-fill, #1B161A)" stroke="var(--enter-stroke, #7D6E64)" stroke-width="2"/>
+<g id="EnterSymbol" transform="translate(59.998 59.995)">
+<mask id="enterSymbolMask" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="15" height="15">
+<path d="M6.83333 6.83333V0.833333H13.5V13.5H0.833333V6.83333H6.83333Z" fill="white" stroke="white" stroke-width="1.66667" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M10.1667 3.50052V10.1672H3.49999" stroke="black" stroke-width="1.66667" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M4.83338 8.83333L3.50005 10.1667L4.83338 11.5" stroke="black" stroke-width="1.66667" stroke-linecap="round" stroke-linejoin="round"/>
+</mask>
+<g mask="url(#enterSymbolMask)">
+<path d="M-0.833258 -0.834077H15.8334V15.1659H-0.833258V-0.834077Z" fill="var(--enter-symbol, #7D6E64)"/>
+</g>
+</g>
+</g>
+</svg>

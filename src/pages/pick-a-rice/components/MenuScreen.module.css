@@ -31,25 +31,15 @@
 
 .logoImage {
   position: absolute;
+  left: 14px;
+  top: 4px;
   display: block;
+  width: 131px;
+  height: 100px;
   max-width: none;
   animation:
     leftFloatIn 400ms cubic-bezier(0.16, 0.885, 0.25, 1.14) both,
     guideFadeIn 100ms linear both;
-}
-
-.logoRice {
-  left: 15px;
-  top: 13px;
-  width: 72px;
-  height: 40px;
-}
-
-.logoCooker {
-  left: 15px;
-  top: 52.05px;
-  width: 129px;
-  height: 40px;
 }
 
 .backGroup {
@@ -82,8 +72,17 @@
 }
 
 .backIcon {
+  display: block;
   width: 20px;
   height: 20px;
+  background: #e8ff76;
+  mask: var(--back-icon) center / contain no-repeat;
+  transition: background-color 180ms ease;
+  -webkit-mask: var(--back-icon) center / contain no-repeat;
+}
+
+.backCircleActive .backIcon {
+  background: #3f3833;
 }
 
 .letters {
@@ -123,10 +122,6 @@
   background: #859631;
 }
 
-.letterRevertHolding {
-  animation: revertHoldPink 1ms steps(1, end) forwards;
-}
-
 .letterBubbleShow {
   visibility: hidden;
   animation: bubbleShow 1ms steps(1, end) forwards;
@@ -151,37 +146,6 @@
 @keyframes bubbleHide {
   to {
     visibility: hidden;
-  }
-}
-
-.letterRevertHolding:nth-child(1) {
-  animation-delay: 160ms;
-}
-
-.letterRevertHolding:nth-child(2) {
-  animation-delay: 320ms;
-}
-
-.letterRevertHolding:nth-child(3) {
-  animation-delay: 480ms;
-}
-
-.letterRevertHolding:nth-child(4) {
-  animation-delay: 640ms;
-}
-
-.letterRevertHolding:nth-child(5) {
-  animation-delay: 800ms;
-}
-
-.letterRevertHolding:nth-child(6) {
-  animation-delay: 960ms;
-}
-
-@keyframes revertHoldPink {
-  to {
-    background: #fdb1e5;
-    color: #3f3833;
   }
 }
 
@@ -394,6 +358,13 @@
   pointer-events: none;
 }
 
+.topRightItems {
+  left: 309px;
+  top: 37px;
+  width: 201px;
+  height: 137px;
+}
+
 .keyUp {
   left: 363px;
   top: 156px;
@@ -452,227 +423,63 @@
   transform: translate(-0.41px, 10.54px);
 }
 
-.wheel {
-  left: 423.25px;
-  top: 53.58px;
-  width: 85.43px;
-  height: 111.32px;
-}
-
-.prevMouse {
-  left: 343px;
-  top: 54px;
-  width: 30.5px;
-  height: 41.586px;
-  transform: rotate(180deg) scaleY(-1);
-}
-
-.smallKeyLine {
-  left: 308.25px;
-  top: 134.33px;
-  width: 41.5px;
-  height: 5.915px;
-}
-
-.smallKeyBody {
-  left: 309.13px;
-  top: 118.25px;
-  width: 42.306px;
-  height: 16.695px;
-}
-
 .enterKey {
-  position: absolute;
   left: 302px;
   top: 241px;
   width: 96.776px;
   height: 110.03px;
-}
-
-.enterOuter {
-  left: 0;
-  top: 0;
-  width: 96.776px;
-  height: 110.03px;
-  --fill-0: #1b161a;
-  --stroke-0: #7d6e64;
-}
-
-.enterOuter path {
-  transition: stroke 120ms ease-out;
-}
-
-.enterInner {
-  left: 4.75px;
-  top: 0.61px;
-  width: 87.704px;
-  height: 89.132px;
-  --fill-0: #1b161a;
-  --stroke-0: #7d6e64;
-  transition:
-    transform 120ms ease-out,
-    stroke 120ms ease-out;
-}
-
-.enterSymbol {
-  left: 59.998px;
-  top: 59.995px;
-  width: 16px;
-  height: 16px;
+  --enter-fill: #1b161a;
+  --enter-stroke: #7d6e64;
   --enter-symbol: #7d6e64;
+}
+
+.enterKey [id='BottomPressed'] {
+  opacity: 0;
+}
+
+.enterKey [id='BottomIdle'],
+.enterKey [id='BottomPressed'],
+.enterKey [id='Top'] {
   transition:
-    transform 120ms ease-out,
-    fill 120ms ease-out;
+    stroke 120ms ease-out,
+    transform 120ms ease-out;
 }
 
-.keyPressed .enterOuter {
-  --stroke-0: #e8ff76;
+.keyPressed.enterKey {
+  --enter-stroke: #e8ff76;
+  --enter-symbol: #e8ff76;
 }
 
-.keyPressed .enterInner {
-  --stroke-0: #e8ff76;
+.keyPressed.enterKey [id='BottomIdle'] {
+  opacity: 0;
+}
+
+.keyPressed.enterKey [id='BottomPressed'] {
+  opacity: 1;
+}
+
+.keyPressed.enterKey [id='Top'] {
   transform: translateY(16.39px);
 }
 
-.keyPressed .enterSymbol {
-  --enter-symbol: #e8ff76;
-  transform: translateY(16.41px);
+.verticalArrow1,
+.verticalArrow2,
+.verticalArrow3 {
+  width: 9px;
+  height: 32px;
 }
 
-.lineH1 {
-  left: 445.5px;
-  top: 46px;
-  width: 28px;
-  height: 4.331px;
+.verticalArrow1 {
+  left: 353px;
+  top: 167px;
 }
 
-.lineH2 {
-  left: 459px;
-  top: 168.33px;
-  width: 28px;
-  height: 4.331px;
-  transform: scaleY(-1);
+.verticalArrow2 {
+  left: 500px;
+  top: 225px;
 }
 
-.linePrevTop {
-  left: 357px;
-  top: 37px;
-  width: 2px;
-  height: 13px;
-}
-
-.lineSmallKey {
-  left: 326px;
-  top: 103px;
-  width: 2px;
-  height: 14px;
-}
-
-.lineLong1 {
-  left: 356px;
-  top: 169px;
-  width: 2px;
-  height: 26px;
-}
-
-.lineLong2 {
-  left: 503px;
-  top: 229px;
-  width: 2px;
-  height: 26px;
-}
-
-.lineEnter {
-  left: 404px;
-  top: 306px;
-  width: 2px;
-  height: 27px;
-}
-
-.tick1 {
-  left: 323px;
-  top: 114px;
-  width: 8px;
-  height: 3px;
-}
-
-.tick2 {
-  left: 354px;
-  top: 48px;
-  width: 8px;
-  height: 3px;
-}
-
-.arrowA,
-.arrowB,
-.arrowC,
-.arrowLeft1,
-.arrowLeft2,
-.arrowLeft3,
-.arrowDown1,
-.arrowDown2,
-.arrowDown3,
-.arrowD {
-  width: 6.545px;
-  height: 2.455px;
-}
-
-.arrowA {
-  left: 442.12px;
-  top: 47.36px;
-  transform: rotate(45deg);
-}
-
-.arrowB {
-  left: 456px;
-  top: 164.33px;
-  transform: rotate(123.16deg);
-}
-
-.arrowC {
-  left: 484px;
-  top: 165.33px;
-  transform: rotate(-130.78deg);
-}
-
-.arrowLeft1 {
-  left: 354px;
-  top: 168px;
-  transform: rotate(180deg);
-}
-
-.arrowLeft2 {
-  left: 501px;
-  top: 226px;
-  transform: rotate(180deg);
-}
-
-.arrowLeft3 {
-  left: 402px;
-  top: 305px;
-  transform: rotate(180deg);
-}
-
-.arrowDown1 {
-  left: 501px;
-  top: 253px;
-  transform: rotate(180deg) scaleY(-1);
-}
-
-.arrowDown2 {
-  left: 354px;
-  top: 193px;
-  transform: rotate(180deg) scaleY(-1);
-}
-
-.arrowDown3 {
-  left: 402px;
-  top: 332px;
-  transform: rotate(180deg) scaleY(-1);
-}
-
-.arrowD {
-  left: 471px;
-  top: 46.33px;
-  transform: rotate(-60deg);
+.verticalArrow3 {
+  left: 401px;
+  top: 304px;
 }

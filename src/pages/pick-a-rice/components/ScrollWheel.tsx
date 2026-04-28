@@ -7,6 +7,9 @@ import GridSvg from '@/assets/scroll-wheel/grid.svg?react';
 import installRiceSvg from '@/assets/scroll-wheel/install-rice.svg';
 import dotfilesSvg from '@/assets/scroll-wheel/dotfiles.svg';
 import tryAnotherSvg from '@/assets/scroll-wheel/try-another.svg';
+import enterMessageSvg from '@/assets/boot/enter-message.svg';
+import closeMessageSvg from '@/assets/boot/close-message.svg';
+import githubMessageSvg from '@/assets/boot/github-message.svg';
 import {
   MORPH_TRANSITION,
   POSITIONS,
@@ -21,6 +24,7 @@ import {
   useView,
 } from '../view';
 import { MENU_ITEMS, type MenuItem } from '../menuOptions';
+import type { BootItem } from './BootScreen';
 
 const MotionRim = motion.create(RimSvg);
 
@@ -46,19 +50,39 @@ const CREAM_CENTER = 88;
 const PILL_Y_BASE = 18.5;
 const PILL_Y_STEP = 0;
 const RIM_ROTATE_PER_PX = 0.1;
+const BOOT_WHEEL_ITEMS: BootItem[] = ['enter', 'close', 'github'];
+const BOOT_DOT_OPTION: Record<BootItem, PreviewOption> = {
+  enter: 'leave',
+  close: 'install',
+  github: 'dots',
+};
 
-export function ScrollWheel({ menuItem = null }: { menuItem?: MenuItem | null }) {
+export function ScrollWheel({
+  menuItem = null,
+  bootItem = null,
+}: {
+  menuItem?: MenuItem | null;
+  bootItem?: BootItem | null;
+}) {
   const view = useView();
   const previewOption = usePreviewOption();
   const scroll = useScroll();
   const pressed = usePressedDirections();
   const menuIndex = menuItem ? MENU_ITEMS.indexOf(menuItem) : -1;
+  const bootIndex = bootItem ? BOOT_WHEEL_ITEMS.indexOf(bootItem) : -1;
   const menuActive = menuIndex >= 0;
+  const bootActive = bootIndex >= 0;
   const activeScroll = menuActive
     ? { offset: menuIndex * RICE_ITEM_PITCH, index: menuIndex, total: MENU_ITEMS.length }
+    : bootActive
+      ? { offset: bootIndex * RICE_ITEM_PITCH, index: bootIndex, total: BOOT_WHEEL_ITEMS.length }
     : scroll;
-  const pickingContentVisible = menuActive || view === 'picking';
-  const previewContentVisible = !menuActive && view === 'preview';
+  const controlledWheel = menuActive || bootActive;
+  const pickingContentVisible = menuActive || (!bootActive && view === 'picking');
+  const bootContentVisible = bootActive;
+  const previewContentVisible = !controlledWheel && view === 'preview';
+  const dotsVisible = previewContentVisible || bootContentVisible;
+  const dotOption = bootItem ? BOOT_DOT_OPTION[bootItem] : previewOption;
 
   return (
     <motion.div
@@ -69,8 +93,8 @@ export function ScrollWheel({ menuItem = null }: { menuItem?: MenuItem | null })
     >
       <MotionRim
         className={styles.rim}
-        style={menuActive ? undefined : { rotate: activeScroll.offset * RIM_ROTATE_PER_PX }}
-        animate={menuActive ? { rotate: activeScroll.offset * RIM_ROTATE_PER_PX } : undefined}
+        style={controlledWheel ? undefined : { rotate: activeScroll.offset * RIM_ROTATE_PER_PX }}
+        animate={controlledWheel ? { rotate: activeScroll.offset * RIM_ROTATE_PER_PX } : undefined}
         transition={MORPH_TRANSITION}
       />
 
@@ -102,18 +126,33 @@ export function ScrollWheel({ menuItem = null }: { menuItem?: MenuItem | null })
         >
           <PreviewWheelGraphic option={previewOption} />
         </motion.div>
+
+        <motion.div
+          className={styles.content}
+          initial={false}
+          animate={bootContentVisible ? 'visible' : 'hidden'}
+          variants={SHRUNKEN_TEXT_VARIANTS}
+        >
+          {bootItem && <BootWheelGraphic item={bootItem} />}
+        </motion.div>
       </div>
 
       <motion.div
         className={styles.previewDots}
         initial={false}
-        animate={previewContentVisible ? 'visible' : 'hidden'}
+        animate={dotsVisible ? 'visible' : 'hidden'}
         variants={SHRUNKEN_TEXT_VARIANTS}
       >
-        <PreviewDots option={previewOption} />
+        <PreviewDots option={dotOption} />
       </motion.div>
     </motion.div>
   );
+}
+
+function BootWheelGraphic({ item }: { item: BootItem }) {
+  const cls = `${styles.bootGraphic} ${styles[`bootGraphic_${item}`]}`;
+  const src = item === 'enter' ? enterMessageSvg : item === 'github' ? githubMessageSvg : closeMessageSvg;
+  return <img className={cls} src={src} alt="" aria-hidden="true" />;
 }
 
 function PreviewWheelGraphic({ option }: { option: PreviewOption }) {

@@ -1,29 +1,13 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import styles from './MenuScreen.module.css';
-import logoRice from '@/assets/menu/logo-rice.svg';
-import logoCooker from '@/assets/menu/logo-cooker.svg';
-import backActive from '@/assets/menu/back-active.svg';
-import backIdle from '@/assets/menu/back-idle.svg';
+import holdStyles from './HoldPaint.module.css';
+import riceCookerText from '@/assets/menu/rice-cooker-text.svg';
+import backIcon from '@/assets/menu/back.svg';
 import externalIcon from '@/assets/menu/external.svg';
 import KeyUp from '@/assets/menu/key-up.svg?react';
-import wheel from '@/assets/menu/wheel.svg';
-import prevMouse from '@/assets/menu/prev-mouse.svg';
-import smallKeyLine from '@/assets/menu/small-key-line.svg';
-import smallKeyBody from '@/assets/menu/small-key-body.svg';
-import EnterInner from '@/assets/menu/enter-inner.svg?react';
-import EnterSymbol from '@/assets/menu/enter-symbol.svg?react';
-import lineH from '@/assets/menu/line-h.svg';
-import linePrevTop from '@/assets/menu/line-prev-top.svg';
-import lineSmallKey from '@/assets/menu/line-small-key.svg';
-import lineLong from '@/assets/menu/line-long.svg';
-import lineEnter from '@/assets/menu/line-enter.svg';
-import tick from '@/assets/menu/tick.svg';
-import arrowA from '@/assets/menu/arrow-a.svg';
-import arrowB from '@/assets/menu/arrow-b.svg';
-import arrowC from '@/assets/menu/arrow-c.svg';
-import arrowLeft from '@/assets/menu/arrow-left.svg';
-import arrowDown from '@/assets/menu/arrow-down.svg';
-import arrowD from '@/assets/menu/arrow-d.svg';
+import EnterKeySvg from '@/assets/menu/enter-key.svg?react';
+import topRightItems from '@/assets/menu/top-right-items.svg';
+import verticalArrow from '@/assets/menu/vertical-arrow.svg';
 import SocialWeb from '@/assets/menu/social-web.svg?react';
 import SocialX from '@/assets/menu/social-x.svg?react';
 import SocialGithub from '@/assets/menu/social-github.svg?react';
@@ -44,10 +28,6 @@ const BUBBLE_STAGGER_MS = 60;
 const BACK_HIDE_MS = BACK_TEXT.length * BUBBLE_STAGGER_MS;
 const REVERT_HOLD_STEP_MS = 160;
 const REVERT_HOLD_MS = (REVERT_TEXT.length + 1) * REVERT_HOLD_STEP_MS;
-const ENTER_BOTTOM_IDLE =
-  'M8.27051 1H44.5625C48.5778 1 51.833 4.25516 51.833 8.27051V35.002C51.833 40.1218 55.9837 44.2724 61.1035 44.2725H88.5059C92.5211 44.2725 95.7762 47.5277 95.7764 51.543V101.76C95.7764 105.775 92.5212 109.03 88.5059 109.03H8.27051C4.25516 109.03 1 105.775 1 101.76V8.27051C1 4.25516 4.25516 1 8.27051 1Z';
-const ENTER_BOTTOM_PRESSED =
-  'M12 14H40.833C46.9081 14 51.833 18.9249 51.833 25V51.002C51.833 56.1218 55.9837 60.2724 61.1035 60.2725H84.7764C90.8513 60.2725 95.7762 65.1975 95.7764 71.2725V98.0303C95.7764 104.105 90.8515 109.03 84.7764 109.03H12C5.92487 109.03 1 104.105 1 98.0303V25C1 18.9249 5.92487 14 12 14Z';
 
 const rows = {
   revert: {
@@ -68,6 +48,7 @@ const rows = {
 } as const;
 
 const cx = (...classes: Array<string | false | undefined>) => classes.filter(Boolean).join(' ');
+const backIconStyle = { '--back-icon': `url("${backIcon}")` } as CSSProperties;
 
 function Letters({
   text,
@@ -89,13 +70,16 @@ function Letters({
             className={cx(
               styles.letter,
               ghost && styles.letterGhost,
-              revertHolding && styles.letterRevertHolding,
+              revertHolding && holdStyles.holdPaint,
               bubbleAnimation === 'show' && styles.letterBubbleShow,
               bubbleAnimation === 'hide' && styles.letterBubbleHide,
               bubbleAnimation === 'hidden' && styles.letterBubbleHidden,
             )}
             key={`${letter}-${index}`}
-            style={{ '--bubble-delay': `${bubbleIndex * BUBBLE_STAGGER_MS}ms` } as CSSProperties}
+            style={{
+              '--bubble-delay': `${bubbleIndex * BUBBLE_STAGGER_MS}ms`,
+              '--hold-delay': `${(index + 1) * REVERT_HOLD_STEP_MS}ms`,
+            } as CSSProperties}
           >
             {letter}
           </span>
@@ -231,24 +215,7 @@ function ArrowKey({
 
 function EnterKey({ pressed }: { pressed: boolean }) {
   return (
-    <span className={cx(styles.enterKey, pressed && styles.keyPressed)}>
-      <svg
-        aria-hidden="true"
-        className={cx(styles.asset, styles.enterOuter)}
-        viewBox="0 0 96.7763 110.03"
-        fill="none"
-        preserveAspectRatio="none"
-      >
-        <path
-          d={pressed ? ENTER_BOTTOM_PRESSED : ENTER_BOTTOM_IDLE}
-          fill="var(--fill-0, #1B161A)"
-          stroke="var(--stroke-0, #7D6E64)"
-          strokeWidth="2"
-        />
-      </svg>
-      <EnterInner aria-hidden="true" className={cx(styles.asset, styles.enterInner)} />
-      <EnterSymbol aria-hidden="true" className={cx(styles.asset, styles.enterSymbol)} />
-    </span>
+    <EnterKeySvg aria-hidden="true" className={cx(styles.asset, styles.enterKey, pressed && styles.keyPressed)} />
   );
 }
 
@@ -257,35 +224,15 @@ function Guide({ pressedControl }: { pressedControl: PhysicalControl | null }) {
     <>
       <div className={styles.guideAssets}>
         <p className={styles.keyHint}>use your keys!</p>
+        <img src={topRightItems} alt="" className={cx(styles.asset, styles.topRightItems)} />
         <ArrowKey className={styles.keyUp} pressed={pressedControl === 'up'} />
         <ArrowKey className={styles.keyDown} down pressed={pressedControl === 'down'} />
 
-        <img src={wheel} alt="" className={cx(styles.asset, styles.wheel)} />
-        <img src={prevMouse} alt="" className={cx(styles.asset, styles.prevMouse)} />
-        <img src={smallKeyLine} alt="" className={cx(styles.asset, styles.smallKeyLine)} />
-        <img src={smallKeyBody} alt="" className={cx(styles.asset, styles.smallKeyBody)} />
-
         <EnterKey pressed={pressedControl === 'enter'} />
 
-        <img src={lineH} alt="" className={cx(styles.asset, styles.lineH1)} />
-        <img src={lineH} alt="" className={cx(styles.asset, styles.lineH2)} />
-        <img src={linePrevTop} alt="" className={cx(styles.asset, styles.linePrevTop)} />
-        <img src={lineSmallKey} alt="" className={cx(styles.asset, styles.lineSmallKey)} />
-        <img src={lineLong} alt="" className={cx(styles.asset, styles.lineLong1)} />
-        <img src={lineLong} alt="" className={cx(styles.asset, styles.lineLong2)} />
-        <img src={lineEnter} alt="" className={cx(styles.asset, styles.lineEnter)} />
-        <img src={tick} alt="" className={cx(styles.asset, styles.tick1)} />
-        <img src={tick} alt="" className={cx(styles.asset, styles.tick2)} />
-        <img src={arrowA} alt="" className={cx(styles.asset, styles.arrowA)} />
-        <img src={arrowB} alt="" className={cx(styles.asset, styles.arrowB)} />
-        <img src={arrowC} alt="" className={cx(styles.asset, styles.arrowC)} />
-        <img src={arrowLeft} alt="" className={cx(styles.asset, styles.arrowLeft1)} />
-        <img src={arrowLeft} alt="" className={cx(styles.asset, styles.arrowLeft2)} />
-        <img src={arrowLeft} alt="" className={cx(styles.asset, styles.arrowLeft3)} />
-        <img src={arrowDown} alt="" className={cx(styles.asset, styles.arrowDown1)} />
-        <img src={arrowDown} alt="" className={cx(styles.asset, styles.arrowDown2)} />
-        <img src={arrowDown} alt="" className={cx(styles.asset, styles.arrowDown3)} />
-        <img src={arrowD} alt="" className={cx(styles.asset, styles.arrowD)} />
+        <img src={verticalArrow} alt="" className={cx(styles.asset, styles.verticalArrow1)} />
+        <img src={verticalArrow} alt="" className={cx(styles.asset, styles.verticalArrow2)} />
+        <img src={verticalArrow} alt="" className={cx(styles.asset, styles.verticalArrow3)} />
       </div>
     </>
   );
@@ -450,12 +397,11 @@ export function MenuScreen({
   return (
     <div className={styles.menu} onClick={(event) => event.stopPropagation()}>
       <div className={styles.version}>V0.1</div>
-      <img src={logoRice} alt="" className={cx(styles.logoImage, styles.logoRice)} />
-      <img src={logoCooker} alt="" className={cx(styles.logoImage, styles.logoCooker)} />
+      <img src={riceCookerText} alt="" className={styles.logoImage} />
 
       <div className={styles.backGroup} onMouseEnter={() => onActiveChange('back')} onClick={onBack}>
         <span className={cx(styles.backCircle, backVisualActive && styles.backCircleActive)}>
-          <img src={backVisualActive ? backActive : backIdle} alt="" className={styles.backIcon} />
+          <span aria-hidden="true" className={styles.backIcon} style={backIconStyle} />
         </span>
         <Letters
           text={BACK_TEXT}
