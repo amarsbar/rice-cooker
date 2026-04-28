@@ -110,18 +110,18 @@ export function PickARice() {
     setBootItem(next);
   }, [bootItem]);
 
-  const applyBootItem = useCallback((item: BootItem) => {
-    if (item === 'enter') {
+  const applyBootItem = useCallback(() => {
+    if (bootItem === 'enter') {
       return;
     }
 
-    if (item === 'close') {
+    if (bootItem === 'close') {
       window.rice?.closeWindow?.();
       return;
     }
 
     window.open('https://github.com/amarsbar/rice-cooker/', '_blank', 'noopener,noreferrer');
-  }, []);
+  }, [bootItem]);
 
   const stopBootEnterHold = useCallback(() => {
     bootEnterHoldTimeoutRefs.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
@@ -310,7 +310,7 @@ export function PickARice() {
 
   const applyFocusedRice = useCallback(() => {
     if (bootOpen) {
-      applyBootItem(bootItem);
+      applyBootItem();
       return;
     }
     if (menuOpen || pickerTransitioning) return;

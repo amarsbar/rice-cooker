@@ -84,7 +84,7 @@ export function BootScreen({
 }: {
   active: BootItem;
   onActiveChange: (item: BootItem) => void;
-  onApply: (item: BootItem) => void;
+  onApply: () => void;
   enterHoldLetters?: number;
 }) {
   const word = WORDS[active];
@@ -120,7 +120,7 @@ export function BootScreen({
             onClick={(event) => {
               event.stopPropagation();
               onActiveChange(item);
-              onApply(item);
+              onApply();
             }}
             aria-label={WORDS[item]}
           >
@@ -137,7 +137,7 @@ export function BootScreen({
         onMouseDown={(event) => event.preventDefault()}
         onClick={(event) => {
           event.stopPropagation();
-          onApply(active);
+          onApply();
         }}
       >
         <span className={styles.wordCluster}>
