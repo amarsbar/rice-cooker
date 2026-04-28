@@ -29,7 +29,7 @@ const KEY_TO_CONTROL: Record<string, Control> = {
   e: 'enter',
 };
 
-const keyToControl = (key: string): Control | undefined =>
+export const keyToControl = (key: string): Control | undefined =>
   KEY_TO_CONTROL[key] ?? KEY_TO_CONTROL[key.toLowerCase()];
 
 const isInteractiveTarget = (target: EventTarget | null): boolean =>

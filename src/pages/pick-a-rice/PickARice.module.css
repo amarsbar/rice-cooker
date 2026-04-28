@@ -5,3 +5,10 @@
   height: 574px;
   margin: 0 auto;
 }
+
+.menuNavOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+}

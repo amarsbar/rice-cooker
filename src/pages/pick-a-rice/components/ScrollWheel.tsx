@@ -11,13 +11,16 @@ import {
   MORPH_TRANSITION,
   POSITIONS,
   PREVIEW_OPTIONS,
+  RICE_ITEM_PITCH,
   type PreviewOption,
+  type ScrollState,
   SCREEN_FADE_TRANSITION,
   SHRUNKEN_TEXT_VARIANTS,
   usePreviewOption,
   useScroll,
   useView,
 } from '../view';
+import { MENU_ITEMS, type MenuItem } from '../menuOptions';
 
 const MotionRim = motion.create(RimSvg);
 
@@ -44,11 +47,18 @@ const PILL_Y_BASE = 18.5;
 const PILL_Y_STEP = 0;
 const RIM_ROTATE_PER_PX = 0.1;
 
-export function ScrollWheel() {
+export function ScrollWheel({ menuItem = null }: { menuItem?: MenuItem | null }) {
   const view = useView();
   const previewOption = usePreviewOption();
   const scroll = useScroll();
   const pressed = usePressedDirections();
+  const menuIndex = menuItem ? MENU_ITEMS.indexOf(menuItem) : -1;
+  const menuActive = menuIndex >= 0;
+  const activeScroll = menuActive
+    ? { offset: menuIndex * RICE_ITEM_PITCH, index: menuIndex, total: MENU_ITEMS.length }
+    : scroll;
+  const pickingContentVisible = menuActive || view === 'picking';
+  const previewContentVisible = !menuActive && view === 'preview';
 
   return (
     <motion.div
@@ -59,7 +69,9 @@ export function ScrollWheel() {
     >
       <MotionRim
         className={styles.rim}
-        style={{ rotate: scroll.offset * RIM_ROTATE_PER_PX }}
+        style={menuActive ? undefined : { rotate: activeScroll.offset * RIM_ROTATE_PER_PX }}
+        animate={menuActive ? { rotate: activeScroll.offset * RIM_ROTATE_PER_PX } : undefined}
+        transition={MORPH_TRANSITION}
       />
 
       <div className={styles.inner}>
@@ -72,10 +84,10 @@ export function ScrollWheel() {
         <motion.div
           className={styles.content}
           initial={false}
-          animate={{ opacity: view === 'picking' ? 1 : 0 }}
+          animate={{ opacity: pickingContentVisible ? 1 : 0 }}
           transition={SCREEN_FADE_TRANSITION}
         >
-          <BeadIndicator />
+          <BeadIndicator scroll={activeScroll} />
           <OutlinedText className={`${styles.tag} ${styles.tagTop}`}>niri</OutlinedText>
           <OutlinedText className={`${styles.tag} ${styles.tagBottom}`}>dms</OutlinedText>
           <OutlinedText className={`${styles.tag} ${styles.tagPlus}`}>+</OutlinedText>
@@ -85,7 +97,7 @@ export function ScrollWheel() {
         <motion.div
           className={styles.content}
           initial={false}
-          animate={view === 'preview' ? 'visible' : 'hidden'}
+          animate={previewContentVisible ? 'visible' : 'hidden'}
           variants={SHRUNKEN_TEXT_VARIANTS}
         >
           <PreviewWheelGraphic option={previewOption} />
@@ -95,7 +107,7 @@ export function ScrollWheel() {
       <motion.div
         className={styles.previewDots}
         initial={false}
-        animate={view === 'preview' ? 'visible' : 'hidden'}
+        animate={previewContentVisible ? 'visible' : 'hidden'}
         variants={SHRUNKEN_TEXT_VARIANTS}
       >
         <PreviewDots option={previewOption} />
@@ -155,8 +167,8 @@ function PreviewDots({ option }: { option: PreviewOption }) {
   );
 }
 
-function BeadIndicator() {
-  const { index, total } = useScroll();
+function BeadIndicator({ scroll }: { scroll: ScrollState }) {
+  const { index, total } = scroll;
   const leftCount = Math.min(index, 3);
   const pillY = PILL_Y_BASE + leftCount * PILL_Y_STEP;
   return (

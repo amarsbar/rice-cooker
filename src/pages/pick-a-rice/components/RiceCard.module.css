@@ -11,16 +11,16 @@
     border-color var(--theme-color-transition);
 }
 
-/* Figma 509:34645: 552 x 558 at inner-frame (15, -109), 50% opacity. */
 .bg {
   position: absolute;
-  left: 15px;
-  top: -109px;
+  left: 50%;
+  top: 50%;
   width: 552px;
   height: 558px;
+  max-width: none;
   object-fit: cover;
   opacity: 0.5;
-  max-width: none;
+  transform: translate(-50%, -50%);
   pointer-events: none;
 }
 

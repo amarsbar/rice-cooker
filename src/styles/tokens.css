@@ -51,6 +51,7 @@
      same names — components only reference role tokens, never raw
      palette. */
   --c-card-bg: #000001;                              /* opaque card bg in picking state */
+  --c-menu-card-bg: #151014;
   --c-card-bg-shrunken: rgba(26, 20, 25, 0.8);       /* semi-transparent in preview */
   --c-card-border: var(--color-mint);                /* card border + green tab + theme knob base */
   --c-sound-on-body: var(--color-navy);              /* sound on ring + inner disc */

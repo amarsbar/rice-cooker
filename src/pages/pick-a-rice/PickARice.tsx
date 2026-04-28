@@ -24,7 +24,10 @@ import { PhysicalControls, type PhysicalControl } from './components/PhysicalCon
 import { ClosingCircles } from './components/ClosingCircles';
 import { Antenna } from './components/Antenna';
 import { PreviewStars } from './components/PreviewStars';
+import { MenuScreen } from './components/MenuScreen';
+import { CardHeader } from './components/CardHeader';
 import { playRiceSound } from './sounds';
+import { MENU_ITEMS, type MenuItem } from './menuOptions';
 
 const clampRiceIndex = (index: number, count: number) => Math.max(0, Math.min(count - 1, index));
 type HoldDirection = -1 | 0 | 1;
@@ -45,6 +48,8 @@ export function PickARice() {
   const [riceHoldDirection, setRiceHoldDirection] = useState<HoldDirection>(0);
   const [pressedControls, setPressedControls] = useState<ReadonlySet<PhysicalControl>>(new Set());
   const backendRunningRef = useRef(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuItem, setMenuItem] = useState<MenuItem>(MENU_ITEMS[0]);
   const requestedRiceIndexRef = useRef(0);
   const lastRiceSoundTargetRef = useRef(0);
   const [cycleIdx, setCycleIdx] = useState(0);
@@ -115,6 +120,7 @@ export function PickARice() {
   }, [playMoveForTarget]);
 
   const focusPreviousRice = useCallback(() => {
+    if (menuOpen) return;
     if (view === 'preview') {
       playRiceSound('moveUp');
       setPreviewOption((option) => cyclePreviewOption(option, -1));
@@ -122,9 +128,10 @@ export function PickARice() {
     }
     if (view === 'downloading') return;
     requestFocusedRice(requestedRiceIndexRef.current - 1);
-  }, [requestFocusedRice, view]);
+  }, [menuOpen, requestFocusedRice, view]);
 
   const focusNextRice = useCallback(() => {
+    if (menuOpen) return;
     if (view === 'preview') {
       playRiceSound('moveDown');
       setPreviewOption((option) => cyclePreviewOption(option, 1));
@@ -132,7 +139,7 @@ export function PickARice() {
     }
     if (view === 'downloading') return;
     requestFocusedRice(requestedRiceIndexRef.current + 1);
-  }, [requestFocusedRice, view]);
+  }, [menuOpen, requestFocusedRice, view]);
 
   const syncRiceScroll = useCallback((offset: number) => {
     const index = clampRiceIndex(Math.round(offset / RICE_ITEM_PITCH), rices.length);
@@ -142,14 +149,30 @@ export function PickARice() {
   }, [rices.length]);
 
   const startRiceHold = useCallback((direction: -1 | 1) => {
+    if (menuOpen) return;
     if (view === 'picking') setRiceHoldDirection(direction);
-  }, [view]);
+  }, [menuOpen, view]);
 
   const stopRiceHold = useCallback(() => setRiceHoldDirection(0), []);
 
   useEffect(() => {
     if (view !== 'picking') setRiceHoldDirection(0);
   }, [view]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setMenuOpen((open) => {
+        const nextOpen = !open;
+        if (nextOpen) setMenuItem(MENU_ITEMS[0]);
+        return nextOpen;
+      });
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   useEffect(() => {
     if (view !== 'downloading') return;
@@ -169,6 +192,7 @@ export function PickARice() {
   }, []);
 
   const applyFocusedRice = useCallback(() => {
+    if (menuOpen) return;
     const { backendRunning, previewOption, selectedRice, view } = latestApplyStateRef.current;
     if (backendRunning || !selectedRice) return;
 
@@ -197,9 +221,10 @@ export function PickARice() {
         window.open(selectedRice.repo, '_blank', 'noopener,noreferrer');
       }
     }
-  }, [runBackend, startDownload]);
+  }, [menuOpen, runBackend, startDownload]);
 
   const cycleOnBareStage = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (menuOpen) return;
     if (e.target !== e.currentTarget) return;
     applyFocusedRice();
   };
@@ -225,28 +250,48 @@ export function PickARice() {
               />
               <GreenTab />
               <Antenna />
-              <RiceCard>
-                <ScreenContent
-                  rices={rices}
-                  holdDirection={riceHoldDirection}
-                  navRequest={riceNavRequest}
-                  pressedControls={pressedControls}
-                  onScrollOffsetChange={syncRiceScroll}
-                  onRiceStepStart={playMoveForTarget}
-                />
-                <PreviewContent
-                  themeName="themename"
-                  creatorName="creatorname"
-                  installSupported={selectedRice?.install_supported ?? true}
-                  onApply={applyFocusedRice}
-                />
-                <ClosingCircles active={view === 'downloading'} />
+              <RiceCard menuOpen={menuOpen}>
+                {menuOpen ? (
+                  <>
+                    <MenuScreen
+                      active={menuItem}
+                      onActiveChange={setMenuItem}
+                      onBack={() => setMenuOpen(false)}
+                    />
+                    <div className={styles.menuNavOverlay}>
+                      <CardHeader
+                        pressedControls={pressedControls}
+                        menuOpen
+                        navOnly
+                        applyAnimation="hide"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <ScreenContent
+                      rices={rices}
+                      holdDirection={riceHoldDirection}
+                      navRequest={riceNavRequest}
+                      pressedControls={pressedControls}
+                      onScrollOffsetChange={syncRiceScroll}
+                      onRiceStepStart={playMoveForTarget}
+                    />
+                    <PreviewContent
+                      themeName="themename"
+                      creatorName="creatorname"
+                      installSupported={selectedRice?.install_supported ?? true}
+                      onApply={applyFocusedRice}
+                    />
+                    <ClosingCircles active={view === 'downloading'} />
+                  </>
+                )}
               </RiceCard>
               <ClosePin />
               <SoundButton />
               <ThemeKnob />
-              <ScrollWheel />
-              <PreviewStars active={view === 'preview'} />
+              <ScrollWheel menuItem={menuOpen ? menuItem : null} />
+              <PreviewStars active={view === 'preview' && !menuOpen} />
             </div>
           </ScrollProvider>
         </PreviewOptionProvider>
