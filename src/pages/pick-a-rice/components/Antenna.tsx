@@ -9,20 +9,18 @@ const ANTENNA = {
 
 const EASE = [0.4, 0, 0.2, 1] as const;
 
-export function Antenna() {
+export function Antenna({ extended }: { extended: boolean }) {
   const view = useView();
   if (view === 'picking') return null;
-
-  const active = view === 'downloading';
 
   return (
     <div className={styles.antenna} style={ANTENNA} aria-hidden="true">
       <motion.span
         className={styles.base}
         initial={{ scaleX: 0 }}
-        animate={{ scaleX: active ? 1 : 0 }}
+        animate={{ scaleX: extended ? 1 : 0 }}
         transition={{
-          delay: active ? 0.3 : 0.18,
+          delay: extended ? 0.3 : 0.18,
           duration: 0.18,
           ease: EASE,
         }}
@@ -30,10 +28,10 @@ export function Antenna() {
       <motion.span
         className={styles.stem}
         initial={{ scaleY: 0 }}
-        animate={{ scaleY: active ? 1 : 0 }}
+        animate={{ scaleY: extended ? 1 : 0 }}
         transition={{
-          delay: active ? 0.45 : 0,
-          duration: active ? 0.32 : 0.28,
+          delay: extended ? 0.45 : 0,
+          duration: extended ? 0.32 : 0.28,
           ease: EASE,
         }}
       />

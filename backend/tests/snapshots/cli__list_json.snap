@@ -6,6 +6,7 @@ expression: stdout
   {
     "name": "one",
     "display_name": "One",
+    "creator_name": "author-one",
     "description": "first rice",
     "repo": "https://example.invalid/one",
     "install_supported": true,
@@ -17,6 +18,7 @@ expression: stdout
   {
     "name": "two",
     "display_name": "Two",
+    "creator_name": "author-two",
     "description": "",
     "repo": "https://example.invalid/two",
     "install_supported": false,

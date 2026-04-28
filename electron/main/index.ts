@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, screen, shell, type WebContents } from 'electron';
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
@@ -128,7 +128,7 @@ function backendArgs(request: BackendRunRequest): string[] {
   }
 }
 
-function runBackend(request: BackendRunRequest): Promise<BackendRunResult> {
+function runBackend(request: BackendRunRequest, sender?: WebContents): Promise<BackendRunResult> {
   if (activeBackendChild) throw new Error('a backend command is already running');
 
   const events: BackendRunResult['events'] = [];
@@ -150,6 +150,7 @@ function runBackend(request: BackendRunRequest): Promise<BackendRunResult> {
       const event = parseBackendEvent(line);
       if (event) {
         events.push(event);
+        sender?.send('backend:event', event);
       } else {
         pushRawTail(rawTail, line);
       }
@@ -375,7 +376,7 @@ ipcMain.on('window:close', (event) => {
 
 ipcMain.handle('backend:list', () => backendList());
 
-ipcMain.handle('backend:run', (_event, request: BackendRunRequest) => runBackend(request));
+ipcMain.handle('backend:run', (event, request: BackendRunRequest) => runBackend(request, event.sender));
 
 app.whenReady()
   .then(() => {

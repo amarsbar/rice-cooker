@@ -31,6 +31,7 @@ pub struct Flags {
 pub struct ListRow {
     pub name: String,
     pub display_name: String,
+    pub creator_name: String,
     pub description: String,
     pub repo: String,
     pub install_supported: bool,
@@ -455,6 +456,7 @@ pub fn list(cat: &Catalog, paths: &Paths) -> Result<Vec<ListRow>> {
         .map(|(name, entry)| ListRow {
             name: name.clone(),
             display_name: entry.display_name.clone(),
+            creator_name: entry.creator_name.clone(),
             description: entry.description.clone(),
             repo: entry.repo.clone(),
             install_supported: entry.install_supported,
@@ -753,6 +755,7 @@ mod tests {
     fn entry_with_deps() -> RiceEntry {
         RiceEntry {
             display_name: "X".into(),
+            creator_name: "x".into(),
             description: String::new(),
             repo: "https://x".into(),
             commit: "0123456789abcdef0123456789abcdef01234567".into(),
@@ -832,6 +835,7 @@ mod tests {
             r#"
             [x]
             display_name = "X"
+            creator_name = "x"
             repo = "https://x"
             commit = "0123456789abcdef0123456789abcdef01234567"
             symlink_src = "."
@@ -872,6 +876,7 @@ mod tests {
             r#"
             [x]
             display_name = "X"
+            creator_name = "x"
             repo = "-invalid-local-repo"
             commit = "0123456789abcdef0123456789abcdef01234567"
             symlink_src = "."

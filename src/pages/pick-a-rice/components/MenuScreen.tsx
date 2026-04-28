@@ -242,10 +242,12 @@ export function MenuScreen({
   active,
   onActiveChange,
   onBack,
+  onRevert,
 }: {
   active: MenuItem;
   onActiveChange: (item: MenuItem) => void;
   onBack: () => void;
+  onRevert: () => void;
 }) {
   const [creditIndex, setCreditIndex] = useState(0);
   const [revertHolding, setRevertHolding] = useState(false);
@@ -318,6 +320,7 @@ export function MenuScreen({
           revertHoldingTimeoutRef.current = window.setTimeout(() => {
             setRevertHolding(false);
             revertHoldingTimeoutRef.current = null;
+            onRevert();
           }, REVERT_HOLD_MS);
         }
         return;
@@ -382,7 +385,7 @@ export function MenuScreen({
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
     };
-  }, [active, backLeaving, creditIndex, onActiveChange, onBack]);
+  }, [active, backLeaving, creditIndex, onActiveChange, onBack, onRevert]);
 
   useEffect(() => {
     if (active !== 'revert') {

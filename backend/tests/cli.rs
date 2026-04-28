@@ -16,6 +16,7 @@ use tempfile::TempDir;
 const CATALOG: &str = r#"
 [one]
 display_name = "One"
+creator_name = "author-one"
 description = "first rice"
 repo = "https://example.invalid/one"
 commit = "0123456789abcdef0123456789abcdef01234567"
@@ -26,6 +27,7 @@ documented_system_effects = ["writes /etc/thing"]
 
 [two]
 display_name = "Two"
+creator_name = "author-two"
 repo = "https://example.invalid/two"
 commit = "fedcba9876543210fedcba9876543210fedcba98"
 symlink_src = "."

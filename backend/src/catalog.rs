@@ -22,6 +22,7 @@ pub struct Catalog {
 #[serde(deny_unknown_fields)]
 pub struct RiceEntry {
     pub display_name: String,
+    pub creator_name: String,
     #[serde(default)]
     pub description: String,
     pub repo: String,
@@ -103,6 +104,10 @@ fn validate_entry(name: &str, entry: &RiceEntry) -> Result<()> {
         !entry.display_name.is_empty(),
         "{name}: display_name is empty"
     );
+    ensure!(
+        !entry.creator_name.is_empty(),
+        "{name}: creator_name is empty"
+    );
     ensure!(!entry.repo.is_empty(), "{name}: repo is empty");
     ensure!(!entry.commit.is_empty(), "{name}: commit is empty");
 
@@ -166,6 +171,7 @@ mod tests {
     const MINIMAL: &str = r#"
         [dms]
         display_name = "DMS"
+        creator_name = "AvengeMedia"
         repo = "https://x/dms"
         commit = "0123456789abcdef0123456789abcdef01234567"
         symlink_src = "."
@@ -177,6 +183,7 @@ mod tests {
         let c = Catalog::parse(MINIMAL).unwrap();
         let e = c.get("dms").unwrap();
         assert_eq!(e.display_name, "DMS");
+        assert_eq!(e.creator_name, "AvengeMedia");
         assert!(e.aur_deps.is_empty());
         assert!(e.pacman_deps.is_empty());
         assert!(e.preview_aur_deps.is_empty());
@@ -190,6 +197,7 @@ mod tests {
         let t = r#"
             [x]
             display_name = "X"
+            creator_name = "x"
             repo = "https://x"
             commit = "0123456789abcdef0123456789abcdef01234567"
             symlink_src = "."
@@ -207,6 +215,7 @@ mod tests {
         let t = r#"
             [x]
             display_name = "X"
+            creator_name = "x"
             repo = "https://x"
             commit = "PLACEHOLDER0123"
             symlink_src = "."
@@ -231,6 +240,7 @@ mod tests {
                 r#"
                 [x]
                 display_name = "X"
+                creator_name = "x"
                 repo = "https://x"
                 commit = "{bad}"
                 symlink_src = "."
@@ -248,6 +258,7 @@ mod tests {
                 r#"
                 [x]
                 display_name = "X"
+                creator_name = "x"
                 repo = "https://x"
                 commit = "0123456789abcdef0123456789abcdef01234567"
                 symlink_src = "."
@@ -263,24 +274,35 @@ mod tests {
         for body in [
             r#"[x]
                display_name = ""
+               creator_name = "x"
                repo = "https://x"
                commit = "0123456789abcdef0123456789abcdef01234567"
                symlink_src = "."
                symlink_dst = "~/.config/x""#,
             r#"[x]
                display_name = "X"
+               creator_name = ""
+               repo = "https://x"
+               commit = "0123456789abcdef0123456789abcdef01234567"
+               symlink_src = "."
+               symlink_dst = "~/.config/x""#,
+            r#"[x]
+               display_name = "X"
+               creator_name = "x"
                repo = ""
                commit = "0123456789abcdef0123456789abcdef01234567"
                symlink_src = "."
                symlink_dst = "~/.config/x""#,
             r#"[x]
                display_name = "X"
+               creator_name = "x"
                repo = "https://x"
                commit = "0123456789abcdef0123456789abcdef01234567"
                symlink_src = ""
                symlink_dst = "~/.config/x""#,
             r#"[x]
                display_name = "X"
+               creator_name = "x"
                repo = "https://x"
                commit = "0123456789abcdef0123456789abcdef01234567"
                symlink_src = "."
@@ -295,6 +317,7 @@ mod tests {
         let t = r#"
             [caelestia]
             display_name = "Caelestia"
+            creator_name = "soramenew"
             repo = "https://github.com/caelestia-dots/caelestia"
             commit = "0283b44960791ab12cde19c9797d70976a0b96a4"
             symlink_src = "."

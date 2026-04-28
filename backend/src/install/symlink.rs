@@ -69,6 +69,7 @@ mod tests {
     fn mk_entry(src: &str, dst: &str) -> RiceEntry {
         RiceEntry {
             display_name: "X".into(),
+            creator_name: "x".into(),
             description: "".into(),
             repo: "https://x".into(),
             commit: "0123456789abcdef0123456789abcdef01234567".into(),

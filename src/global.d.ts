@@ -1,4 +1,4 @@
-import type { BackendRunRequest, BackendRunResult, RiceListRow } from './shared/backend';
+import type { BackendEvent, BackendRunRequest, BackendRunResult, RiceListRow } from './shared/backend';
 
 /** Preload-exposed IPC surface. Shape is duplicated here so the web tsconfig
  *  doesn't pull the preload file (and transitively any node-only types) into
@@ -10,6 +10,7 @@ declare global {
       backend: {
         list(): Promise<RiceListRow[]>;
         run(request: BackendRunRequest): Promise<BackendRunResult>;
+        onEvent(callback: (event: BackendEvent) => void): () => void;
       };
     };
   }

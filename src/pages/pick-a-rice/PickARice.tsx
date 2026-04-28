@@ -38,7 +38,7 @@ import { MENU_ITEMS, type MenuItem } from './menuOptions';
 
 const clampRiceIndex = (index: number, count: number) => Math.max(0, Math.min(count - 1, index));
 type HoldDirection = -1 | 0 | 1;
-const DOWNLOAD_DURATION_MS = 1000;
+const LAUNCH_FALLBACK_MS = 1500;
 const MENU_FADE_MS = 100;
 const cyclePreviewOption = (option: PreviewOption, delta: -1 | 1) => {
   const index = PREVIEW_OPTIONS.indexOf(option);
@@ -50,12 +50,16 @@ export function PickARice() {
   const [previewOption, setPreviewOption] = useState<PreviewOption>('install');
   const [rices, setRices] = useState<RiceListRow[]>([]);
   const [backendRunning, setBackendRunning] = useState(false);
+  const [downloadsComplete, setDownloadsComplete] = useState(false);
   const [focusedRiceIndex, setFocusedRiceIndex] = useState(0);
   const [riceScrollOffset, setRiceScrollOffset] = useState(0);
   const [riceNavRequest, setRiceNavRequest] = useState({ index: 0, version: 0 });
   const [riceHoldDirection, setRiceHoldDirection] = useState<HoldDirection>(0);
   const [pressedControls, setPressedControls] = useState<ReadonlySet<PhysicalControl>>(new Set());
   const backendRunningRef = useRef(false);
+  const downloadActiveRef = useRef(false);
+  const downloadDoneViewRef = useRef<View>('preview');
+  const launchFallbackRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pickerExiting, setPickerExiting] = useState(false);
   const [pickerEntering, setPickerEntering] = useState(false);
@@ -157,6 +161,17 @@ export function PickARice() {
     playRiceSound(sound);
   }, [rices.length]);
 
+  const finishDownload = useCallback((complete: boolean) => {
+    if (launchFallbackRef.current !== null) {
+      window.clearTimeout(launchFallbackRef.current);
+      launchFallbackRef.current = null;
+    }
+    downloadActiveRef.current = false;
+    setDownloadsComplete(complete);
+    setPreviewOption('install');
+    setView(downloadDoneViewRef.current);
+  }, []);
+
   const runBackend = useCallback(async (request: BackendRunRequest, afterSuccess?: () => void) => {
     if (backendRunningRef.current) return;
     backendRunningRef.current = true;
@@ -166,15 +181,51 @@ export function PickARice() {
       if (result.ok) {
         afterSuccess?.();
       } else {
+        if (downloadActiveRef.current) finishDownload(false);
         console.error('[rice-cooker] backend command failed:', result);
       }
     } catch (error) {
+      if (downloadActiveRef.current) finishDownload(false);
       console.error('[rice-cooker] backend command failed:', error);
     } finally {
       backendRunningRef.current = false;
       setBackendRunning(false);
     }
-  }, []);
+  }, [finishDownload]);
+
+  const revertRice = useCallback(() => {
+    playRiceSound('revert');
+    void runBackend({ command: 'uninstall' });
+  }, [runBackend]);
+
+  useEffect(() => window.rice.backend.onEvent((event) => {
+    if (!downloadActiveRef.current) return;
+
+    if (event.type === 'step' && event.step === 'deps' && event.state === 'done') {
+      setDownloadsComplete(true);
+      return;
+    }
+
+    if (event.type === 'step' && event.step === 'launch' && event.state === 'done') {
+      launchFallbackRef.current = window.setTimeout(
+        () => finishDownload(true),
+        LAUNCH_FALLBACK_MS,
+      );
+      return;
+    }
+
+    if (
+      event.type === 'success' ||
+      (event.type === 'step' && event.step === 'verify' && event.state === 'done')
+    ) {
+      finishDownload(true);
+      return;
+    }
+
+    if (event.type === 'fail') {
+      finishDownload(false);
+    }
+  }), [finishDownload]);
 
   const requestFocusedRice = useCallback((nextIndex: number) => {
     const index = clampRiceIndex(nextIndex, rices.length);
@@ -279,6 +330,7 @@ export function PickARice() {
 
   useEffect(() => () => {
     if (menuTransitionTimeoutRef.current !== null) window.clearTimeout(menuTransitionTimeoutRef.current);
+    if (launchFallbackRef.current !== null) window.clearTimeout(launchFallbackRef.current);
     bootEnterHoldTimeoutRefs.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
   }, []);
 
@@ -291,19 +343,11 @@ export function PickARice() {
     stopBootEnterHold();
   }, [bootItem, bootOpen, pressedControls, startBootEnterHold, stopBootEnterHold]);
 
-  useEffect(() => {
-    if (view !== 'downloading') return;
-
-    const timeoutId = window.setTimeout(() => {
-      setPreviewOption('install');
-      setView('preview');
-    }, DOWNLOAD_DURATION_MS);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [view]);
-
-  const startDownload = useCallback(() => {
+  const startDownload = useCallback((doneView: View) => {
     playRiceSound('applyRice');
+    downloadActiveRef.current = true;
+    downloadDoneViewRef.current = doneView;
+    setDownloadsComplete(false);
     setPreviewOption('install');
     setView('downloading');
   }, []);
@@ -318,7 +362,7 @@ export function PickARice() {
     if (backendRunning || !selectedRice) return;
 
     if (view === 'picking') {
-      startDownload();
+      startDownload('preview');
       void runBackend({ command: 'preview', name: selectedRice.name });
       return;
     }
@@ -326,6 +370,7 @@ export function PickARice() {
     if (view === 'preview') {
       if (previewOption === 'install') {
         if (selectedRice.install_supported) {
+          startDownload('picking');
           void runBackend({ command: 'try', name: selectedRice.name });
         }
         return;
@@ -371,7 +416,7 @@ export function PickARice() {
                 onPressedChange={setPressedControls}
               />
               <GreenTab />
-              <Antenna />
+              <Antenna extended={view === 'downloading' && !downloadsComplete} />
               <RiceCard menuOpen={menuOpen || bootOpen}>
                 {bootOpen ? (
                   <BootScreen
@@ -386,6 +431,7 @@ export function PickARice() {
                       active={menuItem}
                       onActiveChange={setMenuItem}
                       onBack={closeMenu}
+                      onRevert={revertRice}
                     />
                   </div>
                 ) : (
@@ -399,12 +445,12 @@ export function PickARice() {
                       onRiceStepStart={playMoveForTarget}
                     />
                     <PreviewContent
-                      themeName="themename"
-                      creatorName="creatorname"
+                      themeName={selectedRice?.display_name ?? 'themename'}
+                      creatorName={selectedRice?.creator_name ?? 'creatorname'}
                       installSupported={selectedRice?.install_supported ?? true}
                       onApply={applyFocusedRice}
                     />
-                    <ClosingCircles active={view === 'downloading'} />
+                    <ClosingCircles active={view === 'downloading'} riceName={selectedRice?.name} />
                   </div>
                 )}
               </RiceCard>

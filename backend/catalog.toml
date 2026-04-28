@@ -14,6 +14,7 @@
 
 [caelestia]
 display_name = "Caelestia"
+creator_name = "soramenew"
 description = "Caelestia Quickshell. Ships as caelestia-shell-git AUR."
 repo = "https://github.com/caelestia-dots/caelestia"
 commit = "0283b44960791ab12cde19c9797d70976a0b96a4"
@@ -37,6 +38,7 @@ preview_aur_deps = ["caelestia-shell-git"]
 
 [noctalia]
 display_name = "Noctalia"
+creator_name = "noctalia-dev"
 description = "Minimal dark Quickshell"
 repo = "https://github.com/noctalia-dev/noctalia-shell"
 commit = "d7b68652e79bce5813dc4fea7e51636a5da3e1b7"
@@ -55,6 +57,7 @@ pacman_deps = [
 
 [dms]
 display_name = "DankMaterialShell"
+creator_name = "AvengeMedia"
 description = "Material-design Quickshell"
 repo = "https://github.com/AvengeMedia/DankMaterialShell"
 commit = "c6ed64b24e414cd4b9588b645a6345b15fa697f4"
@@ -74,6 +77,7 @@ aur_deps = ["dsearch-bin"]
 
 [linux-retroism]
 display_name = "linux-retroism"
+creator_name = "diinki"
 description = "Diinki's Quickshell"
 repo = "https://github.com/diinki/linux-retroism"
 commit = "255eb6a7b5a0d26413eea8dc5f47e8d67bb4b1ff"
@@ -100,6 +104,7 @@ pacman_deps = [
 
 [whisker]
 display_name = "whisker"
+creator_name = "corecathx"
 description = "corecathx's Quickshell"
 repo = "https://github.com/corecathx/whisker"
 commit = "ab1edb84b7b8cf1c0514d12f1c639f8c863e3900"
@@ -117,6 +122,7 @@ aur_deps = ["whisker-shell-git"]
 
 [nandoroid]
 display_name = "Nandoroid"
+creator_name = "na-ive"
 description = "na-ive's Android-inspired Quickshell shell"
 repo = "https://github.com/na-ive/nandoroid-shell"
 commit = "c24bda36581fe7a34c692f2798a9296dcfca6f93"
@@ -168,6 +174,7 @@ documented_system_effects = [
 
 [zephyr]
 display_name = "Zephyr (flicko)"
+creator_name = "flickowoa"
 description = "flickowoa's Zephyr Quickshell"
 repo = "https://github.com/flickowoa/dotfiles"
 commit = "92a33e776a844070bab67cd4a4a1a688b3ea6730"
