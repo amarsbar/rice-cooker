@@ -1,4 +1,4 @@
-//! preview / try / uninstall / list / status pipeline.
+//! preview / install / uninstall / list / status pipeline.
 
 use std::fs;
 use std::io::Write;
@@ -53,7 +53,7 @@ enum ActivateMode {
 impl ActivateMode {
     fn subcommand(self) -> &'static str {
         match self {
-            ActivateMode::Install => "try",
+            ActivateMode::Install => "install",
             ActivateMode::Preview => "preview",
         }
     }
@@ -97,7 +97,7 @@ macro_rules! try_stage {
     };
 }
 
-pub fn run_try<W: Write>(
+pub fn run_install<W: Write>(
     cat: &Catalog,
     paths: &Paths,
     name: &str,
@@ -404,7 +404,7 @@ fn replay_original_shell<W: Write>(paths: &Paths, events: &mut EventWriter<W>) -
         }
         (Some((reason, tail)), Some(ce)) => {
             // Include the clear_original error — dropping it leaves a silent
-            // landmine: stale `original` on disk will mis-replay on the next try.
+            // landmine: stale `original` on disk will mis-replay on the next install.
             emit_fail(
                 events,
                 "replay",
@@ -815,13 +815,13 @@ mod tests {
     }
 
     #[test]
-    fn run_try_emits_fail_for_missing_catalog_entry() {
+    fn run_install_emits_fail_for_missing_catalog_entry() {
         let (_t, paths) = tmp_paths();
         let cat = Catalog::default();
         let mut buf = Vec::new();
         {
             let mut events = EventWriter::new(&mut buf);
-            assert!(!run_try(&cat, &paths, "x", &mut events).unwrap());
+            assert!(!run_install(&cat, &paths, "x", &mut events).unwrap());
         }
         let out = std::str::from_utf8(&buf).unwrap();
         assert!(out.contains(r#""stage":"preflight""#));
@@ -829,7 +829,7 @@ mod tests {
     }
 
     #[test]
-    fn run_try_refuses_preview_only_entry() {
+    fn run_install_refuses_preview_only_entry() {
         let (_t, paths) = tmp_paths();
         let cat = Catalog::parse(
             r#"
@@ -846,10 +846,10 @@ mod tests {
         let mut buf = Vec::new();
         {
             let mut events = EventWriter::new(&mut buf);
-            assert!(!run_try(&cat, &paths, "x", &mut events).unwrap());
+            assert!(!run_install(&cat, &paths, "x", &mut events).unwrap());
         }
         let out = std::str::from_utf8(&buf).unwrap();
-        assert!(out.contains(r#""subcommand":"try""#));
+        assert!(out.contains(r#""subcommand":"install""#));
         assert!(out.contains(r#""stage":"preflight""#));
         assert!(out.contains("install is not supported"));
     }

@@ -79,9 +79,9 @@ mod tests {
             (
                 Event::Hello {
                     version: 1,
-                    subcommand: "try".into(),
+                    subcommand: "install".into(),
                 },
-                r#"{"type":"hello","version":1,"subcommand":"try"}"#,
+                r#"{"type":"hello","version":1,"subcommand":"install"}"#,
             ),
             // Pin every Step wire form.
             (
@@ -192,7 +192,7 @@ mod tests {
         let mut w = EventWriter::new(&mut buf);
         w.emit(&Event::Hello {
             version: 1,
-            subcommand: "try".into(),
+            subcommand: "install".into(),
         })
         .unwrap();
         w.emit(&Event::Step {
@@ -204,7 +204,7 @@ mod tests {
         let out = String::from_utf8(buf).unwrap();
         assert_eq!(
             out,
-            "{\"type\":\"hello\",\"version\":1,\"subcommand\":\"try\"}\n\
+            "{\"type\":\"hello\",\"version\":1,\"subcommand\":\"install\"}\n\
              {\"type\":\"step\",\"step\":\"clone\",\"state\":\"start\"}\n"
         );
     }

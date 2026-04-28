@@ -23,8 +23,8 @@ struct Cli {
 enum Cmd {
     /// Preview <name>, installing only catalog preview dependencies.
     Preview { name: String },
-    /// Activate <name> (install + launch; evicts any currently-active rice).
-    Try { name: String },
+    /// Install <name> fully and launch it; evicts any currently-active rice.
+    Install { name: String },
     /// Uninstall the active rice and replay the pre-rice shell. Clone stays
     /// cached at `~/.cache/rice-cooker/rices/<name>/`.
     Uninstall {
@@ -59,12 +59,12 @@ fn run() -> Result<bool> {
             let mut events = EventWriter::new(&mut lock);
             install::run_preview(&cat, &paths, name, &mut events)
         }
-        Cmd::Try { name } => {
+        Cmd::Install { name } => {
             let cat = Catalog::from_file(&catalog_path(&paths, cli.catalog.as_deref())?)?;
             let stdout = std::io::stdout();
             let mut lock = stdout.lock();
             let mut events = EventWriter::new(&mut lock);
-            install::run_try(&cat, &paths, name, &mut events)
+            install::run_install(&cat, &paths, name, &mut events)
         }
         Cmd::Uninstall { force } => {
             let stdout = std::io::stdout();

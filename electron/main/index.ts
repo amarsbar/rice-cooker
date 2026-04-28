@@ -119,8 +119,8 @@ function backendArgs(request: BackendRunRequest): string[] {
   switch (request.command) {
     case 'uninstall':
       return ['uninstall'];
+    case 'install':
     case 'preview':
-    case 'try':
       if (!request.name) throw new Error(`${request.command} requires a rice name`);
       return [request.command, request.name];
     default:

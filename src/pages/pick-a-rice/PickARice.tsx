@@ -371,7 +371,7 @@ export function PickARice() {
       if (previewOption === 'install') {
         if (selectedRice.install_supported) {
           startDownload('picking');
-          void runBackend({ command: 'try', name: selectedRice.name });
+          void runBackend({ command: 'install', name: selectedRice.name });
         }
         return;
       }

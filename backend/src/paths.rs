@@ -121,7 +121,7 @@ impl Paths {
             Err(e) => return Err(e).with_context(|| format!("reading {}", path.display())),
         };
         // Malformed content (empty file from older backend, plain path, typo
-        // from a hand-edit) reads as None; next `try` preflight re-captures.
+        // from a hand-edit) reads as None; next install preflight re-captures.
         Ok(serde_json::from_str::<Option<OriginalShell>>(s.trim()).unwrap_or(None))
     }
 
@@ -190,7 +190,7 @@ fn remove_if_exists(p: &Path) -> Result<()> {
     }
 }
 
-// No parent-dir fsync: `original` is cache; next `try` preflight re-captures.
+// No parent-dir fsync: `original` is cache; next install preflight re-captures.
 fn write_line_file(path: &Path, contents: &str) -> Result<()> {
     let mut tmp = path.as_os_str().to_os_string();
     tmp.push(".tmp");
@@ -292,7 +292,7 @@ mod tests {
     #[test]
     fn original_stale_plain_text_reads_as_unrecorded() {
         // Older backend versions wrote a bare path; migration contract is that
-        // such a file reads as None and re-records on the next try.
+        // such a file reads as None and re-records on the next install.
         let (_t, p) = tmp_paths();
         fs::write(p.original_file(), "shell.qml\n").unwrap();
         assert!(p.original().unwrap().is_none());

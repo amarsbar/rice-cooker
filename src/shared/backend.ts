@@ -9,7 +9,7 @@ export interface RiceListRow {
   documented_system_effects: string[];
 }
 
-export type BackendCommand = 'preview' | 'try' | 'uninstall';
+export type BackendCommand = 'preview' | 'install' | 'uninstall';
 
 export interface BackendRunRequest {
   command: BackendCommand;
