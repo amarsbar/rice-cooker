@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import styles from './ClosePin.module.css';
-import ClosePinSvg from '@/assets/icon-buttons/close-pin.svg?react';
+import ClosePinSvg from '@/assets/icon-buttons/pin.svg?react';
 import { MORPH_TRANSITION, POSITIONS, useView } from '../view';
 
 /** Close-window pin — pin-shaped close icon that sits to the right of

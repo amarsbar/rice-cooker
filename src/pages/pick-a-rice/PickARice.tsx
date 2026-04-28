@@ -235,6 +235,7 @@ export function PickARice() {
   const closeMenu = useCallback(() => {
     if (!menuOpen || menuExiting) return;
     if (menuTransitionTimeoutRef.current !== null) window.clearTimeout(menuTransitionTimeoutRef.current);
+    playRiceSound('exitMenu');
     setMenuExiting(true);
     menuTransitionTimeoutRef.current = window.setTimeout(() => {
       setMenuOpen(false);
@@ -256,6 +257,7 @@ export function PickARice() {
       if (pickerTransitioning) return;
       if (view !== 'picking') return;
       setMenuItem(MENU_ITEMS[0]);
+      playRiceSound('enterMenu');
       setPickerExiting(true);
       if (menuTransitionTimeoutRef.current !== null) window.clearTimeout(menuTransitionTimeoutRef.current);
       menuTransitionTimeoutRef.current = window.setTimeout(() => {

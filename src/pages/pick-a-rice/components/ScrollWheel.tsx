@@ -7,9 +7,9 @@ import GridSvg from '@/assets/scroll-wheel/grid.svg?react';
 import installRiceSvg from '@/assets/scroll-wheel/install-rice.svg';
 import dotfilesSvg from '@/assets/scroll-wheel/dotfiles.svg';
 import tryAnotherSvg from '@/assets/scroll-wheel/try-another.svg';
-import enterMessageSvg from '@/assets/boot/enter-message.svg';
-import closeMessageSvg from '@/assets/boot/close-message.svg';
-import githubMessageSvg from '@/assets/boot/github-message.svg';
+import BootEnterMessage from '@/assets/scroll-wheel/boot-enter.svg?react';
+import BootCloseMessage from '@/assets/scroll-wheel/boot-close.svg?react';
+import BootGithubMessage from '@/assets/scroll-wheel/boot-github.svg?react';
 import {
   MORPH_TRANSITION,
   POSITIONS,
@@ -56,6 +56,11 @@ const BOOT_DOT_OPTION: Record<BootItem, PreviewOption> = {
   close: 'install',
   github: 'dots',
 };
+const BOOT_MESSAGES = {
+  enter: BootEnterMessage,
+  close: BootCloseMessage,
+  github: BootGithubMessage,
+} as const;
 
 export function ScrollWheel({
   menuItem = null,
@@ -70,17 +75,21 @@ export function ScrollWheel({
   const pressed = usePressedDirections();
   const menuIndex = menuItem ? MENU_ITEMS.indexOf(menuItem) : -1;
   const bootIndex = bootItem ? BOOT_WHEEL_ITEMS.indexOf(bootItem) : -1;
+  const previewIndex = view === 'preview' ? PREVIEW_OPTIONS.indexOf(previewOption) : -1;
   const menuActive = menuIndex >= 0;
   const bootActive = bootIndex >= 0;
+  const previewActive = previewIndex >= 0 && !menuActive && !bootActive;
   const activeScroll = menuActive
     ? { offset: menuIndex * RICE_ITEM_PITCH, index: menuIndex, total: MENU_ITEMS.length }
     : bootActive
       ? { offset: bootIndex * RICE_ITEM_PITCH, index: bootIndex, total: BOOT_WHEEL_ITEMS.length }
-    : scroll;
-  const controlledWheel = menuActive || bootActive;
+      : previewActive
+        ? { offset: previewIndex * RICE_ITEM_PITCH, index: previewIndex, total: PREVIEW_OPTIONS.length }
+        : scroll;
+  const controlledWheel = menuActive || bootActive || previewActive;
   const pickingContentVisible = menuActive || (!bootActive && view === 'picking');
   const bootContentVisible = bootActive;
-  const previewContentVisible = !controlledWheel && view === 'preview';
+  const previewContentVisible = previewActive;
   const dotsVisible = previewContentVisible || bootContentVisible;
   const dotOption = bootItem ? BOOT_DOT_OPTION[bootItem] : previewOption;
 
@@ -151,8 +160,8 @@ export function ScrollWheel({
 
 function BootWheelGraphic({ item }: { item: BootItem }) {
   const cls = `${styles.bootGraphic} ${styles[`bootGraphic_${item}`]}`;
-  const src = item === 'enter' ? enterMessageSvg : item === 'github' ? githubMessageSvg : closeMessageSvg;
-  return <img className={cls} src={src} alt="" aria-hidden="true" />;
+  const Message = BOOT_MESSAGES[item];
+  return <Message className={cls} aria-hidden="true" />;
 }
 
 function PreviewWheelGraphic({ option }: { option: PreviewOption }) {

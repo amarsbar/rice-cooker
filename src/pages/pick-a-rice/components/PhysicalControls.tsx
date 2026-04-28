@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import styles from './PhysicalControls.module.css';
-import DownButton from '@/assets/physical-controls/down.svg?react';
-import UpButton from '@/assets/physical-controls/up.svg?react';
+import ArrowButton from '@/assets/physical-controls/up.svg?react';
 import enterIcon from '@/assets/physical-controls/enter.svg';
 import { MORPH_TRANSITION, POSITIONS, useView } from '../view';
 
@@ -205,7 +204,7 @@ export function PhysicalControls({
         onClick={(event) => event.stopPropagation()}
       >
         <span className={styles.cap}>
-          <UpButton aria-hidden="true" className={styles.controlImage} />
+          <ArrowButton aria-hidden="true" className={styles.controlImage} />
         </span>
       </button>
 
@@ -223,7 +222,7 @@ export function PhysicalControls({
         onClick={(event) => event.stopPropagation()}
       >
         <span className={styles.cap}>
-          <DownButton aria-hidden="true" className={styles.controlImage} />
+          <ArrowButton aria-hidden="true" className={`${styles.controlImage} ${styles.controlImageDown}`} />
         </span>
       </button>
 

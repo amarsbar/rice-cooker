@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion';
-import BackIcon from '@/assets/preview-actions/back.svg?react';
+import BackIcon from '@/assets/icons/back.svg?react';
 import DownloadIcon from '@/assets/preview-actions/download.svg?react';
-import GithubIcon from '@/assets/preview-actions/github.svg?react';
-import pointer from '@/assets/pointer.svg';
+import GithubIcon from '@/assets/icons/github.svg?react';
+import pointer from '@/assets/icons/pointer.svg';
 import styles from './PreviewContent.module.css';
 import { SHRUNKEN_TEXT_VARIANTS, usePreviewOption, useView, type PreviewOption } from '../view';
 

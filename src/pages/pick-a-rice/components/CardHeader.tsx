@@ -1,6 +1,6 @@
 import styles from './CardHeader.module.css';
-import MenuDotsSvg from '@/assets/screen/menu-dots.svg?react';
-import screenDivider from '@/assets/screen/divider.svg';
+import MenuDotsSvg from '@/assets/screen/four-dots.svg?react';
+import screenDivider from '@/assets/screen/dot-row.svg';
 import type { PhysicalControl } from './PhysicalControls';
 
 const APPLY_LABEL = 'APPLY';

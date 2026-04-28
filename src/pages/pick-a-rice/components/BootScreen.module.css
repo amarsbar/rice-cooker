@@ -97,6 +97,8 @@
   display: block;
   width: 20px;
   height: 20px;
+  --fill-0: #e8ff76;
+  --stroke-0: #e8ff76;
 }
 
 .optionEnter .optionIconImage {
@@ -146,6 +148,7 @@
 }
 
 .wordLetterHeld {
+  z-index: 1;
   background: #fdb1e5;
 }
 
@@ -159,9 +162,9 @@
     transform 400ms ease;
 }
 
-.decoTriangle,
-.decoDrop,
-.decoGear,
+.decoArch,
+.decoHyprland,
+.decoQuickshell,
 .flower,
 .forceHint,
 .warningRisk {
@@ -171,7 +174,7 @@
   pointer-events: none;
 }
 
-.decoTriangle {
+.decoArch {
   left: 242.13px;
   top: 16.83px;
   width: 46.744px;
@@ -181,19 +184,19 @@
   justify-content: center;
 }
 
-.decoTriangle img {
+.decoArch img {
   width: 36.546px;
   height: 32.441px;
 }
 
-.decoDrop {
+.decoHyprland {
   left: 361.06px;
   top: 69.76px;
   width: 39.052px;
   height: 42.27px;
 }
 
-.decoGear {
+.decoQuickshell {
   left: 44.88px;
   top: 183.22px;
   width: 39.788px;
@@ -203,7 +206,7 @@
   justify-content: center;
 }
 
-.decoGear img {
+.decoQuickshell img {
   width: 31.303px;
   height: 31.303px;
 }
@@ -240,14 +243,17 @@
 .flowerPink {
   left: 62.14px;
   top: 210.68px;
+  color: #fdb1e5;
 }
 
 .flowerLime {
   left: 441.55px;
   top: 68.84px;
+  color: #e8ff76;
 }
 
 .flowerYellow {
   left: 411.87px;
   top: 249.62px;
+  color: #fade26;
 }

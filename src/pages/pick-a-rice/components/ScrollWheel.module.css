@@ -167,24 +167,28 @@
 .previewGraphic {
   position: absolute;
   display: block;
-  left: 50%;
-  top: 50%;
   transform: translate(-50%, -50%);
   overflow: visible;
   pointer-events: none;
 }
 
 .previewGraphic_install {
+  left: calc(50% + 0.09px);
+  top: calc(50% + 0.09px);
   width: 127px;
   height: 71px;
 }
 
 .previewGraphic_leave {
+  left: calc(50% + 0.09px);
+  top: calc(50% - 0.25px);
   width: 119px;
   height: 75px;
 }
 
 .previewGraphic_dots {
+  left: calc(50% - 0.41px);
+  top: calc(50% - 0.41px);
   width: 114px;
   height: 75px;
 }
@@ -197,6 +201,7 @@
   max-width: none;
   transform: translate(-50%, -50%);
   pointer-events: none;
+  color: var(--color-brown);
 }
 
 .bootGraphic_enter {

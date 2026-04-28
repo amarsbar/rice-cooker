@@ -1,15 +1,16 @@
 import type { CSSProperties } from 'react';
 import styles from './BootScreen.module.css';
-import sadMessage from '@/assets/boot/sad-message.svg';
-import enterIcon from '@/assets/boot/door-enter.svg';
-import closeIcon from '@/assets/boot/close.svg';
-import githubIcon from '@/assets/boot/github.svg';
-import pointerArrow from '@/assets/pointer.svg';
-import stickerTriangle from '@/assets/boot/sticker-triangle.svg';
-import stickerDrop from '@/assets/boot/sticker-drop.svg';
-import stickerGear from '@/assets/boot/sticker-gear.svg';
-import forceIcon from '@/assets/boot/force-icon.svg';
-import WarningRisk from '@/assets/boot/warning-risk.svg?react';
+import sadMessage from '@/assets/boot/sad-card.svg';
+import EnterIcon from '@/assets/boot/enter.svg?react';
+import CloseIcon from '@/assets/boot/close.svg?react';
+import GithubIcon from '@/assets/icons/github.svg?react';
+import pointerArrow from '@/assets/icons/pointer.svg';
+import stickerArch from '@/assets/boot/arch-sticker.svg';
+import stickerHyprland from '@/assets/boot/hyprland-sticker.svg';
+import stickerQuickshell from '@/assets/boot/quickshell-sticker.svg';
+import forceIcon from '@/assets/boot/force-hold.svg';
+import FlowerSvg from '@/assets/boot/flower.svg?react';
+import WarningRisk from '@/assets/boot/warning-sticker.svg?react';
 
 export const BOOT_ITEMS = ['enter', 'close', 'github'] as const;
 export type BootItem = (typeof BOOT_ITEMS)[number];
@@ -35,11 +36,11 @@ const iconPosition: Record<BootItem, { idle: { left: number; top: number }; acti
   github: { idle: { left: 156.57, top: 327.76 }, active: { left: 164.28, top: 327.76 } },
 };
 
-const icons: Record<BootItem, string> = {
-  enter: enterIcon,
-  close: closeIcon,
-  github: githubIcon,
-};
+const icons = {
+  enter: EnterIcon,
+  close: CloseIcon,
+  github: GithubIcon,
+} as const;
 
 const optionClass: Record<BootItem, string> = {
   enter: styles.optionEnter,
@@ -105,25 +106,28 @@ export function BootScreen({
 
       <p className={styles.description}>Rice Cooker is only built for arch + hyprland + quickshell.</p>
 
-      {BOOT_ITEMS.map((item) => (
-        <button
-          type="button"
-          tabIndex={-1}
-          key={item}
-          className={`${styles.optionIcon} ${optionClass[item]} ${active === item ? styles.optionIconActive : ''}`}
-          style={(active === item ? iconPosition[item].active : iconPosition[item].idle) as CSSProperties}
-          onMouseDown={(event) => event.preventDefault()}
-          onMouseEnter={() => onActiveChange(item)}
-          onClick={(event) => {
-            event.stopPropagation();
-            onActiveChange(item);
-            onApply();
-          }}
-          aria-label={WORDS[item]}
-        >
-          <img src={icons[item]} alt="" className={styles.optionIconImage} />
-        </button>
-      ))}
+      {BOOT_ITEMS.map((item) => {
+        const Icon = icons[item];
+        return (
+          <button
+            type="button"
+            tabIndex={-1}
+            key={item}
+            className={`${styles.optionIcon} ${optionClass[item]} ${active === item ? styles.optionIconActive : ''}`}
+            style={(active === item ? iconPosition[item].active : iconPosition[item].idle) as CSSProperties}
+            onMouseDown={(event) => event.preventDefault()}
+            onMouseEnter={() => onActiveChange(item)}
+            onClick={(event) => {
+              event.stopPropagation();
+              onActiveChange(item);
+              onApply();
+            }}
+            aria-label={WORDS[item]}
+          >
+            <Icon className={styles.optionIconImage} aria-hidden="true" />
+          </button>
+        );
+      })}
 
       <button
         type="button"
@@ -138,12 +142,11 @@ export function BootScreen({
       >
         <span className={styles.wordCluster}>
           {[...word].map((char, index) => {
-            const held = active === 'enter' && index < enterHoldLetters;
+            const held = index < enterHoldLetters;
             return (
               <span
                 className={`${styles.wordLetter} ${held ? styles.wordLetterHeld : ''}`}
-                key={`${char}-${index}`}
-                style={{ zIndex: held ? index + 1 : 0 }}
+                key={index}
               >
                 {char}
               </span>
@@ -182,34 +185,22 @@ function Decorations({ active }: { active: BootItem }) {
   if (active === 'github') {
     return (
       <>
-        <Flower className={`${styles.flower} ${styles.flowerPink}`} color="#FDB1E5" />
-        <Flower className={`${styles.flower} ${styles.flowerLime}`} color="#E8FF76" />
-        <Flower className={`${styles.flower} ${styles.flowerYellow}`} color="#FADE26" />
+        <FlowerSvg className={`${styles.flower} ${styles.flowerPink}`} aria-hidden="true" />
+        <FlowerSvg className={`${styles.flower} ${styles.flowerLime}`} aria-hidden="true" />
+        <FlowerSvg className={`${styles.flower} ${styles.flowerYellow}`} aria-hidden="true" />
       </>
     );
   }
 
   return (
     <>
-      <span className={styles.decoTriangle}>
-        <img src={stickerTriangle} alt="" />
+      <span className={styles.decoArch}>
+        <img src={stickerArch} alt="" />
       </span>
-      <img src={stickerDrop} alt="" className={styles.decoDrop} />
-      <span className={styles.decoGear}>
-        <img src={stickerGear} alt="" />
+      <img src={stickerHyprland} alt="" className={styles.decoHyprland} />
+      <span className={styles.decoQuickshell}>
+        <img src={stickerQuickshell} alt="" />
       </span>
     </>
-  );
-}
-
-function Flower({ className, color }: { className: string; color: string }) {
-  return (
-    <svg className={className} viewBox="0 0 29.958 29.9551" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path
-        d="M8.09473 0C10.9633 0.000143025 13.4813 1.49369 14.9189 3.74414C16.368 1.49353 18.9074 0.000976562 21.7988 0.000976562C26.3045 0.00112102 29.9569 3.62456 29.957 8.09473C29.957 10.9632 28.4519 13.4813 26.1836 14.9189C28.4521 16.3679 29.958 18.9056 29.958 21.7969C29.958 26.3024 26.3047 29.9551 21.7988 29.9551C18.9065 29.955 16.3676 28.4484 14.9189 26.1787C13.4814 28.4474 10.9637 29.954 8.09473 29.9541C3.62418 29.9541 0.000137324 26.3013 0 21.7959C0 18.9051 1.49198 16.366 3.74219 14.917C1.49265 13.4792 0.000166821 10.9623 0 8.09473C0 3.6244 3.6241 0 8.09473 0ZM14.9189 12.4434C14.2842 13.4372 13.4391 14.282 12.4453 14.917C13.4396 15.5571 14.2849 16.4099 14.9199 17.4121C15.5597 16.4107 16.4117 15.5588 17.4131 14.9189C16.411 14.2837 15.5589 13.4378 14.9189 12.4434Z"
-        fill={color}
-      />
-      <circle cx="15.0373" cy="15.0381" r="6.01509" fill="#1B161A" />
-    </svg>
   );
 }
