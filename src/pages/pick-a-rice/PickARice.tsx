@@ -21,9 +21,14 @@ import { SoundButton } from './components/SoundButton';
 import { ThemeKnob } from './components/ThemeKnob';
 import { ScrollWheel } from './components/ScrollWheel';
 import { PhysicalControls, type PhysicalControl } from './components/PhysicalControls';
+import { ClosingCircles } from './components/ClosingCircles';
+import { Antenna } from './components/Antenna';
+import { PreviewStars } from './components/PreviewStars';
+import { playRiceSound } from './sounds';
 
 const clampRiceIndex = (index: number, count: number) => Math.max(0, Math.min(count - 1, index));
 type HoldDirection = -1 | 0 | 1;
+const DOWNLOAD_DURATION_MS = 1000;
 const cyclePreviewOption = (option: PreviewOption, delta: -1 | 1) => {
   const index = PREVIEW_OPTIONS.indexOf(option);
   return PREVIEW_OPTIONS[(index + delta + PREVIEW_OPTIONS.length) % PREVIEW_OPTIONS.length];
@@ -41,6 +46,7 @@ export function PickARice() {
   const [pressedControls, setPressedControls] = useState<ReadonlySet<PhysicalControl>>(new Set());
   const backendRunningRef = useRef(false);
   const requestedRiceIndexRef = useRef(0);
+  const lastRiceSoundTargetRef = useRef(0);
   const [cycleIdx, setCycleIdx] = useState(0);
   const theme = THEME_CYCLE[cycleIdx];
   const advance = useCallback(() => setCycleIdx((i) => (i + 1) % THEME_CYCLE.length), []);
@@ -74,6 +80,14 @@ export function PickARice() {
     };
   }, []);
 
+  const playMoveForTarget = useCallback((nextIndex: number) => {
+    const index = clampRiceIndex(nextIndex, rices.length);
+    if (index === lastRiceSoundTargetRef.current) return;
+    const sound = index < lastRiceSoundTargetRef.current ? 'moveUp' : 'moveDown';
+    lastRiceSoundTargetRef.current = index;
+    playRiceSound(sound);
+  }, [rices.length]);
+
   const runBackend = useCallback(async (request: BackendRunRequest, afterSuccess?: () => void) => {
     if (backendRunningRef.current) return;
     backendRunningRef.current = true;
@@ -95,23 +109,28 @@ export function PickARice() {
 
   const requestFocusedRice = useCallback((nextIndex: number) => {
     const index = clampRiceIndex(nextIndex, rices.length);
+    if (index !== requestedRiceIndexRef.current) playMoveForTarget(index);
     requestedRiceIndexRef.current = index;
     setRiceNavRequest((request) => ({ index, version: request.version + 1 }));
-  }, [rices.length]);
+  }, [playMoveForTarget]);
 
   const focusPreviousRice = useCallback(() => {
     if (view === 'preview') {
+      playRiceSound('moveUp');
       setPreviewOption((option) => cyclePreviewOption(option, -1));
       return;
     }
+    if (view === 'downloading') return;
     requestFocusedRice(requestedRiceIndexRef.current - 1);
   }, [requestFocusedRice, view]);
 
   const focusNextRice = useCallback(() => {
     if (view === 'preview') {
+      playRiceSound('moveDown');
       setPreviewOption((option) => cyclePreviewOption(option, 1));
       return;
     }
+    if (view === 'downloading') return;
     requestFocusedRice(requestedRiceIndexRef.current + 1);
   }, [requestFocusedRice, view]);
 
@@ -132,25 +151,53 @@ export function PickARice() {
     if (view !== 'picking') setRiceHoldDirection(0);
   }, [view]);
 
+  useEffect(() => {
+    if (view !== 'downloading') return;
+
+    const timeoutId = window.setTimeout(() => {
+      setPreviewOption('install');
+      setView('preview');
+    }, DOWNLOAD_DURATION_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [view]);
+
+  const startDownload = useCallback(() => {
+    playRiceSound('applyRice');
+    setPreviewOption('install');
+    setView('downloading');
+  }, []);
+
   const applyFocusedRice = useCallback(() => {
     const { backendRunning, previewOption, selectedRice, view } = latestApplyStateRef.current;
     if (backendRunning || !selectedRice) return;
 
     if (view === 'picking') {
-      setPreviewOption('install');
-      setView('preview');
+      startDownload();
       void runBackend({ command: 'preview', name: selectedRice.name });
       return;
     }
 
-    if (previewOption === 'leave') {
-      void runBackend({ command: 'uninstall' }, () => setView('picking'));
-    } else if (previewOption === 'install' && selectedRice.install_supported) {
-      void runBackend({ command: 'try', name: selectedRice.name });
-    } else if (previewOption === 'dots') {
-      window.open(selectedRice.repo, '_blank', 'noopener,noreferrer');
+    if (view === 'preview') {
+      if (previewOption === 'install') {
+        if (selectedRice.install_supported) {
+          void runBackend({ command: 'try', name: selectedRice.name });
+        }
+        return;
+      }
+
+      if (previewOption === 'leave') {
+        playRiceSound('revert');
+        setPreviewOption('install');
+        void runBackend({ command: 'uninstall' }, () => setView('picking'));
+        return;
+      }
+
+      if (previewOption === 'dots') {
+        window.open(selectedRice.repo, '_blank', 'noopener,noreferrer');
+      }
     }
-  }, [runBackend]);
+  }, [runBackend, startDownload]);
 
   const cycleOnBareStage = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target !== e.currentTarget) return;
@@ -177,6 +224,7 @@ export function PickARice() {
                 onPressedChange={setPressedControls}
               />
               <GreenTab />
+              <Antenna />
               <RiceCard>
                 <ScreenContent
                   rices={rices}
@@ -184,6 +232,7 @@ export function PickARice() {
                   navRequest={riceNavRequest}
                   pressedControls={pressedControls}
                   onScrollOffsetChange={syncRiceScroll}
+                  onRiceStepStart={playMoveForTarget}
                 />
                 <PreviewContent
                   themeName="themename"
@@ -191,11 +240,13 @@ export function PickARice() {
                   installSupported={selectedRice?.install_supported ?? true}
                   onApply={applyFocusedRice}
                 />
+                <ClosingCircles active={view === 'downloading'} />
               </RiceCard>
               <ClosePin />
               <SoundButton />
               <ThemeKnob />
               <ScrollWheel />
+              <PreviewStars active={view === 'preview'} />
             </div>
           </ScrollProvider>
         </PreviewOptionProvider>

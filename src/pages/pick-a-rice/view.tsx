@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react';
 
-export type View = 'picking' | 'preview';
+export type View = 'picking' | 'preview' | 'downloading';
 export const PREVIEW_OPTIONS = ['leave', 'install', 'dots'] as const;
 export type PreviewOption = (typeof PREVIEW_OPTIONS)[number];
 
@@ -107,6 +107,7 @@ export const POSITIONS = {
     scrollWheel: { left: 466, top: 374 },
   },
   preview: SHRUNKEN,
+  downloading: SHRUNKEN,
 } as const;
 
 export const MORPH_TRANSITION = { duration: 0.3, ease: [0.4, 0.0, 0.2, 1] as const } as const;

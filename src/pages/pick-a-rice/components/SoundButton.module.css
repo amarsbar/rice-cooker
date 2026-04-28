@@ -1,7 +1,77 @@
 .button {
+  --sound-body: var(--c-sound-on-body);
+  --sound-icon: var(--c-sound-on-icon);
+
   position: absolute;
   z-index: 3;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.button:focus {
+  outline: none;
+}
+
+.off {
+  --sound-body: var(--c-sound-off-body);
+  --sound-icon: var(--c-sound-off-icon);
+}
+
+.ring {
+  position: absolute;
+  inset: 0;
+  width: 42px;
+  height: 42px;
+  color: var(--sound-body);
+  overflow: visible;
+  transition: color 55ms ease-out;
+}
+
+.ring circle {
+  stroke: currentColor;
+}
+
+.disc {
+  position: absolute;
+  left: 2.31px;
+  top: 2.31px;
+  width: 37.377px;
+  height: 37.377px;
+  border-radius: 158.333px;
+  background: var(--sound-body);
+  transition:
+    background-color 55ms ease-out,
+    box-shadow 45ms ease-out;
+}
+
+.pressed .disc {
+  box-shadow: inset 0 0 7px 0 rgba(0, 0, 0, 0.9);
+}
+
+.glyph {
+  position: absolute;
+  inset: 1px;
   width: 40px;
   height: 40px;
   pointer-events: none;
+}
+
+.glyph :global(.fillSoundBody) {
+  fill: transparent;
+}
+
+.glyph :global(.strokeSoundBody) {
+  stroke: transparent;
+}
+
+.glyph :global(.fillSoundIcon) {
+  fill: var(--sound-icon);
+  transition: fill 55ms ease-out;
 }
