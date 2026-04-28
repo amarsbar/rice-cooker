@@ -80,17 +80,6 @@
     color var(--theme-color-transition);
 }
 
-.applyLetterHide {
-  animation: bubbleHide 1ms steps(1, end) forwards;
-  animation-delay: calc(var(--bubble-index) * 60ms);
-}
-
-@keyframes bubbleHide {
-  to {
-    visibility: hidden;
-  }
-}
-
 .divider {
   position: absolute;
   left: 20px;

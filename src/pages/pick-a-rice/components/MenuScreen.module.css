@@ -24,12 +24,18 @@
   font-size: 12px;
   letter-spacing: -0.24px;
   line-height: 1;
+  animation:
+    leftFloatIn 400ms cubic-bezier(0.16, 0.885, 0.25, 1.14) both,
+    guideFadeIn 100ms linear both;
 }
 
 .logoImage {
   position: absolute;
   display: block;
   max-width: none;
+  animation:
+    leftFloatIn 400ms cubic-bezier(0.16, 0.885, 0.25, 1.14) both,
+    guideFadeIn 100ms linear both;
 }
 
 .logoRice {
@@ -149,27 +155,27 @@
 }
 
 .letterRevertHolding:nth-child(1) {
-  animation-delay: 1s;
+  animation-delay: 160ms;
 }
 
 .letterRevertHolding:nth-child(2) {
-  animation-delay: 2s;
+  animation-delay: 320ms;
 }
 
 .letterRevertHolding:nth-child(3) {
-  animation-delay: 3s;
+  animation-delay: 480ms;
 }
 
 .letterRevertHolding:nth-child(4) {
-  animation-delay: 4s;
+  animation-delay: 640ms;
 }
 
 .letterRevertHolding:nth-child(5) {
-  animation-delay: 5s;
+  animation-delay: 800ms;
 }
 
 .letterRevertHolding:nth-child(6) {
-  animation-delay: 6s;
+  animation-delay: 960ms;
 }
 
 @keyframes revertHoldPink {
@@ -194,6 +200,9 @@
     height 400ms ease,
     background-color 180ms ease,
     border-color 180ms ease;
+  animation:
+    leftFloatIn 400ms cubic-bezier(0.16, 0.885, 0.25, 1.14) both,
+    guideFadeIn 100ms linear both;
 }
 
 .rowExpanded {
@@ -346,6 +355,16 @@
   }
 }
 
+@keyframes leftFloatIn {
+  from {
+    transform: translateX(-10px);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
 @keyframes guideFadeIn {
   from {
     opacity: 0;
@@ -354,22 +373,6 @@
   to {
     opacity: 1;
   }
-}
-
-.guideLabel {
-  position: absolute;
-  margin: 0;
-  color: #fade26;
-  font-size: 14px;
-  letter-spacing: -0.28px;
-  line-height: normal;
-  text-align: center;
-  transform: translateX(-50%);
-}
-
-.confirmLabel {
-  left: 455.5px;
-  top: 11px;
 }
 
 .keyHint {
@@ -403,6 +406,50 @@
   top: 216px;
   width: 57.147px;
   height: 50.975px;
+}
+
+.arrowKeySvg {
+  --key-fill: #1b161a;
+  --key-stroke: #7d6e64;
+  --key-symbol: #7d6e64;
+}
+
+.arrowKeySvg [id='Bottom'] {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  transition: transform 120ms ease-out;
+}
+
+.arrowKeySvg [id='Top'] {
+  transform: translate(-0.41px, 0);
+  transition: transform 120ms ease-out;
+}
+
+.arrowKeySvg [id='Face'],
+.arrowKeySvg [id='Arrow'] {
+  transition:
+    fill 120ms ease-out,
+    stroke 120ms ease-out,
+    transform 120ms ease-out;
+}
+
+.arrowKeyDownSvg [id='Arrow'] {
+  transform: rotate(180deg);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.keyPressed.arrowKeySvg {
+  --key-stroke: #e8ff76;
+  --key-symbol: #e8ff76;
+}
+
+.keyPressed.arrowKeySvg [id='Bottom'] {
+  transform: scaleY(0.863);
+}
+
+.keyPressed.arrowKeySvg [id='Top'] {
+  transform: translate(-0.41px, 10.54px);
 }
 
 .wheel {
@@ -447,6 +494,12 @@
   top: 0;
   width: 96.776px;
   height: 110.03px;
+  --fill-0: #1b161a;
+  --stroke-0: #7d6e64;
+}
+
+.enterOuter path {
+  transition: stroke 120ms ease-out;
 }
 
 .enterInner {
@@ -454,6 +507,11 @@
   top: 0.61px;
   width: 87.704px;
   height: 89.132px;
+  --fill-0: #1b161a;
+  --stroke-0: #7d6e64;
+  transition:
+    transform 120ms ease-out,
+    stroke 120ms ease-out;
 }
 
 .enterSymbol {
@@ -461,6 +519,24 @@
   top: 59.995px;
   width: 16px;
   height: 16px;
+  --enter-symbol: #7d6e64;
+  transition:
+    transform 120ms ease-out,
+    fill 120ms ease-out;
+}
+
+.keyPressed .enterOuter {
+  --stroke-0: #e8ff76;
+}
+
+.keyPressed .enterInner {
+  --stroke-0: #e8ff76;
+  transform: translateY(16.39px);
+}
+
+.keyPressed .enterSymbol {
+  --enter-symbol: #e8ff76;
+  transform: translateY(16.41px);
 }
 
 .lineH1 {

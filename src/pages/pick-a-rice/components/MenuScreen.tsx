@@ -5,15 +5,13 @@ import logoCooker from '@/assets/menu/logo-cooker.svg';
 import backActive from '@/assets/menu/back-active.svg';
 import backIdle from '@/assets/menu/back-idle.svg';
 import externalIcon from '@/assets/menu/external.svg';
-import keyUp from '@/assets/menu/key-up.svg';
-import keyDown from '@/assets/menu/key-down.svg';
+import KeyUp from '@/assets/menu/key-up.svg?react';
 import wheel from '@/assets/menu/wheel.svg';
 import prevMouse from '@/assets/menu/prev-mouse.svg';
 import smallKeyLine from '@/assets/menu/small-key-line.svg';
 import smallKeyBody from '@/assets/menu/small-key-body.svg';
-import enterOuter from '@/assets/menu/enter-outer.svg';
-import enterInner from '@/assets/menu/enter-inner.svg';
-import enterSymbol from '@/assets/menu/enter-symbol.svg';
+import EnterInner from '@/assets/menu/enter-inner.svg?react';
+import EnterSymbol from '@/assets/menu/enter-symbol.svg?react';
 import lineH from '@/assets/menu/line-h.svg';
 import linePrevTop from '@/assets/menu/line-prev-top.svg';
 import lineSmallKey from '@/assets/menu/line-small-key.svg';
@@ -32,7 +30,7 @@ import SocialGithub from '@/assets/menu/social-github.svg?react';
 import SocialInstagram from '@/assets/menu/social-instagram.svg?react';
 import { playRiceSound } from '../sounds';
 import { MENU_ITEMS, type MenuItem } from '../menuOptions';
-import { keyToControl } from './PhysicalControls';
+import { keyToControl, type PhysicalControl } from './PhysicalControls';
 const creditUrls = [
   'https://www.butterfly.so/',
   'https://x.com/bflycomputer',
@@ -41,14 +39,21 @@ const creditUrls = [
 ] as const;
 const creditItemCount = creditUrls.length;
 const BACK_TEXT = 'BACK';
+const REVERT_TEXT = 'REVERT';
 const BUBBLE_STAGGER_MS = 60;
 const BACK_HIDE_MS = BACK_TEXT.length * BUBBLE_STAGGER_MS;
+const REVERT_HOLD_STEP_MS = 160;
+const REVERT_HOLD_MS = (REVERT_TEXT.length + 1) * REVERT_HOLD_STEP_MS;
+const ENTER_BOTTOM_IDLE =
+  'M8.27051 1H44.5625C48.5778 1 51.833 4.25516 51.833 8.27051V35.002C51.833 40.1218 55.9837 44.2724 61.1035 44.2725H88.5059C92.5211 44.2725 95.7762 47.5277 95.7764 51.543V101.76C95.7764 105.775 92.5212 109.03 88.5059 109.03H8.27051C4.25516 109.03 1 105.775 1 101.76V8.27051C1 4.25516 4.25516 1 8.27051 1Z';
+const ENTER_BOTTOM_PRESSED =
+  'M12 14H40.833C46.9081 14 51.833 18.9249 51.833 25V51.002C51.833 56.1218 55.9837 60.2724 61.1035 60.2725H84.7764C90.8513 60.2725 95.7762 65.1975 95.7764 71.2725V98.0303C95.7764 104.105 90.8515 109.03 84.7764 109.03H12C5.92487 109.03 1 104.105 1 98.0303V25C1 18.9249 5.92487 14 12 14Z';
 
 const rows = {
   revert: {
     title: 'Revert',
     description: 'will take you back to your original rice.',
-    letters: 'REVERT',
+    letters: REVERT_TEXT,
   },
   submit: {
     title: 'Submit a rice',
@@ -207,26 +212,60 @@ function CreditLinks({
   );
 }
 
-function Guide() {
+function ArrowKey({
+  className,
+  down,
+  pressed,
+}: {
+  className: string;
+  down?: boolean;
+  pressed: boolean;
+}) {
+  return (
+    <KeyUp
+      aria-hidden="true"
+      className={cx(styles.asset, styles.arrowKeySvg, className, down && styles.arrowKeyDownSvg, pressed && styles.keyPressed)}
+    />
+  );
+}
+
+function EnterKey({ pressed }: { pressed: boolean }) {
+  return (
+    <span className={cx(styles.enterKey, pressed && styles.keyPressed)}>
+      <svg
+        aria-hidden="true"
+        className={cx(styles.asset, styles.enterOuter)}
+        viewBox="0 0 96.7763 110.03"
+        fill="none"
+        preserveAspectRatio="none"
+      >
+        <path
+          d={pressed ? ENTER_BOTTOM_PRESSED : ENTER_BOTTOM_IDLE}
+          fill="var(--fill-0, #1B161A)"
+          stroke="var(--stroke-0, #7D6E64)"
+          strokeWidth="2"
+        />
+      </svg>
+      <EnterInner aria-hidden="true" className={cx(styles.asset, styles.enterInner)} />
+      <EnterSymbol aria-hidden="true" className={cx(styles.asset, styles.enterSymbol)} />
+    </span>
+  );
+}
+
+function Guide({ pressedControl }: { pressedControl: PhysicalControl | null }) {
   return (
     <>
-      <p className={cx(styles.guideLabel, styles.confirmLabel)}>CONFIRM</p>
-
       <div className={styles.guideAssets}>
         <p className={styles.keyHint}>use your keys!</p>
-        <img src={keyUp} alt="" className={cx(styles.asset, styles.keyUp)} />
-        <img src={keyDown} alt="" className={cx(styles.asset, styles.keyDown)} />
+        <ArrowKey className={styles.keyUp} pressed={pressedControl === 'up'} />
+        <ArrowKey className={styles.keyDown} down pressed={pressedControl === 'down'} />
 
         <img src={wheel} alt="" className={cx(styles.asset, styles.wheel)} />
         <img src={prevMouse} alt="" className={cx(styles.asset, styles.prevMouse)} />
         <img src={smallKeyLine} alt="" className={cx(styles.asset, styles.smallKeyLine)} />
         <img src={smallKeyBody} alt="" className={cx(styles.asset, styles.smallKeyBody)} />
 
-        <span className={styles.enterKey}>
-          <img src={enterOuter} alt="" className={cx(styles.asset, styles.enterOuter)} />
-          <img src={enterInner} alt="" className={cx(styles.asset, styles.enterInner)} />
-          <img src={enterSymbol} alt="" className={cx(styles.asset, styles.enterSymbol)} />
-        </span>
+        <EnterKey pressed={pressedControl === 'enter'} />
 
         <img src={lineH} alt="" className={cx(styles.asset, styles.lineH1)} />
         <img src={lineH} alt="" className={cx(styles.asset, styles.lineH2)} />
@@ -263,9 +302,11 @@ export function MenuScreen({
 }) {
   const [creditIndex, setCreditIndex] = useState(0);
   const [revertHolding, setRevertHolding] = useState(false);
+  const [pressedControl, setPressedControl] = useState<PhysicalControl | null>(null);
   const [backLeaving, setBackLeaving] = useState(false);
   const previousActiveRef = useRef(active);
   const backLeavingTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const revertHoldingTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const backActiveState = active === 'back';
   const backVisualActive = backActiveState || backLeaving;
   const top = {
@@ -299,6 +340,7 @@ export function MenuScreen({
 
   useEffect(() => () => {
     if (backLeavingTimeoutRef.current !== null) window.clearTimeout(backLeavingTimeoutRef.current);
+    if (revertHoldingTimeoutRef.current !== null) window.clearTimeout(revertHoldingTimeoutRef.current);
   }, []);
 
   useEffect(() => {
@@ -313,6 +355,7 @@ export function MenuScreen({
     const onKeyDown = (event: KeyboardEvent) => {
       const control = keyToControl(event.key);
       const direction = control === 'up' ? -1 : control === 'down' ? 1 : 0;
+      if (control) setPressedControl(control);
 
       if (control === 'enter' && active === 'back') {
         event.preventDefault();
@@ -322,7 +365,14 @@ export function MenuScreen({
 
       if (control === 'enter' && active === 'revert') {
         event.preventDefault();
-        if (!event.repeat) setRevertHolding(true);
+        if (!event.repeat) {
+          setRevertHolding(true);
+          if (revertHoldingTimeoutRef.current !== null) window.clearTimeout(revertHoldingTimeoutRef.current);
+          revertHoldingTimeoutRef.current = window.setTimeout(() => {
+            setRevertHolding(false);
+            revertHoldingTimeoutRef.current = null;
+          }, REVERT_HOLD_MS);
+        }
         return;
       }
 
@@ -356,10 +406,26 @@ export function MenuScreen({
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
-      if (event.key === 'Enter') setRevertHolding(false);
+      const control = keyToControl(event.key);
+      if (!control) return;
+      setPressedControl((current) => (current === control ? null : current));
+      if (control === 'enter') {
+        if (revertHoldingTimeoutRef.current !== null) {
+          window.clearTimeout(revertHoldingTimeoutRef.current);
+          revertHoldingTimeoutRef.current = null;
+        }
+        setRevertHolding(false);
+      }
     };
 
-    const onBlur = () => setRevertHolding(false);
+    const onBlur = () => {
+      setPressedControl(null);
+      if (revertHoldingTimeoutRef.current !== null) {
+        window.clearTimeout(revertHoldingTimeoutRef.current);
+        revertHoldingTimeoutRef.current = null;
+      }
+      setRevertHolding(false);
+    };
 
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
@@ -372,7 +438,13 @@ export function MenuScreen({
   }, [active, backLeaving, creditIndex, onActiveChange, onBack]);
 
   useEffect(() => {
-    if (active !== 'revert') setRevertHolding(false);
+    if (active !== 'revert') {
+      if (revertHoldingTimeoutRef.current !== null) {
+        window.clearTimeout(revertHoldingTimeoutRef.current);
+        revertHoldingTimeoutRef.current = null;
+      }
+      setRevertHolding(false);
+    }
   }, [active]);
 
   return (
@@ -414,7 +486,7 @@ export function MenuScreen({
         onCreditHover={setCreditIndex}
       />
 
-      <Guide />
+      <Guide pressedControl={pressedControl} />
     </div>
   );
 }

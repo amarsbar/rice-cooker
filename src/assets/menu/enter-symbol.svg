@@ -3,14 +3,14 @@
 <mask id="mask0_0_44" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="15" height="15">
 <g id="Group">
 <g id="Group_2">
-<path id="Vector" d="M6.83333 6.83333V0.833333H13.5V13.5H0.833333V6.83333H6.83333Z" fill="var(--fill-0, white)" stroke="var(--stroke-0, white)" stroke-width="1.66667" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector" d="M6.83333 6.83333V0.833333H13.5V13.5H0.833333V6.83333H6.83333Z" fill="white" stroke="white" stroke-width="1.66667" stroke-linecap="round" stroke-linejoin="round"/>
 <path id="Vector_2" d="M10.1667 3.50052V10.1672H3.49999" stroke="var(--stroke-0, black)" stroke-width="1.66667" stroke-linecap="round" stroke-linejoin="round"/>
 <path id="Vector_3" d="M4.83338 8.83333L3.50005 10.1667L4.83338 11.5" stroke="var(--stroke-0, black)" stroke-width="1.66667" stroke-linecap="round" stroke-linejoin="round"/>
 </g>
 </g>
 </mask>
 <g mask="url(#mask0_0_44)">
-<path id="Vector_4" d="M-0.833258 -0.834077H15.8334V15.1659H-0.833258V-0.834077Z" fill="var(--fill-0, #7D6E64)"/>
+<path id="Vector_4" d="M-0.833258 -0.834077H15.8334V15.1659H-0.833258V-0.834077Z" fill="var(--enter-symbol, #7D6E64)"/>
 </g>
 </g>
 </svg>

@@ -25,13 +25,13 @@ import { ClosingCircles } from './components/ClosingCircles';
 import { Antenna } from './components/Antenna';
 import { PreviewStars } from './components/PreviewStars';
 import { MenuScreen } from './components/MenuScreen';
-import { CardHeader } from './components/CardHeader';
 import { playRiceSound } from './sounds';
 import { MENU_ITEMS, type MenuItem } from './menuOptions';
 
 const clampRiceIndex = (index: number, count: number) => Math.max(0, Math.min(count - 1, index));
 type HoldDirection = -1 | 0 | 1;
 const DOWNLOAD_DURATION_MS = 1000;
+const MENU_FADE_MS = 100;
 const cyclePreviewOption = (option: PreviewOption, delta: -1 | 1) => {
   const index = PREVIEW_OPTIONS.indexOf(option);
   return PREVIEW_OPTIONS[(index + delta + PREVIEW_OPTIONS.length) % PREVIEW_OPTIONS.length];
@@ -49,9 +49,13 @@ export function PickARice() {
   const [pressedControls, setPressedControls] = useState<ReadonlySet<PhysicalControl>>(new Set());
   const backendRunningRef = useRef(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [pickerExiting, setPickerExiting] = useState(false);
+  const [pickerEntering, setPickerEntering] = useState(false);
+  const [menuExiting, setMenuExiting] = useState(false);
   const [menuItem, setMenuItem] = useState<MenuItem>(MENU_ITEMS[0]);
   const requestedRiceIndexRef = useRef(0);
   const lastRiceSoundTargetRef = useRef(0);
+  const menuTransitionTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const [cycleIdx, setCycleIdx] = useState(0);
   const theme = THEME_CYCLE[cycleIdx];
   const advance = useCallback(() => setCycleIdx((i) => (i + 1) % THEME_CYCLE.length), []);
@@ -67,6 +71,7 @@ export function PickARice() {
     }),
     [focusedRiceIndex, riceScrollOffset, rices.length],
   );
+  const pickerTransitioning = pickerExiting || pickerEntering;
 
   useEffect(() => {
     let cancelled = false;
@@ -120,7 +125,7 @@ export function PickARice() {
   }, [playMoveForTarget]);
 
   const focusPreviousRice = useCallback(() => {
-    if (menuOpen) return;
+    if (menuOpen || pickerTransitioning) return;
     if (view === 'preview') {
       playRiceSound('moveUp');
       setPreviewOption((option) => cyclePreviewOption(option, -1));
@@ -128,10 +133,10 @@ export function PickARice() {
     }
     if (view === 'downloading') return;
     requestFocusedRice(requestedRiceIndexRef.current - 1);
-  }, [menuOpen, requestFocusedRice, view]);
+  }, [menuOpen, pickerTransitioning, requestFocusedRice, view]);
 
   const focusNextRice = useCallback(() => {
-    if (menuOpen) return;
+    if (menuOpen || pickerTransitioning) return;
     if (view === 'preview') {
       playRiceSound('moveDown');
       setPreviewOption((option) => cyclePreviewOption(option, 1));
@@ -139,7 +144,7 @@ export function PickARice() {
     }
     if (view === 'downloading') return;
     requestFocusedRice(requestedRiceIndexRef.current + 1);
-  }, [menuOpen, requestFocusedRice, view]);
+  }, [menuOpen, pickerTransitioning, requestFocusedRice, view]);
 
   const syncRiceScroll = useCallback((offset: number) => {
     const index = clampRiceIndex(Math.round(offset / RICE_ITEM_PITCH), rices.length);
@@ -149,9 +154,9 @@ export function PickARice() {
   }, [rices.length]);
 
   const startRiceHold = useCallback((direction: -1 | 1) => {
-    if (menuOpen) return;
+    if (menuOpen || pickerTransitioning) return;
     if (view === 'picking') setRiceHoldDirection(direction);
-  }, [menuOpen, view]);
+  }, [menuOpen, pickerTransitioning, view]);
 
   const stopRiceHold = useCallback(() => setRiceHoldDirection(0), []);
 
@@ -159,19 +164,49 @@ export function PickARice() {
     if (view !== 'picking') setRiceHoldDirection(0);
   }, [view]);
 
+  const closeMenu = useCallback(() => {
+    if (!menuOpen || menuExiting) return;
+    if (menuTransitionTimeoutRef.current !== null) window.clearTimeout(menuTransitionTimeoutRef.current);
+    setMenuExiting(true);
+    menuTransitionTimeoutRef.current = window.setTimeout(() => {
+      setMenuOpen(false);
+      setMenuExiting(false);
+      setPickerEntering(true);
+      menuTransitionTimeoutRef.current = null;
+    }, MENU_FADE_MS);
+  }, [menuExiting, menuOpen]);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
-      setMenuOpen((open) => {
-        const nextOpen = !open;
-        if (nextOpen) setMenuItem(MENU_ITEMS[0]);
-        return nextOpen;
-      });
+      if (menuOpen) {
+        closeMenu();
+        return;
+      }
+      if (pickerTransitioning) return;
+      setMenuItem(MENU_ITEMS[0]);
+      setPickerExiting(true);
+      if (menuTransitionTimeoutRef.current !== null) window.clearTimeout(menuTransitionTimeoutRef.current);
+      menuTransitionTimeoutRef.current = window.setTimeout(() => {
+        setMenuOpen(true);
+        setPickerExiting(false);
+        menuTransitionTimeoutRef.current = null;
+      }, MENU_FADE_MS);
     };
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
+  }, [closeMenu, menuOpen, pickerTransitioning]);
+
+  useEffect(() => {
+    if (!pickerEntering || menuOpen) return;
+    const frameId = window.requestAnimationFrame(() => setPickerEntering(false));
+    return () => window.cancelAnimationFrame(frameId);
+  }, [menuOpen, pickerEntering]);
+
+  useEffect(() => () => {
+    if (menuTransitionTimeoutRef.current !== null) window.clearTimeout(menuTransitionTimeoutRef.current);
   }, []);
 
   useEffect(() => {
@@ -192,7 +227,7 @@ export function PickARice() {
   }, []);
 
   const applyFocusedRice = useCallback(() => {
-    if (menuOpen) return;
+    if (menuOpen || pickerTransitioning) return;
     const { backendRunning, previewOption, selectedRice, view } = latestApplyStateRef.current;
     if (backendRunning || !selectedRice) return;
 
@@ -221,10 +256,10 @@ export function PickARice() {
         window.open(selectedRice.repo, '_blank', 'noopener,noreferrer');
       }
     }
-  }, [menuOpen, runBackend, startDownload]);
+  }, [menuOpen, pickerTransitioning, runBackend, startDownload]);
 
   const cycleOnBareStage = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (menuOpen) return;
+    if (menuOpen || pickerTransitioning) return;
     if (e.target !== e.currentTarget) return;
     applyFocusedRice();
   };
@@ -252,23 +287,15 @@ export function PickARice() {
               <Antenna />
               <RiceCard menuOpen={menuOpen}>
                 {menuOpen ? (
-                  <>
+                  <div className={`${styles.menuContent} ${menuExiting ? styles.menuContentExiting : ''}`}>
                     <MenuScreen
                       active={menuItem}
                       onActiveChange={setMenuItem}
-                      onBack={() => setMenuOpen(false)}
+                      onBack={closeMenu}
                     />
-                    <div className={styles.menuNavOverlay}>
-                      <CardHeader
-                        pressedControls={pressedControls}
-                        menuOpen
-                        navOnly
-                        applyAnimation="hide"
-                      />
-                    </div>
-                  </>
+                  </div>
                 ) : (
-                  <>
+                  <div className={`${styles.pickerContent} ${pickerTransitioning ? styles.pickerContentHidden : ''}`}>
                     <ScreenContent
                       rices={rices}
                       holdDirection={riceHoldDirection}
@@ -284,7 +311,7 @@ export function PickARice() {
                       onApply={applyFocusedRice}
                     />
                     <ClosingCircles active={view === 'downloading'} />
-                  </>
+                  </div>
                 )}
               </RiceCard>
               <ClosePin />

@@ -6,9 +6,22 @@
   margin: 0 auto;
 }
 
-.menuNavOverlay {
-  position: absolute;
-  inset: 0;
-  z-index: 90;
+.pickerContent {
+  opacity: 1;
+  transition: opacity 100ms linear;
+}
+
+.pickerContentHidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.menuContent {
+  opacity: 1;
+  transition: opacity 100ms linear;
+}
+
+.menuContentExiting {
+  opacity: 0;
   pointer-events: none;
 }
