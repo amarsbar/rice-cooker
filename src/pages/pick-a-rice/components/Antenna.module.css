@@ -6,9 +6,40 @@
   pointer-events: none;
 }
 
+.dots {
+  position: absolute;
+  left: 9px;
+  top: 0;
+  z-index: 0;
+  width: 0;
+  height: 0;
+}
+
+.dots span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-yellow);
+  opacity: 0;
+  transform: translate(-50%, -29px) scale(0.5);
+  animation: antenna-dot 1.2s linear 0.77s infinite;
+}
+
+.dots span:nth-child(2) {
+  animation-delay: 1.17s;
+}
+
+.dots span:nth-child(3) {
+  animation-delay: 1.57s;
+}
+
 .base,
 .stem {
   position: absolute;
+  z-index: 1;
   display: block;
   background: var(--c-antenna);
   transition: background-color var(--theme-color-transition);
@@ -30,4 +61,26 @@
   height: 116px;
   border-radius: 4px 4px 0 0;
   transform-origin: bottom center;
+}
+
+@keyframes antenna-dot {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -29px) scale(0.5);
+  }
+
+  53.333% {
+    opacity: 1;
+    transform: translate(-50%, -13px) scale(1);
+  }
+
+  99.999% {
+    opacity: 1;
+    transform: translate(-50%, 1px) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 1px) scale(1);
+  }
 }

@@ -41,6 +41,10 @@ const STARS: readonly StarSpec[] = [
   { left: 19, top: 273, size: 7 },
   { left: 67, top: 369, size: 10 },
   { left: 582, top: 200, size: 15 },
+  { left: 170, top: 142, size: 7 },
+  { left: 425.07, top: 166.5, size: 7 },
+  { left: 111, top: 248, size: 7 },
+  { left: 356.06, top: 300.1, size: 7 },
 ];
 
 export function PreviewStars({ active }: PreviewStarsProps) {
@@ -122,7 +126,7 @@ export function PreviewStars({ active }: PreviewStarsProps) {
   );
 }
 
-function StarSvg() {
+export function StarSvg() {
   return (
     <svg viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path

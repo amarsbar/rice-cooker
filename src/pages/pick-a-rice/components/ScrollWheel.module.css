@@ -193,6 +193,20 @@
   height: 75px;
 }
 
+.previewGraphic_ready {
+  left: calc(50% + 0.09px);
+  top: calc(50% + 0.09px);
+  width: 107px;
+  height: 76px;
+}
+
+.previewGraphic_lookingGood {
+  left: calc(50% + 0.42px);
+  top: calc(50% - 0.13px);
+  width: 121px;
+  height: 77px;
+}
+
 .bootGraphic {
   position: absolute;
   left: 50%;

@@ -16,6 +16,8 @@ import { GreenTab } from './components/GreenTab';
 import { RiceCard } from './components/RiceCard';
 import { ScreenContent } from './components/ScreenContent';
 import { PreviewContent } from './components/PreviewContent';
+import { PreviewInstallIntro, PREVIEW_INSTALL_INTRO_MS } from './components/PreviewInstallIntro';
+import { InstallSuccessOverlay, INSTALL_SUCCESS_MS } from './components/InstallSuccessOverlay';
 import { ClosePin } from './components/ClosePin';
 import { SoundButton } from './components/SoundButton';
 import { ThemeKnob } from './components/ThemeKnob';
@@ -60,6 +62,10 @@ export function PickARice() {
   const downloadActiveRef = useRef(false);
   const downloadDoneViewRef = useRef<View>('preview');
   const launchFallbackRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const installIntroTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const installSuccessTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const [installIntroActive, setInstallIntroActive] = useState(false);
+  const [installSuccessActive, setInstallSuccessActive] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pickerExiting, setPickerExiting] = useState(false);
   const [pickerEntering, setPickerEntering] = useState(false);
@@ -169,7 +175,10 @@ export function PickARice() {
     downloadActiveRef.current = false;
     setDownloadsComplete(complete);
     setPreviewOption('install');
-    setView(downloadDoneViewRef.current);
+    const doneView = downloadDoneViewRef.current;
+    setInstallIntroActive(complete && doneView === 'preview');
+    setInstallSuccessActive(complete && doneView === 'picking');
+    setView(doneView);
   }, []);
 
   const runBackend = useCallback(async (request: BackendRunRequest, afterSuccess?: () => void) => {
@@ -240,6 +249,7 @@ export function PickARice() {
       return;
     }
     if (menuOpen || pickerTransitioning) return;
+    if (installIntroActive || installSuccessActive) return;
     if (view === 'preview') {
       playRiceSound('moveUp');
       setPreviewOption((option) => cyclePreviewOption(option, -1));
@@ -247,7 +257,7 @@ export function PickARice() {
     }
     if (view === 'downloading') return;
     requestFocusedRice(requestedRiceIndexRef.current - 1);
-  }, [bootOpen, menuOpen, moveBootItem, pickerTransitioning, requestFocusedRice, view]);
+  }, [bootOpen, installIntroActive, installSuccessActive, menuOpen, moveBootItem, pickerTransitioning, requestFocusedRice, view]);
 
   const focusNextRice = useCallback(() => {
     if (bootOpen) {
@@ -255,6 +265,7 @@ export function PickARice() {
       return;
     }
     if (menuOpen || pickerTransitioning) return;
+    if (installIntroActive || installSuccessActive) return;
     if (view === 'preview') {
       playRiceSound('moveDown');
       setPreviewOption((option) => cyclePreviewOption(option, 1));
@@ -262,7 +273,7 @@ export function PickARice() {
     }
     if (view === 'downloading') return;
     requestFocusedRice(requestedRiceIndexRef.current + 1);
-  }, [bootOpen, menuOpen, moveBootItem, pickerTransitioning, requestFocusedRice, view]);
+  }, [bootOpen, installIntroActive, installSuccessActive, menuOpen, moveBootItem, pickerTransitioning, requestFocusedRice, view]);
 
   const syncRiceScroll = useCallback((offset: number) => {
     const index = clampRiceIndex(Math.round(offset / RICE_ITEM_PITCH), rices.length);
@@ -274,8 +285,9 @@ export function PickARice() {
   const startRiceHold = useCallback((direction: -1 | 1) => {
     if (bootOpen) return;
     if (menuOpen || pickerTransitioning) return;
+    if (installSuccessActive) return;
     if (view === 'picking') setRiceHoldDirection(direction);
-  }, [bootOpen, menuOpen, pickerTransitioning, view]);
+  }, [bootOpen, installSuccessActive, menuOpen, pickerTransitioning, view]);
 
   const stopRiceHold = useCallback(() => setRiceHoldDirection(0), []);
 
@@ -306,6 +318,7 @@ export function PickARice() {
         return;
       }
       if (pickerTransitioning) return;
+      if (installSuccessActive) return;
       if (view !== 'picking') return;
       setMenuItem(MENU_ITEMS[0]);
       playRiceSound('enterMenu');
@@ -320,7 +333,7 @@ export function PickARice() {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [bootOpen, closeMenu, menuOpen, pickerTransitioning, view]);
+  }, [bootOpen, closeMenu, installSuccessActive, menuOpen, pickerTransitioning, view]);
 
   useEffect(() => {
     if (!pickerEntering || menuOpen) return;
@@ -331,8 +344,40 @@ export function PickARice() {
   useEffect(() => () => {
     if (menuTransitionTimeoutRef.current !== null) window.clearTimeout(menuTransitionTimeoutRef.current);
     if (launchFallbackRef.current !== null) window.clearTimeout(launchFallbackRef.current);
+    if (installIntroTimeoutRef.current !== null) window.clearTimeout(installIntroTimeoutRef.current);
+    if (installSuccessTimeoutRef.current !== null) window.clearTimeout(installSuccessTimeoutRef.current);
     bootEnterHoldTimeoutRefs.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
   }, []);
+
+  useEffect(() => {
+    if (!installIntroActive) return;
+    installIntroTimeoutRef.current = window.setTimeout(() => {
+      installIntroTimeoutRef.current = null;
+      setInstallIntroActive(false);
+    }, PREVIEW_INSTALL_INTRO_MS);
+
+    return () => {
+      if (installIntroTimeoutRef.current !== null) {
+        window.clearTimeout(installIntroTimeoutRef.current);
+        installIntroTimeoutRef.current = null;
+      }
+    };
+  }, [installIntroActive]);
+
+  useEffect(() => {
+    if (!installSuccessActive) return;
+    installSuccessTimeoutRef.current = window.setTimeout(() => {
+      installSuccessTimeoutRef.current = null;
+      setInstallSuccessActive(false);
+    }, INSTALL_SUCCESS_MS);
+
+    return () => {
+      if (installSuccessTimeoutRef.current !== null) {
+        window.clearTimeout(installSuccessTimeoutRef.current);
+        installSuccessTimeoutRef.current = null;
+      }
+    };
+  }, [installSuccessActive]);
 
   useEffect(() => {
     if (bootOpen && bootItem === 'enter' && pressedControls.has('enter')) {
@@ -347,6 +392,8 @@ export function PickARice() {
     playRiceSound('applyRice');
     downloadActiveRef.current = true;
     downloadDoneViewRef.current = doneView;
+    setInstallIntroActive(false);
+    setInstallSuccessActive(false);
     setDownloadsComplete(false);
     setPreviewOption('install');
     setView('downloading');
@@ -358,6 +405,7 @@ export function PickARice() {
       return;
     }
     if (menuOpen || pickerTransitioning) return;
+    if (installIntroActive || installSuccessActive) return;
     const { backendRunning, previewOption, selectedRice, view } = latestApplyStateRef.current;
     if (backendRunning || !selectedRice) return;
 
@@ -387,11 +435,12 @@ export function PickARice() {
         window.open(selectedRice.repo, '_blank', 'noopener,noreferrer');
       }
     }
-  }, [applyBootItem, bootOpen, menuOpen, pickerTransitioning, runBackend, startDownload]);
+  }, [applyBootItem, bootOpen, installIntroActive, installSuccessActive, menuOpen, pickerTransitioning, runBackend, startDownload]);
 
   const cycleOnBareStage = (e: React.MouseEvent<HTMLDivElement>) => {
     if (bootOpen) return;
     if (menuOpen || pickerTransitioning) return;
+    if (installIntroActive || installSuccessActive) return;
     if (e.target !== e.currentTarget) return;
     applyFocusedRice();
   };
@@ -435,29 +484,45 @@ export function PickARice() {
                     />
                   </div>
                 ) : (
-                  <div className={`${styles.pickerContent} ${pickerTransitioning ? styles.pickerContentHidden : ''}`}>
-                    <ScreenContent
-                      rices={rices}
-                      holdDirection={riceHoldDirection}
-                      navRequest={riceNavRequest}
-                      pressedControls={pressedControls}
-                      onScrollOffsetChange={syncRiceScroll}
-                      onRiceStepStart={playMoveForTarget}
-                    />
-                    <PreviewContent
-                      themeName={selectedRice?.display_name ?? 'themename'}
-                      creatorName={selectedRice?.creator_name ?? 'creatorname'}
-                      installSupported={selectedRice?.install_supported ?? true}
-                      onApply={applyFocusedRice}
-                    />
-                    <ClosingCircles active={view === 'downloading'} riceName={selectedRice?.name} />
-                  </div>
+                  <>
+                    <div
+                      className={`${styles.pickerContent} ${
+                        pickerTransitioning || installSuccessActive ? styles.pickerContentHidden : ''
+                      }`}
+                    >
+                      <ScreenContent
+                        rices={rices}
+                        holdDirection={riceHoldDirection}
+                        navRequest={riceNavRequest}
+                        pressedControls={pressedControls}
+                        onScrollOffsetChange={syncRiceScroll}
+                        onRiceStepStart={playMoveForTarget}
+                      />
+                      {installIntroActive ? (
+                        <PreviewInstallIntro />
+                      ) : (
+                        <PreviewContent
+                          themeName={selectedRice?.display_name ?? 'themename'}
+                          creatorName={selectedRice?.creator_name ?? 'creatorname'}
+                          installSupported={selectedRice?.install_supported ?? true}
+                          onApply={applyFocusedRice}
+                        />
+                      )}
+                      <ClosingCircles active={view === 'downloading'} riceName={selectedRice?.name} />
+                    </div>
+                    {installSuccessActive && <InstallSuccessOverlay />}
+                  </>
                 )}
               </RiceCard>
               <ClosePin />
               <SoundButton />
               <ThemeKnob />
-              <ScrollWheel menuItem={menuOpen ? menuItem : null} bootItem={bootOpen ? bootItem : null} />
+              <ScrollWheel
+                menuItem={menuOpen ? menuItem : null}
+                bootItem={bootOpen ? bootItem : null}
+                installIntroActive={installIntroActive}
+                installSuccessActive={installSuccessActive}
+              />
               <PreviewStars active={view === 'preview' && !menuOpen && !bootOpen} />
             </div>
           </ScrollProvider>
