@@ -131,8 +131,22 @@ function backendBin(): string {
   return 'rice-cooker-backend';
 }
 
+function backendBaseArgs(): string[] {
+  if (process.env['RICE_COOKER_CATALOG']) return [];
+
+  for (const candidate of [
+    join(process.cwd(), 'backend/catalog.toml'),
+    join(process.cwd(), 'catalog.toml'),
+    join(__dirname, '../../backend/catalog.toml'),
+    join(__dirname, '../catalog.toml'),
+  ]) {
+    if (existsSync(candidate)) return ['--catalog', candidate];
+  }
+  return [];
+}
+
 async function backendList(): Promise<RiceListRow[]> {
-  const { stdout } = await execFileAsync(backendBin(), ['list'], {
+  const { stdout } = await execFileAsync(backendBin(), [...backendBaseArgs(), 'list'], {
     maxBuffer: 1024 * 1024,
   });
   return JSON.parse(stdout) as RiceListRow[];
@@ -157,13 +171,14 @@ function pushRawTail(rawTail: string[], line: string): void {
 }
 
 function backendArgs(request: BackendRunRequest): string[] {
+  const baseArgs = backendBaseArgs();
   switch (request.command) {
     case 'uninstall':
-      return ['uninstall'];
+      return [...baseArgs, 'uninstall'];
     case 'install':
     case 'preview':
       if (!request.name) throw new Error(`${request.command} requires a rice name`);
-      return [request.command, request.name];
+      return [...baseArgs, request.command, request.name];
     default:
       throw new Error(`unknown backend command: ${String((request as { command?: unknown }).command)}`);
   }

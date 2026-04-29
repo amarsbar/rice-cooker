@@ -5,7 +5,8 @@
   "main": "out/main/index.js",
   "type": "module",
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "npm run backend:build && electron-vite dev",
+    "backend:build": "cargo build --manifest-path backend/Cargo.toml",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
