@@ -94,7 +94,9 @@ pub fn validate_name(name: &str) -> Result<()> {
         || name == "."
         || name == ".."
         || name.starts_with('-')
-        || name.chars().any(|c| matches!(c, '/' | '\\' | '\0'));
+        || !name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'));
     ensure!(!bad, "invalid rice name {name:?}");
     Ok(())
 }
@@ -243,6 +245,26 @@ mod tests {
                 creator_name = "x"
                 repo = "https://x"
                 commit = "{bad}"
+                symlink_src = "."
+                symlink_dst = "~/.config/quickshell/x"
+                "#
+            );
+            assert!(Catalog::parse(&t).is_err(), "accepted {bad:?}");
+        }
+    }
+
+    #[test]
+    fn rejects_shell_sensitive_rice_names() {
+        for bad in [
+            "foo#bar", "foo$HOME", "foo;bar", "foo bar", "foo'bar", "foo`bar", "foo/bar",
+        ] {
+            let t = format!(
+                r#"
+                [{bad:?}]
+                display_name = "X"
+                creator_name = "x"
+                repo = "https://x"
+                commit = "0123456789abcdef0123456789abcdef01234567"
                 symlink_src = "."
                 symlink_dst = "~/.config/quickshell/x"
                 "#

@@ -22,6 +22,9 @@ pub fn preflight_hypr_autostart(paths: &Paths) -> Result<()> {
 }
 
 pub fn clear_hypr_autostart(paths: &Paths) -> Result<()> {
+    if !paths.hypr_rice_cooker_conf().exists() {
+        return Ok(());
+    }
     write_fragment(paths, None)
 }
 
@@ -173,11 +176,25 @@ mod tests {
     #[test]
     fn clear_writes_inert_fragment() {
         let (_t, paths) = tmp_paths();
+        fs::write(
+            paths.hypr_rice_cooker_conf(),
+            "exec-once = quickshell -c old\n",
+        )
+        .unwrap();
 
         clear_hypr_autostart(&paths).unwrap();
 
         let fragment = fs::read_to_string(paths.hypr_rice_cooker_conf()).unwrap();
         assert_eq!(fragment, "# Managed by Rice Cooker.\n# no active rice\n");
+    }
+
+    #[test]
+    fn clear_is_noop_without_fragment() {
+        let (_t, paths) = tmp_paths();
+
+        clear_hypr_autostart(&paths).unwrap();
+
+        assert!(!paths.hypr_rice_cooker_conf().exists());
     }
 
     #[test]

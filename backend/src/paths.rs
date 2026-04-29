@@ -23,7 +23,6 @@ pub struct Paths {
     pub home: PathBuf,
     pub cache_home: PathBuf,
     pub data_home: PathBuf,
-    pub config_home: PathBuf,
     xdg: Option<BaseDirectories>,
 }
 
@@ -42,26 +41,20 @@ impl Paths {
         let data_home = xdg.get_data_home().ok_or_else(|| {
             anyhow!("cannot resolve data home — set XDG_DATA_HOME or ensure HOME is absolute")
         })?;
-        let config_home = xdg.get_config_home().ok_or_else(|| {
-            anyhow!("cannot resolve config home — set XDG_CONFIG_HOME or ensure HOME is absolute")
-        })?;
         Ok(Self {
             home,
             cache_home,
             data_home,
-            config_home,
             xdg: Some(xdg),
         })
     }
 
     /// Test-only. `find_catalog` and `searched_catalog_paths` return empty.
     pub fn at_roots(home: PathBuf, cache_home: PathBuf, data_home: PathBuf) -> Self {
-        let config_home = home.join(".config");
         Self {
             home,
             cache_home,
             data_home,
-            config_home,
             xdg: None,
         }
     }
@@ -96,7 +89,7 @@ impl Paths {
     }
 
     pub fn hypr_config_dir(&self) -> PathBuf {
-        self.config_home.join("hypr")
+        user_config_home(&self.home).join("hypr")
     }
 
     pub fn hyprland_conf(&self) -> PathBuf {
@@ -158,6 +151,17 @@ impl Paths {
 
     pub fn clear_original(&self) -> Result<()> {
         remove_if_exists(&self.original_file())
+    }
+}
+
+fn user_config_home(home: &Path) -> PathBuf {
+    user_config_home_from(home, std::env::var_os("XDG_CONFIG_HOME"))
+}
+
+fn user_config_home_from(home: &Path, xdg_config_home: Option<std::ffi::OsString>) -> PathBuf {
+    match xdg_config_home {
+        Some(value) if !value.is_empty() => PathBuf::from(value),
+        _ => home.join(".config"),
     }
 }
 
@@ -263,6 +267,19 @@ mod tests {
         assert_eq!(expand_home("~", h), PathBuf::from("/h"));
         assert_eq!(expand_home("$HOME/y", h), PathBuf::from("/h/y"));
         assert_eq!(expand_home("/etc/hypr", h), PathBuf::from("/etc/hypr"));
+    }
+
+    #[test]
+    fn hypr_config_uses_unprefixed_user_config_home() {
+        let h = Path::new("/home/u");
+        assert_eq!(
+            user_config_home_from(h, None),
+            PathBuf::from("/home/u/.config")
+        );
+        assert_eq!(
+            user_config_home_from(h, Some("/tmp/cfg".into())),
+            PathBuf::from("/tmp/cfg")
+        );
     }
 
     #[test]
