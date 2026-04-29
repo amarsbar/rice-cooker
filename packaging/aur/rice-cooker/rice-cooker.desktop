@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Rice Cooker
+Comment=View, customize and share Hyprland rices
+Exec=rice-cooker %U
+Terminal=false
+Type=Application
+Categories=Utility;
+Keywords=rice;hyprland;quickshell;theme;desktop;
+StartupWMClass=rice-cooker

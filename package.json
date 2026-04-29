@@ -1,6 +1,6 @@
 {
   "name": "rice-cooker",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Open-source app for viewing, customizing and sharing Hyprland/Niri rices",
   "main": "out/main/index.js",
   "type": "module",

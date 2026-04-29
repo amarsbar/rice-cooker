@@ -1,0 +1,66 @@
+# Maintainer: amarsbar <ammarhossain10@gmail.com>
+pkgname=rice-cooker
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="View, customize and share Hyprland rices"
+arch=('x86_64')
+url="https://github.com/amarsbar/rice-cooker"
+license=('BSD-3-Clause')
+depends=('electron41' 'git' 'hyprland' 'polkit' 'quickshell')
+makedepends=('cargo' 'npm' 'rust')
+optdepends=(
+    'paru: preferred AUR helper for installing rice dependencies'
+    'yay: alternative AUR helper for installing rice dependencies'
+    'hyprpolkitagent: polkit authentication agent (any polkit agent works)'
+)
+provides=('rice-cooker-backend')
+conflicts=('rice-cooker-backend' 'rice-cooker-backend-git' 'rice-cooker-git')
+source=(
+    "$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz"
+    'rice-cooker.sh'
+    'rice-cooker.desktop'
+)
+sha256sums=(
+    'SKIP'
+    'SKIP'
+    'SKIP'
+)
+
+prepare() {
+    cd "$pkgname-$pkgver/backend"
+    cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+    cd "$pkgname-$pkgver"
+    npm ci
+    npm run build
+
+    cd backend
+    export CARGO_TARGET_DIR=target
+    cargo build --frozen --release
+}
+
+check() {
+    cd "$pkgname-$pkgver/backend"
+    cargo test --frozen --lib
+}
+
+package() {
+    cd "$pkgname-$pkgver"
+
+    install -Dm755 "backend/target/release/rice-cooker-backend" \
+        "$pkgdir/usr/bin/rice-cooker-backend"
+    install -Dm644 "backend/catalog.toml" \
+        "$pkgdir/usr/share/rice-cooker/catalog.toml"
+    install -Dm644 "backend/polkit/so.butterfly.ricecooker.policy" \
+        "$pkgdir/usr/share/polkit-1/actions/so.butterfly.ricecooker.policy"
+
+    install -dm755 "$pkgdir/usr/share/rice-cooker"
+    cp -a out/main out/preload out/renderer package.json "$pkgdir/usr/share/rice-cooker/"
+
+    install -Dm755 "$srcdir/rice-cooker.sh" "$pkgdir/usr/bin/rice-cooker"
+    install -Dm644 "$srcdir/rice-cooker.desktop" \
+        "$pkgdir/usr/share/applications/rice-cooker.desktop"
+    install -Dm644 "LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
