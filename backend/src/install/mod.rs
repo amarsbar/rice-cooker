@@ -1,5 +1,6 @@
 //! install pipeline + records + symlink shaping.
 
+mod autostart;
 pub mod pipeline;
 pub mod record;
 pub mod symlink;

@@ -71,7 +71,7 @@ pub fn write_current(paths: &Paths, name: &str) -> Result<()> {
 /// rename itself survives power loss. Parent-fsync failure only warns — the
 /// content is durable by then, and erroring here would desync save_record →
 /// write_current (record on disk, current.json skipped, packages orphaned).
-fn atomic_write_fsync(path: &Path, body: &[u8]) -> Result<()> {
+pub(crate) fn atomic_write_fsync(path: &Path, body: &[u8]) -> Result<()> {
     let parent = path
         .parent()
         .ok_or_else(|| anyhow!("{}: no parent directory", path.display()))?;

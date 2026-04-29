@@ -16,6 +16,7 @@ use crate::lock::{Lock, LockError};
 use crate::paths::{OriginalShell, Paths, expand_home};
 use crate::process::{self, VerifyResult};
 
+use super::autostart;
 use super::record::{
     InstallRecord, PacmanDiff, SCHEMA_VERSION, clear_current, load_record, read_current,
     save_record, write_current,
@@ -168,6 +169,13 @@ fn run_activate<W: Write>(
 
     step(events, Step::Preflight, StepState::Start)?;
     try_stage!(events, "preflight", "git", git::preflight());
+    if mode == ActivateMode::Install {
+        try_stage!(
+            events,
+            "autostart",
+            autostart::preflight_hypr_autostart(paths)
+        );
+    }
     if !selected_deps.is_empty() {
         try_stage!(
             events,
@@ -194,6 +202,13 @@ fn run_activate<W: Write>(
         // if the process is actually running and the requested deps are present.
         let alive = try_stage!(events, "liveness", process::rice_shell_alive(name));
         if alive && try_stage!(events, "deps", deps_are_satisfied(&selected_deps)) {
+            if mode == ActivateMode::Install {
+                try_stage!(
+                    events,
+                    "autostart",
+                    autostart::install_hypr_autostart(paths, name)
+                );
+            }
             events.emit(&Event::Success {
                 active: Some(name.to_string()),
             })?;
@@ -270,6 +285,14 @@ fn run_activate<W: Write>(
         }
     }
 
+    if mode == ActivateMode::Install {
+        try_stage!(
+            events,
+            "autostart",
+            autostart::install_hypr_autostart(paths, name)
+        );
+    }
+
     events.emit(&Event::Success {
         active: Some(name.to_string()),
     })?;
@@ -317,6 +340,8 @@ fn uninstall_locked<W: Write>(
     // A tampered current.json must surface as a Fail, not bare Err (post-hello contract).
     let record_path = try_stage!(events, "record", "path", paths.record_json(name));
     let record = try_stage!(events, "record", "load", load_record(&record_path));
+
+    try_stage!(events, "autostart", autostart::clear_hypr_autostart(paths));
 
     step(events, Step::KillQuickshell, StepState::Start)?;
     try_stage!(events, "kill_quickshell", process::kill_quickshell());

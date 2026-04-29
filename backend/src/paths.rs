@@ -23,6 +23,7 @@ pub struct Paths {
     pub home: PathBuf,
     pub cache_home: PathBuf,
     pub data_home: PathBuf,
+    pub config_home: PathBuf,
     xdg: Option<BaseDirectories>,
 }
 
@@ -41,20 +42,26 @@ impl Paths {
         let data_home = xdg.get_data_home().ok_or_else(|| {
             anyhow!("cannot resolve data home — set XDG_DATA_HOME or ensure HOME is absolute")
         })?;
+        let config_home = xdg.get_config_home().ok_or_else(|| {
+            anyhow!("cannot resolve config home — set XDG_CONFIG_HOME or ensure HOME is absolute")
+        })?;
         Ok(Self {
             home,
             cache_home,
             data_home,
+            config_home,
             xdg: Some(xdg),
         })
     }
 
     /// Test-only. `find_catalog` and `searched_catalog_paths` return empty.
     pub fn at_roots(home: PathBuf, cache_home: PathBuf, data_home: PathBuf) -> Self {
+        let config_home = home.join(".config");
         Self {
             home,
             cache_home,
             data_home,
+            config_home,
             xdg: None,
         }
     }
@@ -86,6 +93,18 @@ impl Paths {
 
     pub fn original_file(&self) -> PathBuf {
         self.cache_home.join("original")
+    }
+
+    pub fn hypr_config_dir(&self) -> PathBuf {
+        self.config_home.join("hypr")
+    }
+
+    pub fn hyprland_conf(&self) -> PathBuf {
+        self.hypr_config_dir().join("hyprland.conf")
+    }
+
+    pub fn hypr_rice_cooker_conf(&self) -> PathBuf {
+        self.hypr_config_dir().join("rice-cooker.conf")
     }
 
     pub fn find_catalog(&self) -> Option<PathBuf> {
