@@ -24,6 +24,14 @@
   color: var(--c-header-accent);
 }
 
+.escIcon {
+  position: absolute;
+  left: 93px;
+  top: 11px;
+  width: 22px;
+  height: 14px;
+}
+
 .navLabel {
   color: var(--c-header-accent);
   text-align: center;
