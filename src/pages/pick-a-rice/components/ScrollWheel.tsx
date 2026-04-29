@@ -7,6 +7,8 @@ import GridSvg from '@/assets/scroll-wheel/grid.svg?react';
 import installRiceSvg from '@/assets/scroll-wheel/install-rice.svg';
 import dotfilesSvg from '@/assets/scroll-wheel/dotfiles.svg';
 import tryAnotherSvg from '@/assets/scroll-wheel/try-another.svg';
+import previewReadySvg from '@/assets/scroll-wheel/preview-ready.svg';
+import lookingGoodSvg from '@/assets/scroll-wheel/looking-good.svg';
 import BootEnterMessage from '@/assets/scroll-wheel/boot-enter.svg?react';
 import BootCloseMessage from '@/assets/scroll-wheel/boot-close.svg?react';
 import BootGithubMessage from '@/assets/scroll-wheel/boot-github.svg?react';
@@ -65,9 +67,13 @@ const BOOT_MESSAGES = {
 export function ScrollWheel({
   menuItem = null,
   bootItem = null,
+  installIntroActive = false,
+  installSuccessActive = false,
 }: {
   menuItem?: MenuItem | null;
   bootItem?: BootItem | null;
+  installIntroActive?: boolean;
+  installSuccessActive?: boolean;
 }) {
   const view = useView();
   const previewOption = usePreviewOption();
@@ -78,19 +84,24 @@ export function ScrollWheel({
   const previewIndex = view === 'preview' ? PREVIEW_OPTIONS.indexOf(previewOption) : -1;
   const menuActive = menuIndex >= 0;
   const bootActive = bootIndex >= 0;
-  const previewActive = previewIndex >= 0 && !menuActive && !bootActive;
+  const introActive = installIntroActive && view === 'preview' && !menuActive && !bootActive;
+  const successActive = installSuccessActive && view === 'picking' && !menuActive && !bootActive;
+  const previewActive = previewIndex >= 0 && !menuActive && !bootActive && !introActive;
+  const previewWheelActive = previewActive || introActive;
   const activeScroll = menuActive
     ? { offset: menuIndex * RICE_ITEM_PITCH, index: menuIndex, total: MENU_ITEMS.length }
     : bootActive
       ? { offset: bootIndex * RICE_ITEM_PITCH, index: bootIndex, total: BOOT_WHEEL_ITEMS.length }
-      : previewActive
+      : previewWheelActive
         ? { offset: previewIndex * RICE_ITEM_PITCH, index: previewIndex, total: PREVIEW_OPTIONS.length }
-        : scroll;
-  const controlledWheel = menuActive || bootActive || previewActive;
-  const pickingContentVisible = menuActive || (!bootActive && view === 'picking');
+        : successActive
+          ? { offset: 0, index: 0, total: 1 }
+          : scroll;
+  const controlledWheel = menuActive || bootActive || previewWheelActive || successActive;
+  const pickingContentVisible = menuActive || (!bootActive && view === 'picking' && !successActive);
   const bootContentVisible = bootActive;
-  const previewContentVisible = previewActive;
-  const dotsVisible = previewContentVisible || bootContentVisible;
+  const previewContentVisible = previewWheelActive || successActive;
+  const dotsVisible = previewActive || bootContentVisible;
   const dotOption = bootItem ? BOOT_DOT_OPTION[bootItem] : previewOption;
 
   return (
@@ -133,7 +144,7 @@ export function ScrollWheel({
           animate={previewContentVisible ? 'visible' : 'hidden'}
           variants={SHRUNKEN_TEXT_VARIANTS}
         >
-          <PreviewWheelGraphic option={previewOption} />
+          <PreviewWheelGraphic option={successActive ? 'lookingGood' : introActive ? 'ready' : previewOption} />
         </motion.div>
 
         <motion.div
@@ -164,10 +175,18 @@ function BootWheelGraphic({ item }: { item: BootItem }) {
   return <Message className={cls} aria-hidden="true" />;
 }
 
-function PreviewWheelGraphic({ option }: { option: PreviewOption }) {
+function PreviewWheelGraphic({ option }: { option: PreviewOption | 'ready' | 'lookingGood' }) {
   const cls = `${styles.previewGraphic} ${styles[`previewGraphic_${option}`]}`;
   const src =
-    option === 'leave' ? tryAnotherSvg : option === 'dots' ? dotfilesSvg : installRiceSvg;
+    option === 'lookingGood'
+      ? lookingGoodSvg
+      : option === 'ready'
+      ? previewReadySvg
+      : option === 'leave'
+        ? tryAnotherSvg
+        : option === 'dots'
+          ? dotfilesSvg
+          : installRiceSvg;
   return <img className={cls} src={src} alt="" aria-hidden="true" />;
 }
 

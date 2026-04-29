@@ -15,6 +15,13 @@ export function Antenna({ extended }: { extended: boolean }) {
 
   return (
     <div className={styles.antenna} style={ANTENNA} aria-hidden="true">
+      {extended && (
+        <span className={styles.dots}>
+          <span />
+          <span />
+          <span />
+        </span>
+      )}
       <motion.span
         className={styles.base}
         initial={{ scaleX: 0 }}
