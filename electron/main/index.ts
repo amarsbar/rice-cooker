@@ -1,12 +1,13 @@
 import { app, BrowserWindow, ipcMain, screen, shell, type WebContents } from 'electron';
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { accessSync, constants, existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import type {
   BackendRunRequest,
   BackendRunResult,
+  EnvironmentCheckResult,
   RiceListRow,
 } from '../../src/shared/backend';
 
@@ -15,6 +16,7 @@ const execFileAsync = promisify(execFile);
 
 const APP_CLASS_PATTERN = /^(electron|Electron|rice-cooker)$/;
 const APP_TITLE = 'Rice Cooker';
+const CONFLICTING_SHELLS = ['waybar', 'ags', 'astal', 'eww', 'yambar'] as const;
 const HYPRLAND_WINDOW_EFFECTS = [
   ['no_blur', 'on'],
   ['no_shadow', 'on'],
@@ -75,6 +77,45 @@ const BASE_SIZE = { width: 666, height: 574 } as const;
 const FIGMA_HEIGHT_RATIO = 600 / 1080;
 const RAW_TAIL_LIMIT = 100;
 let activeBackendChild: ChildProcessWithoutNullStreams | null = null;
+
+function executableInPath(name: string): boolean {
+  for (const dir of (process.env['PATH'] ?? '').split(':')) {
+    if (!dir) continue;
+    try {
+      accessSync(join(dir, name), constants.X_OK);
+      return true;
+    } catch {}
+  }
+  return false;
+}
+
+async function processRunning(name: string): Promise<boolean> {
+  try {
+    await execFileAsync('pgrep', ['-x', name], { maxBuffer: 1024 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function environmentCheck(): Promise<EnvironmentCheckResult> {
+  const isHyprland = Boolean(process.env['HYPRLAND_INSTANCE_SIGNATURE']);
+  const conflictingShells = isHyprland
+    ? (await Promise.all(
+        CONFLICTING_SHELLS.map(async (name) => ((await processRunning(name)) ? name : null)),
+      )).filter((name): name is (typeof CONFLICTING_SHELLS)[number] => name !== null)
+    : [];
+
+  return {
+    supported:
+      existsSync('/etc/arch-release') &&
+      process.env['XDG_SESSION_TYPE'] === 'wayland' &&
+      isHyprland &&
+      executableInPath('quickshell') &&
+      conflictingShells.length === 0,
+    conflictingShells,
+  };
+}
 
 function backendBin(): string {
   const override = process.env['RICE_COOKER_BACKEND'];
@@ -377,6 +418,8 @@ ipcMain.on('window:close', (event) => {
 ipcMain.handle('backend:list', () => backendList());
 
 ipcMain.handle('backend:run', (event, request: BackendRunRequest) => runBackend(request, event.sender));
+
+ipcMain.handle('environment:check', () => environmentCheck());
 
 app.whenReady()
   .then(() => {

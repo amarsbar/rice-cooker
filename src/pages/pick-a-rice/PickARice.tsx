@@ -38,6 +38,8 @@ import { MENU_ITEMS, type MenuItem } from './menuOptions';
 
 const clampRiceIndex = (index: number, count: number) => Math.max(0, Math.min(count - 1, index));
 type HoldDirection = -1 | 0 | 1;
+const BOOT_DESCRIPTION = 'Rice Cooker is only built for arch + hyprland + quickshell.';
+const CONFLICTING_RICE_DESCRIPTION = 'Please close any other rice! Rice cooker only supports quickshell.';
 const LAUNCH_FALLBACK_MS = 1500;
 const MENU_FADE_MS = 100;
 const cyclePreviewOption = (option: PreviewOption, delta: -1 | 1) => {
@@ -65,7 +67,10 @@ export function PickARice() {
   const [pickerEntering, setPickerEntering] = useState(false);
   const [menuExiting, setMenuExiting] = useState(false);
   const [menuItem, setMenuItem] = useState<MenuItem>(MENU_ITEMS[0]);
-  const [bootOpen, setBootOpen] = useState(true);
+  const [bootOpen, setBootOpen] = useState(false);
+  const [bootDescription, setBootDescription] = useState(BOOT_DESCRIPTION);
+  const [bootDescriptionWide, setBootDescriptionWide] = useState(false);
+  const [bootBlockedByShell, setBootBlockedByShell] = useState(false);
   const [bootItem, setBootItem] = useState<BootItem>('close');
   const [bootEnterHoldLetters, setBootEnterHoldLetters] = useState(0);
   const requestedRiceIndexRef = useRef(0);
@@ -105,6 +110,46 @@ export function PickARice() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    window.rice.environment
+      .check()
+      .then((result) => {
+        if (cancelled) return;
+        const blockedByShell = result.conflictingShells.length > 0;
+        setBootDescription(blockedByShell ? CONFLICTING_RICE_DESCRIPTION : BOOT_DESCRIPTION);
+        setBootDescriptionWide(blockedByShell);
+        setBootBlockedByShell(blockedByShell);
+        setBootOpen(!result.supported);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        console.error('[rice-cooker] environment check failed:', error);
+        setBootDescription(BOOT_DESCRIPTION);
+        setBootDescriptionWide(false);
+        setBootBlockedByShell(false);
+        setBootOpen(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!bootOpen || !bootBlockedByShell) return undefined;
+    const intervalId = window.setInterval(() => {
+      void window.rice.environment.check().then((result) => {
+        const blockedByShell = result.conflictingShells.length > 0;
+        if (blockedByShell) return;
+        setBootBlockedByShell(false);
+        setBootDescription(BOOT_DESCRIPTION);
+        setBootDescriptionWide(false);
+        setBootOpen(!result.supported);
+      });
+    }, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [bootBlockedByShell, bootOpen]);
 
   const moveBootItem = useCallback((direction: -1 | 1) => {
     const currentIndex = BOOT_ITEMS.indexOf(bootItem);
@@ -421,6 +466,8 @@ export function PickARice() {
                 {bootOpen ? (
                   <BootScreen
                     active={bootItem}
+                    description={bootDescription}
+                    wideDescription={bootDescriptionWide}
                     onActiveChange={setBootItem}
                     onApply={applyBootItem}
                     enterHoldLetters={bootEnterHoldLetters}

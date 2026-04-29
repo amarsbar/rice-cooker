@@ -3,6 +3,7 @@ import type {
   BackendEvent,
   BackendRunRequest,
   BackendRunResult,
+  EnvironmentCheckResult,
   RiceListRow,
 } from '../../src/shared/backend';
 
@@ -19,6 +20,9 @@ const api = {
       ipcRenderer.on('backend:event', listener);
       return () => ipcRenderer.removeListener('backend:event', listener);
     },
+  },
+  environment: {
+    check: () => ipcRenderer.invoke('environment:check') as Promise<EnvironmentCheckResult>,
   },
 };
 

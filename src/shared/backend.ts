@@ -28,3 +28,8 @@ export interface BackendRunResult {
   rawTail: string[];
   exitCode: number | null;
 }
+
+export interface EnvironmentCheckResult {
+  supported: boolean;
+  conflictingShells: string[];
+}

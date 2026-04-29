@@ -78,11 +78,15 @@ function getPointerStyle(item: BootItem, side: 'top' | 'bottom'): CSSProperties 
 
 export function BootScreen({
   active,
+  description = 'Rice Cooker is only built for arch + hyprland + quickshell.',
+  wideDescription = false,
   onActiveChange,
   onApply,
   enterHoldLetters = 0,
 }: {
   active: BootItem;
+  description?: string;
+  wideDescription?: boolean;
   onActiveChange: (item: BootItem) => void;
   onApply: () => void;
   enterHoldLetters?: number;
@@ -104,7 +108,9 @@ export function BootScreen({
         <img src={sadMessage} alt="" className={styles.sadMessage} />
       </div>
 
-      <p className={styles.description}>Rice Cooker is only built for arch + hyprland + quickshell.</p>
+      <p className={`${styles.description} ${wideDescription ? styles.descriptionWide : ''}`}>
+        {description}
+      </p>
 
       {BOOT_ITEMS.map((item) => {
         const Icon = icons[item];

@@ -67,6 +67,10 @@
   line-height: normal;
 }
 
+.descriptionWide {
+  width: 260px;
+}
+
 .optionIcon {
   position: absolute;
   z-index: 1;
