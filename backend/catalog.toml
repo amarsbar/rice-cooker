@@ -15,11 +15,12 @@
 [caelestia]
 display_name = "Caelestia"
 creator_name = "soramenew"
-description = "Caelestia Quickshell. Ships as caelestia-shell-git AUR."
-repo = "https://github.com/caelestia-dots/caelestia"
-commit = "0283b44960791ab12cde19c9797d70976a0b96a4"
+description = "Caelestia Quickshell. Ships as caelestia-shell AUR."
+repo = "https://github.com/caelestia-dots/shell"
+commit = "efc08759ceaeddc2c571d868c623995270ac365d"
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/caelestia"
+package_managed = true
 pacman_deps = [
   "hyprland",
   "xdg-desktop-portal-hyprland",
@@ -33,8 +34,8 @@ pacman_deps = [
   "fish",
   "jq",
 ]
-aur_deps = ["caelestia-shell-git"]
-preview_aur_deps = ["caelestia-shell-git"]
+aur_deps = ["quickshell-git", "caelestia-shell"]
+preview_aur_deps = ["quickshell-git", "caelestia-shell"]
 
 [noctalia]
 display_name = "Noctalia"

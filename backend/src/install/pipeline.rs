@@ -499,6 +499,9 @@ pub(crate) fn clone_cache_hit(clone_dir: &Path, commit: &str) -> bool {
 }
 
 fn do_clone(paths: &Paths, name: &str, entry: &RiceEntry) -> Result<()> {
+    if entry.package_managed {
+        return Ok(());
+    }
     let clone = paths.clone_dir(name)?;
     if clone_cache_hit(&clone, &entry.commit) {
         return Ok(());
@@ -551,6 +554,9 @@ fn do_record(paths: &Paths, name: &str, entry: &RiceEntry, added: Vec<String>) -
 }
 
 fn do_symlink(paths: &Paths, name: &str, entry: &RiceEntry) -> Result<()> {
+    if entry.package_managed {
+        return Ok(());
+    }
     let clone = paths.clone_dir(name)?;
     symlink_shape::create_symlink(&clone, entry, &paths.home)
         .context("run `rice-cooker-backend uninstall` to roll back")
@@ -761,6 +767,7 @@ mod tests {
             commit: "0123456789abcdef0123456789abcdef01234567".into(),
             symlink_src: ".".into(),
             symlink_dst: "~/.config/quickshell/x".into(),
+            package_managed: false,
             install_supported: true,
             aur_deps: vec!["aur-install".into()],
             pacman_deps: vec!["repo-install".into()],

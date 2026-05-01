@@ -75,6 +75,7 @@ mod tests {
             commit: "0123456789abcdef0123456789abcdef01234567".into(),
             symlink_src: src.into(),
             symlink_dst: dst.into(),
+            package_managed: false,
             install_supported: false,
             aur_deps: vec![],
             pacman_deps: vec![],
