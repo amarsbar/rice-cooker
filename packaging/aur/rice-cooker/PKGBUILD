@@ -61,7 +61,7 @@ package() {
         "$pkgdir/usr/share/icons/hicolor/512x512/apps/rice-cooker.png"
 
     install -dm755 "$pkgdir/usr/share/rice-cooker"
-    cp -a out/main out/preload out/renderer package.json "$pkgdir/usr/share/rice-cooker/"
+    cp -a out package.json "$pkgdir/usr/share/rice-cooker/"
     install -Dm644 "packaging/icons/rice-cooker.png" \
         "$pkgdir/usr/share/rice-cooker/rice-cooker.png"
 
