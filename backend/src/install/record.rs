@@ -31,6 +31,19 @@ pub struct InstallRecord {
 pub struct PacmanDiff {
     #[serde(default)]
     pub added_explicit: Vec<String>,
+    #[serde(default)]
+    pub removed: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PendingDeps {
+    pub name: String,
+    pub commit: String,
+    pub symlink_path: PathBuf,
+    pub symlink_target: PathBuf,
+    pub pre_all: Vec<String>,
+    pub pre_explicit: Vec<String>,
 }
 
 impl InstallRecord {
@@ -44,6 +57,31 @@ impl InstallRecord {
 pub fn save_record(path: &Path, r: &InstallRecord) -> Result<()> {
     let body = serde_json::to_string_pretty(r).context("serializing install record")?;
     atomic_write_fsync(path, body.as_bytes())
+}
+
+pub fn save_pending_deps(paths: &Paths, pending: &PendingDeps) -> Result<()> {
+    let body = serde_json::to_string_pretty(pending).context("serializing pending deps")?;
+    atomic_write_fsync(&paths.pending_deps_json(), body.as_bytes())
+}
+
+pub fn load_pending_deps(paths: &Paths) -> Result<Option<PendingDeps>> {
+    let path = paths.pending_deps_json();
+    let body = match fs::read_to_string(&path) {
+        Ok(body) => body,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e).with_context(|| format!("reading {}", path.display())),
+    };
+    serde_json::from_str(&body)
+        .with_context(|| format!("parsing pending deps at {}", path.display()))
+        .map(Some)
+}
+
+pub fn clear_pending_deps(paths: &Paths) -> Result<()> {
+    match fs::remove_file(paths.pending_deps_json()) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e).context("removing pending-deps.json"),
+    }
 }
 
 pub fn load_record(path: &Path) -> Result<InstallRecord> {
@@ -160,6 +198,7 @@ mod tests {
             symlink_target: PathBuf::from("/home/x/.cache/rice-cooker/rices/dms"),
             pacman_diff: PacmanDiff {
                 added_explicit: vec!["caelestia-shell-git".into()],
+                removed: Vec::new(),
             },
         }
     }
@@ -183,6 +222,24 @@ mod tests {
         clear_current(&p).unwrap();
         assert_eq!(read_current(&p).unwrap(), None);
         clear_current(&p).unwrap();
+    }
+
+    #[test]
+    fn pending_deps_roundtrip() {
+        let (_t, p) = tmp_paths();
+        let pending = PendingDeps {
+            name: "dms".into(),
+            commit: "abc123".into(),
+            symlink_path: PathBuf::from("/home/x/.config/quickshell/dms"),
+            symlink_target: PathBuf::from("/home/x/.cache/rice-cooker/rices/dms"),
+            pre_all: vec!["quickshell".into()],
+            pre_explicit: vec!["quickshell".into()],
+        };
+        assert_eq!(load_pending_deps(&p).unwrap(), None);
+        save_pending_deps(&p, &pending).unwrap();
+        assert_eq!(load_pending_deps(&p).unwrap(), Some(pending));
+        clear_pending_deps(&p).unwrap();
+        assert_eq!(load_pending_deps(&p).unwrap(), None);
     }
 
     #[test]

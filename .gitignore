@@ -14,4 +14,3 @@ backend/screenshots/
 packaging/aur/*/pkg/
 packaging/aur/*/src/
 packaging/aur/*/*.pkg.tar.zst
-packaging/aur/rice-cooker-backend-git/rice-cooker/

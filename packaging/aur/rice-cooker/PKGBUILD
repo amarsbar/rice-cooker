@@ -15,8 +15,6 @@ optdepends=(
     'ttf-material-symbols-variable: icon font for Whisker and Nandoroid'
     'ttf-outfit: intended UI font for Whisker'
 )
-provides=('rice-cooker-backend')
-conflicts=('rice-cooker-backend' 'rice-cooker-backend-git' 'rice-cooker-git')
 source=(
     "$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz"
     'rice-cooker.sh'
