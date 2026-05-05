@@ -10,6 +10,7 @@ pkgbase = rice-cooker
 	makedepends = rust
 	depends = electron41
 	depends = git
+	depends = hicolor-icon-theme
 	depends = hyprland
 	depends = polkit
 	depends = qt6-5compat

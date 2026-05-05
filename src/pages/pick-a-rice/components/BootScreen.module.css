@@ -81,28 +81,31 @@
   overflow: hidden;
   border: 1px solid rgba(232, 255, 118, 0.2);
   border-radius: 200px;
-  background: #414727;
+  background: var(--c-preview-action-bg);
   background-clip: padding-box;
+  color: var(--c-preview-action-icon);
   cursor: pointer;
   transition:
     left 400ms ease,
     top 400ms ease,
     background-color 180ms ease,
-    border-color 180ms ease;
+    border-color 180ms ease,
+    color 180ms ease;
 }
 
 .optionIconActive {
   border-color: transparent;
   border-radius: 133.333px;
-  background: #73a94a;
+  background: var(--c-preview-action-active-bg);
+  color: var(--c-preview-action-active-icon);
 }
 
 .optionIconImage {
   display: block;
   width: 20px;
   height: 20px;
-  --fill-0: #e8ff76;
-  --stroke-0: #e8ff76;
+  --fill-0: currentcolor;
+  --stroke-0: currentcolor;
 }
 
 .optionEnter .optionIconImage {
@@ -115,14 +118,16 @@
   z-index: 1;
   border: 0;
   border-radius: 130px;
-  background: #73a94a;
-  color: #3f3833;
+  background: var(--c-preview-word-bg);
+  color: var(--c-preview-word-letter-text);
   cursor: pointer;
   font: inherit;
   transition:
     left 400ms ease,
     top 400ms ease,
-    padding 400ms ease;
+    padding 400ms ease,
+    background-color var(--theme-color-transition),
+    color var(--theme-color-transition);
 }
 
 .wordCluster {
@@ -143,11 +148,14 @@
   margin-right: -7.5px;
   overflow: hidden;
   border-radius: 75px;
-  background: #e8ff76;
-  color: #3f3833;
+  background: var(--c-preview-word-letter-bg);
+  color: var(--c-preview-word-letter-text);
   font-size: 13.5px;
   letter-spacing: 0;
   line-height: normal;
+  transition:
+    background-color var(--theme-color-transition),
+    color var(--theme-color-transition);
   white-space: nowrap;
 }
 
@@ -159,8 +167,10 @@
 .pointer {
   position: absolute;
   z-index: 0;
+  color: var(--c-preview-pointer);
   pointer-events: none;
   transition:
+    color var(--theme-color-transition),
     left 400ms ease,
     top 400ms ease,
     transform 400ms ease;

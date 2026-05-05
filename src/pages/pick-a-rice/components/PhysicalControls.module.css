@@ -15,12 +15,12 @@
   background: transparent;
   cursor: pointer;
   pointer-events: auto;
-  --button-bg: var(--color-yellow);
-  --button-icon: var(--color-brown);
+  --button-bg: var(--c-physical-bg);
+  --button-icon: var(--c-physical-icon);
 }
 
 .button:focus-visible {
-  outline: 2px solid var(--color-lime);
+  outline: 2px solid var(--c-physical-pressed-bg);
   outline-offset: 2px;
 }
 
@@ -35,7 +35,7 @@
 .pressed .cap {
   height: 20px;
   transform: translateY(6px);
-  --button-bg: var(--color-lime);
+  --button-bg: var(--c-physical-pressed-bg);
 }
 
 .controlImage {
@@ -93,7 +93,7 @@
   top: -5px;
   height: 5px;
   border-radius: 100px;
-  background: var(--color-yellow);
+  background: var(--c-physical-bg);
   transition: top 80ms ease-out, height 80ms ease-out, background-color 80ms ease-out;
   pointer-events: none;
 }
@@ -101,7 +101,7 @@
 .stemPressed {
   top: -3px;
   height: 3px;
-  background: var(--color-lime);
+  background: var(--c-physical-pressed-bg);
 }
 
 .upStem {

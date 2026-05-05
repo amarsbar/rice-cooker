@@ -1,6 +1,6 @@
 import styles from './CardHeader.module.css';
 import MenuDotsSvg from '@/assets/screen/four-dots.svg?react';
-import escIcon from '@/assets/screen/esc.svg';
+import EscIcon from '@/assets/screen/esc.svg?react';
 import screenDivider from '@/assets/screen/dot-row.svg';
 import type { PhysicalControl } from './PhysicalControls';
 
@@ -26,7 +26,7 @@ export function CardHeader({
         <>
           <MenuDotsSvg className={styles.menuIcon} />
           <p className={`${styles.label} ${styles.menuLabel}`}>Menu</p>
-          <img src={escIcon} alt="" className={styles.escIcon} />
+          <EscIcon aria-hidden="true" className={styles.escIcon} />
           <p className={labelClass(styles.prevLabel, pressedControls.has('up'))}>Prev</p>
           <p className={labelClass(styles.nextLabel, pressedControls.has('down'))}>Next</p>
           <div className={styles.applyCluster}>

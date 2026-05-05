@@ -569,6 +569,7 @@ export function PickARice() {
                 bootItem={bootOpen ? bootItem : null}
                 installIntroActive={installIntroActive}
                 installSuccessActive={installSuccessActive}
+                downloadDoneView={view === 'downloading' ? downloadDoneViewRef.current : null}
               />
               <PreviewStars active={view === 'preview' && !menuOpen && !bootOpen} />
             </div>

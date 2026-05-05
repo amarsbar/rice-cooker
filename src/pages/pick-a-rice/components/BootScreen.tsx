@@ -4,7 +4,7 @@ import sadMessage from '@/assets/boot/sad-card.svg';
 import EnterIcon from '@/assets/boot/enter.svg?react';
 import CloseIcon from '@/assets/boot/close.svg?react';
 import GithubIcon from '@/assets/icons/github.svg?react';
-import pointerArrow from '@/assets/icons/pointer.svg';
+import PointerArrow from '@/assets/icons/pointer.svg?react';
 import stickerArch from '@/assets/boot/arch-sticker.svg';
 import stickerHyprland from '@/assets/boot/hyprland-sticker.svg';
 import stickerQuickshell from '@/assets/boot/quickshell-sticker.svg';
@@ -170,8 +170,8 @@ export function BootScreen({
 function Pointers({ active }: { active: BootItem }) {
   return (
     <>
-      <img src={pointerArrow} alt="" className={styles.pointer} style={getPointerStyle(active, 'top')} />
-      <img src={pointerArrow} alt="" className={styles.pointer} style={getPointerStyle(active, 'bottom')} />
+      <PointerArrow aria-hidden="true" className={styles.pointer} style={getPointerStyle(active, 'top')} />
+      <PointerArrow aria-hidden="true" className={styles.pointer} style={getPointerStyle(active, 'bottom')} />
     </>
   );
 }
