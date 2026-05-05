@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, screen, shell, type WebContents } from 'electron';
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { accessSync, constants, existsSync } from 'node:fs';
+import { accessSync, constants, createWriteStream, existsSync, mkdirSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -170,6 +171,45 @@ function pushRawTail(rawTail: string[], line: string): void {
   if (rawTail.length > RAW_TAIL_LIMIT) rawTail.splice(0, rawTail.length - RAW_TAIL_LIMIT);
 }
 
+function createBackendRunLog(runId: string): {
+  write: (value: Record<string, unknown>) => void;
+  end: () => void;
+} {
+  try {
+    const cacheHome = process.env['XDG_CACHE_HOME'] || join(homedir(), '.cache');
+    const dir = join(cacheHome, 'rice-cooker');
+    mkdirSync(dir, { recursive: true });
+
+    const stream = createWriteStream(join(dir, 'last-run.ndjson'), { flags: 'w' });
+    let writable = true;
+    let ended = false;
+    stream.on('error', () => {
+      writable = false;
+    });
+
+    return {
+      write(value: Record<string, unknown>) {
+        if (!writable || ended) return;
+        try {
+          stream.write(`${JSON.stringify({ ts: new Date().toISOString(), runId, ...value })}\n`);
+        } catch {
+          writable = false;
+        }
+      },
+      end() {
+        if (ended) return;
+        ended = true;
+        stream.end();
+      },
+    };
+  } catch {
+    return {
+      write() {},
+      end() {},
+    };
+  }
+}
+
 function backendArgs(request: BackendRunRequest): string[] {
   const baseArgs = backendBaseArgs();
   switch (request.command) {
@@ -189,7 +229,12 @@ function runBackend(request: BackendRunRequest, sender?: WebContents): Promise<B
 
   const events: BackendRunResult['events'] = [];
   const rawTail: string[] = [];
-  const child = spawn(backendBin(), backendArgs(request), {
+  const runId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const log = createBackendRunLog(runId);
+  const bin = backendBin();
+  const args = backendArgs(request);
+  log.write({ type: 'run', request, argv: [bin, ...args] });
+  const child = spawn(bin, args, {
     cwd: process.cwd(),
     env: process.env,
   });
@@ -207,8 +252,10 @@ function runBackend(request: BackendRunRequest, sender?: WebContents): Promise<B
       if (event) {
         events.push(event);
         sender?.send('backend:event', event);
+        log.write({ type: 'event', event });
       } else {
         pushRawTail(rawTail, line);
+        log.write({ type: 'raw', stream: isStdout ? 'stdout' : 'stderr', line });
       }
       newline = buffer.indexOf('\n');
     }
@@ -222,14 +269,24 @@ function runBackend(request: BackendRunRequest, sender?: WebContents): Promise<B
   return new Promise((resolve, reject) => {
     child.on('error', (err) => {
       activeBackendChild = null;
+      log.write({ type: 'error', message: err.message });
+      log.end();
       reject(err);
     });
     child.on('close', (exitCode) => {
-      if (stdoutBuffer) pushRawTail(rawTail, stdoutBuffer);
-      if (stderrBuffer) pushRawTail(rawTail, stderrBuffer);
+      if (stdoutBuffer) {
+        pushRawTail(rawTail, stdoutBuffer);
+        log.write({ type: 'raw', stream: 'stdout', line: stdoutBuffer });
+      }
+      if (stderrBuffer) {
+        pushRawTail(rawTail, stderrBuffer);
+        log.write({ type: 'raw', stream: 'stderr', line: stderrBuffer });
+      }
       activeBackendChild = null;
       const failed = events.some((event) => event.type === 'fail');
       const succeeded = events.some((event) => event.type === 'success');
+      log.write({ type: 'exit', exitCode, ok: exitCode === 0 && succeeded && !failed });
+      log.end();
       void applyHyprlandWindowProps();
       resolve({ ok: exitCode === 0 && succeeded && !failed, events, rawTail, exitCode });
     });

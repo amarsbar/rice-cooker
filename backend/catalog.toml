@@ -55,6 +55,7 @@ pacman_deps = [
   "wl-clipboard",
   "wtype",
 ]
+preview_aur_deps = ["noctalia-shell", "noctalia-qs"]
 
 [dms]
 display_name = "DankMaterialShell"
@@ -120,6 +121,8 @@ pacman_deps = [
   "pipewire",
 ]
 aur_deps = ["whisker-shell-git"]
+preview_pacman_deps = ["ttf-material-symbols-variable"]
+preview_aur_deps = ["ttf-outfit"]
 
 [nandoroid]
 display_name = "Nandoroid"
@@ -169,12 +172,13 @@ aur_deps = [
   "quickshell-git",
   "matugen-bin",
 ]
+preview_pacman_deps = ["ttf-material-symbols-variable"]
 documented_system_effects = [
   "only the Quickshell config is installed; matugen templates, Hyprland source block/keybinds, terminal/fish/starship injection, Google Sans Flex, and Nandoroid CLI are not installed",
 ]
 
 [zephyr]
-display_name = "Zephyr (flicko)"
+display_name = "Zephyr"
 creator_name = "flickowoa"
 description = "flickowoa's Zephyr Quickshell"
 repo = "https://github.com/flickowoa/dotfiles"
