@@ -193,12 +193,21 @@ function createBackendRunLog(runId: string): {
     stream.on('error', () => {
       writable = false;
     });
+    stream.on('close', () => {
+      writable = false;
+      ended = true;
+    });
 
     return {
       write(value: Record<string, unknown>) {
         if (!writable || ended) return;
         try {
-          stream.write(`${JSON.stringify({ ts: new Date().toISOString(), runId, ...value })}\n`);
+          writable = stream.write(`${JSON.stringify({ ts: new Date().toISOString(), runId, ...value })}\n`);
+          if (!writable) {
+            stream.once('drain', () => {
+              if (!ended) writable = true;
+            });
+          }
         } catch {
           writable = false;
         }

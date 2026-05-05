@@ -22,8 +22,10 @@ pub struct InstallRecord {
     pub name: String,
     pub commit: String,
     pub installed_at: String,
-    pub symlink_path: PathBuf,
-    pub symlink_target: PathBuf,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symlink_path: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symlink_target: Option<PathBuf>,
     pub pacman_diff: PacmanDiff,
 }
 
@@ -40,8 +42,10 @@ pub struct PacmanDiff {
 pub struct PendingDeps {
     pub name: String,
     pub commit: String,
-    pub symlink_path: PathBuf,
-    pub symlink_target: PathBuf,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symlink_path: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symlink_target: Option<PathBuf>,
     pub pre_all: Vec<String>,
     pub pre_explicit: Vec<String>,
 }
@@ -194,8 +198,8 @@ mod tests {
             name: "dms".into(),
             commit: "abc123".into(),
             installed_at: InstallRecord::now_rfc3339(),
-            symlink_path: PathBuf::from("/home/x/.config/quickshell/dms"),
-            symlink_target: PathBuf::from("/home/x/.cache/rice-cooker/rices/dms"),
+            symlink_path: Some(PathBuf::from("/home/x/.config/quickshell/dms")),
+            symlink_target: Some(PathBuf::from("/home/x/.cache/rice-cooker/rices/dms")),
             pacman_diff: PacmanDiff {
                 added_explicit: vec!["caelestia-shell-git".into()],
                 removed: Vec::new(),
@@ -230,8 +234,8 @@ mod tests {
         let pending = PendingDeps {
             name: "dms".into(),
             commit: "abc123".into(),
-            symlink_path: PathBuf::from("/home/x/.config/quickshell/dms"),
-            symlink_target: PathBuf::from("/home/x/.cache/rice-cooker/rices/dms"),
+            symlink_path: Some(PathBuf::from("/home/x/.config/quickshell/dms")),
+            symlink_target: Some(PathBuf::from("/home/x/.cache/rice-cooker/rices/dms")),
             pre_all: vec!["quickshell".into()],
             pre_explicit: vec!["quickshell".into()],
         };

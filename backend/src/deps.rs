@@ -2,7 +2,6 @@
 //! prompt via --sudo pkexec. No helper binary, no native AUR handling.
 
 use std::env;
-use std::os::unix::fs::PermissionsExt;
 use std::os::unix::process::ExitStatusExt;
 use std::process::{Command, ExitStatus, Stdio};
 
@@ -22,7 +21,12 @@ impl Helper {
                 let candidate = dir.join(name);
                 if let Ok(md) = std::fs::metadata(&candidate)
                     && md.is_file()
-                    && (md.permissions().mode() & 0o111) != 0
+                    && Command::new(&candidate)
+                        .arg("--version")
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .status()
+                        .is_ok_and(|status| status.success())
                 {
                     return Some(helper);
                 }

@@ -458,30 +458,34 @@ fn replay_original_shell<W: Write>(paths: &Paths, events: &mut EventWriter<W>) -
 }
 
 fn remove_rice_symlink(record: &InstallRecord) -> Result<()> {
-    let md = match fs::symlink_metadata(&record.symlink_path) {
+    let (Some(symlink_path), Some(symlink_target)) = (&record.symlink_path, &record.symlink_target)
+    else {
+        return Ok(());
+    };
+    let md = match fs::symlink_metadata(symlink_path) {
         Ok(md) => md,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(e) => return Err(anyhow!("reading {}: {e}", record.symlink_path.display())),
+        Err(e) => return Err(anyhow!("reading {}: {e}", symlink_path.display())),
     };
     if !md.file_type().is_symlink() {
         eprintln!(
             "rice-cooker: skipping {}: not a symlink anymore",
-            record.symlink_path.display()
+            symlink_path.display()
         );
         return Ok(());
     }
-    let target = fs::read_link(&record.symlink_path)
-        .with_context(|| format!("read_link {}", record.symlink_path.display()))?;
-    if target != record.symlink_target {
+    let target = fs::read_link(symlink_path)
+        .with_context(|| format!("read_link {}", symlink_path.display()))?;
+    if target != *symlink_target {
         eprintln!(
             "rice-cooker: skipping {}: target is {target:?}, expected {:?} (user-retargeted?)",
-            record.symlink_path.display(),
-            record.symlink_target
+            symlink_path.display(),
+            symlink_target
         );
         return Ok(());
     }
-    fs::remove_file(&record.symlink_path)
-        .with_context(|| format!("removing symlink {}", record.symlink_path.display()))
+    fs::remove_file(symlink_path)
+        .with_context(|| format!("removing symlink {}", symlink_path.display()))
 }
 
 pub fn list(cat: &Catalog, paths: &Paths) -> Result<Vec<ListRow>> {
@@ -583,8 +587,13 @@ fn do_deps(
         &PendingDeps {
             name: name.to_string(),
             commit: entry.commit.clone(),
-            symlink_path: expand_home(&entry.symlink_dst, &paths.home),
-            symlink_target: paths.clone_dir(name)?.join(&entry.symlink_src),
+            symlink_path: (!entry.package_managed)
+                .then(|| expand_home(&entry.symlink_dst, &paths.home)),
+            symlink_target: if entry.package_managed {
+                None
+            } else {
+                Some(paths.clone_dir(name)?.join(&entry.symlink_src))
+            },
             pre_all: pre_all.clone(),
             pre_explicit: pre_explicit.clone(),
         },
@@ -639,14 +648,19 @@ fn union_sorted(mut prior: Vec<String>, next: Vec<String>) -> Vec<String> {
 }
 
 fn do_record(paths: &Paths, name: &str, entry: &RiceEntry, pacman_diff: PacmanDiff) -> Result<()> {
-    let clone = paths.clone_dir(name)?;
+    let symlink_target = if entry.package_managed {
+        None
+    } else {
+        Some(paths.clone_dir(name)?.join(&entry.symlink_src))
+    };
     let record = InstallRecord {
         schema_version: SCHEMA_VERSION,
         name: name.to_string(),
         commit: entry.commit.clone(),
         installed_at: InstallRecord::now_rfc3339(),
-        symlink_path: expand_home(&entry.symlink_dst, &paths.home),
-        symlink_target: clone.join(&entry.symlink_src),
+        symlink_path: (!entry.package_managed)
+            .then(|| expand_home(&entry.symlink_dst, &paths.home)),
+        symlink_target,
         pacman_diff,
     };
     save_record(&paths.record_json(name)?, &record)?;
