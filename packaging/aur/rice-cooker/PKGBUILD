@@ -6,15 +6,15 @@ pkgdesc="View, customize and share Hyprland rices"
 arch=('x86_64')
 url="https://github.com/amarsbar/rice-cooker"
 license=('BSD-3-Clause')
-depends=('electron41' 'git' 'hicolor-icon-theme' 'hyprland' 'polkit' 'quickshell')
+depends=('electron41' 'git' 'hicolor-icon-theme' 'hyprland' 'polkit' 'qt6-5compat' 'qt6-multimedia' 'quickshell-git')
 makedepends=('cargo' 'npm' 'rust')
 optdepends=(
     'paru: preferred AUR helper for installing rice dependencies'
     'yay: alternative AUR helper for installing rice dependencies'
     'hyprpolkitagent: polkit authentication agent (any polkit agent works)'
+    'ttf-material-symbols-variable: icon font for Whisker and Nandoroid'
+    'ttf-outfit: intended UI font for Whisker'
 )
-provides=('rice-cooker-backend')
-conflicts=('rice-cooker-backend' 'rice-cooker-backend-git' 'rice-cooker-git')
 source=(
     "$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz"
     'rice-cooker.sh'

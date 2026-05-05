@@ -33,6 +33,9 @@ pub struct RiceEntry {
     pub symlink_src: String,
     /// Symlink destination, `~`-expanded. Must stay under `$HOME`.
     pub symlink_dst: String,
+    /// True when the package installs a Quickshell config discoverable by `-c`.
+    #[serde(default)]
+    pub package_managed: bool,
     /// Default false; flip to true after auditing the upstream install.
     #[serde(default)]
     pub install_supported: bool,
@@ -188,6 +191,7 @@ mod tests {
         assert!(e.pacman_deps.is_empty());
         assert!(e.preview_aur_deps.is_empty());
         assert!(e.preview_pacman_deps.is_empty());
+        assert!(!e.package_managed);
         assert!(!e.install_supported);
         assert!(!e.interactive);
     }
@@ -318,18 +322,23 @@ mod tests {
             [caelestia]
             display_name = "Caelestia"
             creator_name = "soramenew"
-            repo = "https://github.com/caelestia-dots/caelestia"
-            commit = "0283b44960791ab12cde19c9797d70976a0b96a4"
+            repo = "https://github.com/caelestia-dots/shell"
+            commit = "efc08759ceaeddc2c571d868c623995270ac365d"
             symlink_src = "."
             symlink_dst = "~/.config/quickshell/caelestia"
+            package_managed = true
             install_supported = true
-            aur_deps = ["caelestia-shell-git"]
-            preview_aur_deps = ["caelestia-shell-git"]
+            aur_deps = ["quickshell-git", "caelestia-shell"]
+            preview_aur_deps = ["quickshell-git", "caelestia-shell"]
         "#;
         let c = Catalog::parse(t).unwrap();
         let e = c.get("caelestia").unwrap();
         assert!(e.install_supported);
-        assert_eq!(e.aur_deps, vec!["caelestia-shell-git"]);
-        assert_eq!(e.preview_aur_deps, vec!["caelestia-shell-git"]);
+        assert!(e.package_managed);
+        assert_eq!(e.aur_deps, vec!["quickshell-git", "caelestia-shell"]);
+        assert_eq!(
+            e.preview_aur_deps,
+            vec!["quickshell-git", "caelestia-shell"]
+        );
     }
 }

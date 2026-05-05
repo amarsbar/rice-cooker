@@ -15,11 +15,12 @@
 [caelestia]
 display_name = "Caelestia"
 creator_name = "soramenew"
-description = "Caelestia Quickshell. Ships as caelestia-shell-git AUR."
-repo = "https://github.com/caelestia-dots/caelestia"
-commit = "0283b44960791ab12cde19c9797d70976a0b96a4"
+description = "Caelestia Quickshell. Ships as caelestia-shell AUR."
+repo = "https://github.com/caelestia-dots/shell"
+commit = "efc08759ceaeddc2c571d868c623995270ac365d"
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/caelestia"
+package_managed = true
 pacman_deps = [
   "hyprland",
   "xdg-desktop-portal-hyprland",
@@ -33,8 +34,8 @@ pacman_deps = [
   "fish",
   "jq",
 ]
-aur_deps = ["caelestia-shell-git"]
-preview_aur_deps = ["caelestia-shell-git"]
+aur_deps = ["quickshell-git", "caelestia-shell"]
+preview_aur_deps = ["quickshell-git", "caelestia-shell"]
 
 [noctalia]
 display_name = "Noctalia"
@@ -54,6 +55,7 @@ pacman_deps = [
   "wl-clipboard",
   "wtype",
 ]
+preview_aur_deps = ["noctalia-shell", "noctalia-qs"]
 
 [dms]
 display_name = "DankMaterialShell"
@@ -119,6 +121,8 @@ pacman_deps = [
   "pipewire",
 ]
 aur_deps = ["whisker-shell-git"]
+preview_pacman_deps = ["ttf-material-symbols-variable"]
+preview_aur_deps = ["ttf-outfit"]
 
 [nandoroid]
 display_name = "Nandoroid"
@@ -168,12 +172,13 @@ aur_deps = [
   "quickshell-git",
   "matugen-bin",
 ]
+preview_pacman_deps = ["ttf-material-symbols-variable"]
 documented_system_effects = [
   "only the Quickshell config is installed; matugen templates, Hyprland source block/keybinds, terminal/fish/starship injection, Google Sans Flex, and Nandoroid CLI are not installed",
 ]
 
 [zephyr]
-display_name = "Zephyr (flicko)"
+display_name = "Zephyr"
 creator_name = "flickowoa"
 description = "flickowoa's Zephyr Quickshell"
 repo = "https://github.com/flickowoa/dotfiles"

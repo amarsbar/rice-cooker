@@ -17,8 +17,8 @@ use crate::paths::{OriginalShell, Paths, expand_home};
 use crate::process::{self, VerifyResult};
 
 use super::record::{
-    InstallRecord, PacmanDiff, SCHEMA_VERSION, clear_current, load_record, read_current,
-    save_record, write_current,
+    InstallRecord, PacmanDiff, PendingDeps, SCHEMA_VERSION, clear_current, clear_pending_deps,
+    load_pending_deps, load_record, read_current, save_pending_deps, save_record, write_current,
 };
 use super::symlink as symlink_shape;
 
@@ -128,6 +128,7 @@ fn run_activate<W: Write>(
     let Some(_lock) = acquire_lock(paths, events)? else {
         return Ok(false);
     };
+    try_stage!(events, "deps", reconcile_pending_deps(paths));
 
     let entry = match cat.get(name) {
         Some(e) if !is_placeholder_commit(&e.commit) => e,
@@ -187,7 +188,7 @@ fn run_activate<W: Write>(
     }
     step(events, Step::Preflight, StepState::Done)?;
 
-    let mut prior_added_explicit = Vec::new();
+    let mut prior_pacman_diff = PacmanDiff::default();
     let same_current = current.as_deref() == Some(name);
     if same_current {
         // current.json can be stale (crash, manual kill) — only short-circuit
@@ -201,7 +202,7 @@ fn run_activate<W: Write>(
         }
         let record_path = try_stage!(events, "record", "path", paths.record_json(name));
         let record = try_stage!(events, "record", "load", load_record(&record_path));
-        prior_added_explicit = record.pacman_diff.added_explicit;
+        prior_pacman_diff = record.pacman_diff;
     }
 
     // Evict outgoing rice (no replay — we launch a new one next).
@@ -218,18 +219,36 @@ fn run_activate<W: Write>(
     step(events, Step::Clone, StepState::Done)?;
 
     step(events, Step::Deps, StepState::Start)?;
-    let newly_added = try_stage!(events, "deps", do_deps(&selected_deps));
-    step(events, Step::Deps, StepState::Done)?;
-    let added_explicit = merge_added_explicit(prior_added_explicit, newly_added);
+    let deps_outcome = try_stage!(events, "deps", do_deps(paths, name, entry, &selected_deps));
+    if deps_outcome.install_error.is_none() {
+        step(events, Step::Deps, StepState::Done)?;
+    }
+    let mut pacman_diff = deps_outcome.pacman_diff;
+    let current_run_changed =
+        !pacman_diff.added_explicit.is_empty() || !pacman_diff.removed.is_empty();
+    pacman_diff.added_explicit =
+        union_sorted(prior_pacman_diff.added_explicit, pacman_diff.added_explicit);
+    if same_current {
+        pacman_diff.removed = union_sorted(prior_pacman_diff.removed, pacman_diff.removed);
+    }
+    if let Some(reason) = deps_outcome.install_error {
+        if current_run_changed {
+            step(events, Step::Record, StepState::Start)?;
+            try_stage!(events, "record", do_record(paths, name, entry, pacman_diff));
+            try_stage!(events, "record", clear_pending_deps(paths));
+            step(events, Step::Record, StepState::Done)?;
+        } else {
+            try_stage!(events, "deps", clear_pending_deps(paths));
+        }
+        emit_fail(events, "deps", &reason, None)?;
+        return Ok(false);
+    }
 
     // Record persists BEFORE symlink so a symlink failure still leaves
     // a record uninstall can use to roll back the packages.
     step(events, Step::Record, StepState::Start)?;
-    try_stage!(
-        events,
-        "record",
-        do_record(paths, name, entry, added_explicit)
-    );
+    try_stage!(events, "record", do_record(paths, name, entry, pacman_diff));
+    try_stage!(events, "record", clear_pending_deps(paths));
     step(events, Step::Record, StepState::Done)?;
 
     step(events, Step::Symlink, StepState::Start)?;
@@ -287,6 +306,7 @@ pub fn run_uninstall<W: Write>(
     let Some(_lock) = acquire_lock(paths, events)? else {
         return Ok(false);
     };
+    try_stage!(events, "deps", reconcile_pending_deps(paths));
 
     step(events, Step::Preflight, StepState::Start)?;
     let current = try_stage!(events, "preflight", read_current(paths));
@@ -337,6 +357,22 @@ fn uninstall_locked<W: Write>(
                 "deps",
                 "remove_packages",
                 deps::remove_packages(&still)
+            );
+        }
+    }
+    if !record.pacman_diff.removed.is_empty() {
+        let missing = try_stage!(
+            events,
+            "deps",
+            "filter_removed",
+            deps::missing(&record.pacman_diff.removed)
+        );
+        if !missing.is_empty() {
+            try_stage!(
+                events,
+                "deps",
+                "restore_removed",
+                deps::install_packages(&missing)
             );
         }
     }
@@ -422,30 +458,34 @@ fn replay_original_shell<W: Write>(paths: &Paths, events: &mut EventWriter<W>) -
 }
 
 fn remove_rice_symlink(record: &InstallRecord) -> Result<()> {
-    let md = match fs::symlink_metadata(&record.symlink_path) {
+    let (Some(symlink_path), Some(symlink_target)) = (&record.symlink_path, &record.symlink_target)
+    else {
+        return Ok(());
+    };
+    let md = match fs::symlink_metadata(symlink_path) {
         Ok(md) => md,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(e) => return Err(anyhow!("reading {}: {e}", record.symlink_path.display())),
+        Err(e) => return Err(anyhow!("reading {}: {e}", symlink_path.display())),
     };
     if !md.file_type().is_symlink() {
         eprintln!(
             "rice-cooker: skipping {}: not a symlink anymore",
-            record.symlink_path.display()
+            symlink_path.display()
         );
         return Ok(());
     }
-    let target = fs::read_link(&record.symlink_path)
-        .with_context(|| format!("read_link {}", record.symlink_path.display()))?;
-    if target != record.symlink_target {
+    let target = fs::read_link(symlink_path)
+        .with_context(|| format!("read_link {}", symlink_path.display()))?;
+    if target != *symlink_target {
         eprintln!(
             "rice-cooker: skipping {}: target is {target:?}, expected {:?} (user-retargeted?)",
-            record.symlink_path.display(),
-            record.symlink_target
+            symlink_path.display(),
+            symlink_target
         );
         return Ok(());
     }
-    fs::remove_file(&record.symlink_path)
-        .with_context(|| format!("removing symlink {}", record.symlink_path.display()))
+    fs::remove_file(symlink_path)
+        .with_context(|| format!("removing symlink {}", symlink_path.display()))
 }
 
 pub fn list(cat: &Catalog, paths: &Paths) -> Result<Vec<ListRow>> {
@@ -499,58 +539,138 @@ pub(crate) fn clone_cache_hit(clone_dir: &Path, commit: &str) -> bool {
 }
 
 fn do_clone(paths: &Paths, name: &str, entry: &RiceEntry) -> Result<()> {
+    if entry.package_managed {
+        return Ok(());
+    }
     let clone = paths.clone_dir(name)?;
+    let tmp = clone.with_extension("rctmp");
+    remove_dir_all_forceful(&tmp)?;
     if clone_cache_hit(&clone, &entry.commit) {
         return Ok(());
     }
+    git::clone_at_commit(&entry.repo, &entry.commit, &tmp)?;
     if clone.exists() {
         remove_dir_all_forceful(&clone)
             .with_context(|| format!("removing stale clone {}", clone.display()))?;
     }
-    git::clone_at_commit(&entry.repo, &entry.commit, &clone)
+    fs::rename(&tmp, &clone)
+        .with_context(|| format!("renaming {} -> {}", tmp.display(), clone.display()))
 }
 
-fn do_deps(all_deps: &[String]) -> Result<Vec<String>> {
-    let missing = deps::missing(all_deps)?;
-    // Skip both pacman -Qqe snapshots when there's nothing to install.
-    if missing.is_empty() {
-        return Ok(Vec::new());
+struct DepsOutcome {
+    pacman_diff: PacmanDiff,
+    install_error: Option<String>,
+}
+
+fn do_deps(
+    paths: &Paths,
+    name: &str,
+    entry: &RiceEntry,
+    all_deps: &[String],
+) -> Result<DepsOutcome> {
+    if all_deps.is_empty() {
+        return Ok(DepsOutcome {
+            pacman_diff: PacmanDiff::default(),
+            install_error: None,
+        });
     }
-    let pre = pacman_explicit().context("pacman -Qqe pre-snapshot")?;
-    deps::install_packages(&missing)?;
-    let post = pacman_explicit().context("pacman -Qqe post-snapshot")?;
-    Ok(diff_explicit(&pre, &post))
+    if deps_are_satisfied(all_deps)? {
+        return Ok(DepsOutcome {
+            pacman_diff: PacmanDiff::default(),
+            install_error: None,
+        });
+    }
+    let pre_all = pacman_all().context("pacman -Qq pre-snapshot")?;
+    let pre_explicit = pacman_explicit().context("pacman -Qqe pre-snapshot")?;
+    save_pending_deps(
+        paths,
+        &PendingDeps {
+            name: name.to_string(),
+            commit: entry.commit.clone(),
+            symlink_path: (!entry.package_managed)
+                .then(|| expand_home(&entry.symlink_dst, &paths.home)),
+            symlink_target: if entry.package_managed {
+                None
+            } else {
+                Some(paths.clone_dir(name)?.join(&entry.symlink_src))
+            },
+            pre_all: pre_all.clone(),
+            pre_explicit: pre_explicit.clone(),
+        },
+    )?;
+    let install_result = deps::install_packages(all_deps);
+    let post_all = pacman_all().context("pacman -Qq post-snapshot")?;
+    let post_explicit = pacman_explicit().context("pacman -Qqe post-snapshot")?;
+    Ok(DepsOutcome {
+        pacman_diff: PacmanDiff {
+            added_explicit: diff_packages(&pre_explicit, &post_explicit),
+            removed: diff_packages(&post_all, &pre_all),
+        },
+        install_error: install_result.err().map(|e| format!("{e:#}")),
+    })
+}
+
+fn reconcile_pending_deps(paths: &Paths) -> Result<()> {
+    let Some(pending) = load_pending_deps(paths)? else {
+        return Ok(());
+    };
+    let post_all = pacman_all().context("pacman -Qq pending-deps recovery snapshot")?;
+    let post_explicit = pacman_explicit().context("pacman -Qqe pending-deps recovery snapshot")?;
+    let pacman_diff = PacmanDiff {
+        added_explicit: diff_packages(&pending.pre_explicit, &post_explicit),
+        removed: diff_packages(&post_all, &pending.pre_all),
+    };
+    if !pacman_diff.added_explicit.is_empty() || !pacman_diff.removed.is_empty() {
+        let record = InstallRecord {
+            schema_version: SCHEMA_VERSION,
+            name: pending.name.clone(),
+            commit: pending.commit,
+            installed_at: InstallRecord::now_rfc3339(),
+            symlink_path: pending.symlink_path,
+            symlink_target: pending.symlink_target,
+            pacman_diff,
+        };
+        save_record(&paths.record_json(&pending.name)?, &record)?;
+        write_current(paths, &pending.name)?;
+    }
+    clear_pending_deps(paths)
 }
 
 fn deps_are_satisfied(all_deps: &[String]) -> Result<bool> {
     Ok(deps::missing(all_deps)?.is_empty())
 }
 
-fn merge_added_explicit(mut prior: Vec<String>, newly_added: Vec<String>) -> Vec<String> {
-    prior.extend(newly_added);
+fn union_sorted(mut prior: Vec<String>, next: Vec<String>) -> Vec<String> {
+    prior.extend(next);
     prior.sort();
     prior.dedup();
     prior
 }
 
-fn do_record(paths: &Paths, name: &str, entry: &RiceEntry, added: Vec<String>) -> Result<()> {
-    let clone = paths.clone_dir(name)?;
+fn do_record(paths: &Paths, name: &str, entry: &RiceEntry, pacman_diff: PacmanDiff) -> Result<()> {
+    let symlink_target = if entry.package_managed {
+        None
+    } else {
+        Some(paths.clone_dir(name)?.join(&entry.symlink_src))
+    };
     let record = InstallRecord {
         schema_version: SCHEMA_VERSION,
         name: name.to_string(),
         commit: entry.commit.clone(),
         installed_at: InstallRecord::now_rfc3339(),
-        symlink_path: expand_home(&entry.symlink_dst, &paths.home),
-        symlink_target: clone.join(&entry.symlink_src),
-        pacman_diff: PacmanDiff {
-            added_explicit: added,
-        },
+        symlink_path: (!entry.package_managed)
+            .then(|| expand_home(&entry.symlink_dst, &paths.home)),
+        symlink_target,
+        pacman_diff,
     };
     save_record(&paths.record_json(name)?, &record)?;
     write_current(paths, name)
 }
 
 fn do_symlink(paths: &Paths, name: &str, entry: &RiceEntry) -> Result<()> {
+    if entry.package_managed {
+        return Ok(());
+    }
     let clone = paths.clone_dir(name)?;
     symlink_shape::create_symlink(&clone, entry, &paths.home)
         .context("run `rice-cooker-backend uninstall` to roll back")
@@ -618,12 +738,24 @@ fn record_original(paths: &Paths) -> Result<()> {
 }
 
 fn pacman_explicit() -> Result<Vec<String>> {
+    pacman_query(&["-Qqe"])
+}
+
+fn pacman_all() -> Result<Vec<String>> {
+    pacman_query(&["-Qq"])
+}
+
+fn pacman_query(args: &[&str]) -> Result<Vec<String>> {
     let out = Command::new("pacman")
-        .args(["-Qqe"])
+        .args(args)
         .output()
-        .context("running pacman -Qqe")?;
+        .with_context(|| format!("running pacman {}", args.join(" ")))?;
     if !out.status.success() {
-        return Err(anyhow!("pacman -Qqe exited {:?}", out.status.code()));
+        return Err(anyhow!(
+            "pacman {} exited {:?}",
+            args.join(" "),
+            out.status.code()
+        ));
     }
     Ok(String::from_utf8_lossy(&out.stdout)
         .lines()
@@ -633,7 +765,7 @@ fn pacman_explicit() -> Result<Vec<String>> {
         .collect())
 }
 
-fn diff_explicit(pre: &[String], post: &[String]) -> Vec<String> {
+fn diff_packages(pre: &[String], post: &[String]) -> Vec<String> {
     use std::collections::HashSet;
     let pre_set: HashSet<&str> = pre.iter().map(String::as_str).collect();
     let mut added: Vec<String> = post
@@ -679,18 +811,18 @@ mod tests {
     use std::process::Stdio;
 
     #[test]
-    fn diff_explicit_finds_added() {
+    fn diff_packages_finds_added() {
         let pre = vec!["a".into(), "b".into()];
         let post = vec!["a".into(), "b".into(), "c".into(), "d".into()];
-        assert_eq!(diff_explicit(&pre, &post), vec!["c", "d"]);
+        assert_eq!(diff_packages(&pre, &post), vec!["c", "d"]);
     }
 
     #[test]
-    fn diff_explicit_ignores_removed_and_unchanged() {
+    fn diff_packages_ignores_removed_and_unchanged() {
         let pre: Vec<String> = vec!["a".into(), "b".into()];
         let shrunk: Vec<String> = vec!["a".into()];
-        assert!(diff_explicit(&pre, &shrunk).is_empty());
-        assert!(diff_explicit(&pre, &pre).is_empty());
+        assert!(diff_packages(&pre, &shrunk).is_empty());
+        assert!(diff_packages(&pre, &pre).is_empty());
     }
 
     fn init_repo_at(dir: &Path) -> String {
@@ -761,6 +893,7 @@ mod tests {
             commit: "0123456789abcdef0123456789abcdef01234567".into(),
             symlink_src: ".".into(),
             symlink_dst: "~/.config/quickshell/x".into(),
+            package_managed: false,
             install_supported: true,
             aur_deps: vec!["aur-install".into()],
             pacman_deps: vec!["repo-install".into()],
@@ -785,9 +918,9 @@ mod tests {
     }
 
     #[test]
-    fn merge_added_explicit_sorts_and_dedups() {
+    fn union_sorted_sorts_and_dedups() {
         assert_eq!(
-            merge_added_explicit(
+            union_sorted(
                 vec!["zsh".into(), "fish".into()],
                 vec!["fish".into(), "starship".into()]
             ),

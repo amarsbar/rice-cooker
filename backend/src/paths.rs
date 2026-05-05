@@ -83,6 +83,9 @@ impl Paths {
         validate_name(name)?;
         Ok(self.installs_dir().join(format!("{name}.json")))
     }
+    pub fn pending_deps_json(&self) -> PathBuf {
+        self.installs_dir().join("pending-deps.json")
+    }
 
     pub fn original_file(&self) -> PathBuf {
         self.cache_home.join("original")
@@ -138,7 +141,12 @@ impl Paths {
     }
 
     pub fn clear_original(&self) -> Result<()> {
-        remove_if_exists(&self.original_file())
+        let path = self.original_file();
+        match fs::remove_file(&path) {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(e).with_context(|| format!("removing {}", path.display())),
+        }
     }
 }
 
@@ -179,14 +187,6 @@ pub fn expand_home(raw: &str, home: &Path) -> PathBuf {
         home.to_path_buf()
     } else {
         PathBuf::from(raw)
-    }
-}
-
-fn remove_if_exists(p: &Path) -> Result<()> {
-    match fs::remove_file(p) {
-        Ok(()) => Ok(()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(e).with_context(|| format!("removing {}", p.display())),
     }
 }
 

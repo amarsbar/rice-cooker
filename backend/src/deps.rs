@@ -3,7 +3,6 @@
 
 use std::env;
 use std::os::unix::process::ExitStatusExt;
-use std::path::Path;
 use std::process::{Command, ExitStatus, Stdio};
 
 use anyhow::{Context, Result, anyhow};
@@ -19,7 +18,16 @@ impl Helper {
         let path = env::var_os("PATH")?;
         for (name, helper) in [("paru", Helper::Paru), ("yay", Helper::Yay)] {
             for dir in env::split_paths(&path) {
-                if is_executable_file(&dir.join(name)) {
+                let candidate = dir.join(name);
+                if let Ok(md) = std::fs::metadata(&candidate)
+                    && md.is_file()
+                    && Command::new(&candidate)
+                        .arg("--version")
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .status()
+                        .is_ok_and(|status| status.success())
+                {
                     return Some(helper);
                 }
             }
@@ -77,7 +85,7 @@ pub fn install_packages(pkgs: &[String]) -> Result<()> {
     let mut cmd = Command::new(helper.bin());
     match helper {
         Helper::Paru => {
-            cmd.args(["--sudobin", "pkexec", "--skipreview"]);
+            cmd.args(["--sudo", "pkexec", "--skipreview"]);
         }
         Helper::Yay => {
             cmd.args([
@@ -94,7 +102,7 @@ pub fn install_packages(pkgs: &[String]) -> Result<()> {
             ]);
         }
     }
-    cmd.args(["-S", "--needed", "--noconfirm"]);
+    cmd.args(["--useask", "-S", "--needed", "--noconfirm"]);
     cmd.args(pkgs);
     cmd.stdin(Stdio::null())
         .stdout(Stdio::inherit())
@@ -176,14 +184,6 @@ fn validate_pkg_names(pkgs: &[String]) -> Result<()> {
         }
     }
     Ok(())
-}
-
-fn is_executable_file(p: &Path) -> bool {
-    use std::os::unix::fs::PermissionsExt;
-    match std::fs::metadata(p) {
-        Ok(md) => md.is_file() && (md.permissions().mode() & 0o111) != 0,
-        Err(_) => false,
-    }
 }
 
 /// Distinguishes "not installed" (exit 1) from "pacman is broken" (any other
