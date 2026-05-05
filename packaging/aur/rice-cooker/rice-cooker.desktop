@@ -2,6 +2,7 @@
 Name=Rice Cooker
 Comment=View, customize and share Hyprland rices
 Exec=rice-cooker %U
+Icon=rice-cooker
 Terminal=false
 Type=Application
 Categories=Utility;

@@ -16,6 +16,7 @@ const execFileAsync = promisify(execFile);
 
 const APP_CLASS_PATTERN = /^(electron|Electron|rice-cooker)$/;
 const APP_TITLE = 'Rice Cooker';
+const APP_ICON_FILE = 'rice-cooker.png';
 const CONFLICTING_SHELLS = ['waybar', 'ags', 'astal', 'eww', 'yambar'] as const;
 const HYPRLAND_WINDOW_EFFECTS = [
   ['no_blur', 'on'],
@@ -145,6 +146,12 @@ function backendBaseArgs(): string[] {
   return [];
 }
 
+function appIconPath(): string {
+  return app.isPackaged
+    ? join(app.getAppPath(), APP_ICON_FILE)
+    : join(process.cwd(), 'packaging/icons', APP_ICON_FILE);
+}
+
 async function backendList(): Promise<RiceListRow[]> {
   const { stdout } = await execFileAsync(backendBin(), [...backendBaseArgs(), 'list'], {
     maxBuffer: 1024 * 1024,
@@ -237,6 +244,7 @@ function runBackend(request: BackendRunRequest, sender?: WebContents): Promise<B
 }
 
 function createWindow(): void {
+  const icon = appIconPath();
   const scale =
     Number(process.env['RICE_SCALE']) ||
     Math.max(
@@ -261,6 +269,7 @@ function createWindow(): void {
     fullscreenable: false,
     backgroundColor: '#00000000',
     show: false,
+    icon,
     webPreferences: {
       preload: join(__dirname, '../preload/index.cjs'),
       nodeIntegration: false,

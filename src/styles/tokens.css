@@ -69,6 +69,17 @@
   --c-step-text: var(--color-brown);                 /* step pill "1" glyph */
   --c-wheel-rim: var(--color-mint-deep);
   --c-wheel-inner: var(--color-cream);
+  --c-preview-nav: var(--color-yellow);
+  --c-preview-meta: var(--c-card-border);
+  --c-preview-action-bg: var(--color-yellow);
+  --c-preview-action-icon: var(--color-brown);
+  --c-preview-action-active-bg: var(--color-green);
+  --c-preview-action-active-icon: var(--color-lime);
+  --c-preview-word-bg: var(--color-green);
+  --c-preview-word-letter-bg: var(--color-lime);
+  --c-preview-word-letter-text: var(--color-brown);
+  --c-preview-pointer: var(--color-lime);
+  --c-preview-dot: var(--color-yellow);
   --c-grid: var(--color-grid-t2);
   --c-knob-dot: var(--color-knob-dot-t2);
   --c-knob-body: var(--color-knob-green);
@@ -78,6 +89,9 @@
   --c-btn-default-icon: var(--color-brown);          /* back/github/delete default icon (fill + stroke) */
   --c-btn-hover-bg: var(--color-green);
   --c-btn-hover-icon: var(--color-lime);
+  --c-physical-bg: var(--color-yellow);
+  --c-physical-pressed-bg: var(--color-lime);
+  --c-physical-icon: var(--color-brown);
   --c-screen-text: var(--color-lime);
   --c-screen-text-on-pill: var(--color-brown);
   --c-antenna: var(--color-antenna);
@@ -117,11 +131,23 @@
   --c-close-pin: var(--color-pink);
   --c-primary: var(--color-light-blue);
   --c-primary-text: var(--color-near-black);
+  --c-header-accent: var(--color-light-pink);
   --c-logo-stroke: var(--color-near-black);
   --c-accent: var(--color-light-pink);
   --c-step-text: var(--color-counter-text);
   --c-wheel-rim: var(--color-light-blue);
   --c-wheel-inner: var(--color-cream-soft);
+  --c-preview-nav: var(--color-light-pink);
+  --c-preview-meta: var(--color-mint);
+  --c-preview-action-bg: var(--color-light-blue);
+  --c-preview-action-icon: var(--color-navy);
+  --c-preview-action-active-bg: var(--color-navy);
+  --c-preview-action-active-icon: var(--color-light-blue);
+  --c-preview-word-bg: var(--color-navy);
+  --c-preview-word-letter-bg: var(--color-light-blue);
+  --c-preview-word-letter-text: var(--color-brown);
+  --c-preview-pointer: var(--color-light-pink);
+  --c-preview-dot: var(--color-light-pink);
   --c-grid: var(--color-grid-t1);
   --c-knob-dot: var(--color-yellow-deep);
   --c-knob-body: var(--color-yellow-deep);
@@ -131,6 +157,10 @@
   --c-btn-default-icon: var(--color-navy);
   --c-btn-hover-bg: var(--color-light-pink);
   --c-btn-hover-icon: var(--color-brown);          /* t1 hover arrow is brown, not lime */
+  --c-physical-bg: var(--color-light-pink);
+  --c-physical-pressed-bg: var(--color-light-blue);
+  --c-physical-icon: var(--color-brown);
+  --c-screen-text: var(--color-light-blue);
   --c-closing-bg: var(--color-near-black);
 }
 
@@ -148,11 +178,23 @@
   --c-close-pin: var(--color-red);
   --c-primary: var(--color-lime);
   --c-primary-text: var(--color-brown);
+  --c-header-accent: var(--color-lime);
   --c-logo-stroke: black;
   --c-accent: var(--color-lime);
   --c-step-text: var(--color-counter-text);
   --c-wheel-rim: var(--color-sky-soft);
   --c-wheel-inner: var(--color-charcoal);
+  --c-preview-nav: var(--color-lime);
+  --c-preview-meta: var(--color-light-blue);
+  --c-preview-action-bg: var(--color-lime);
+  --c-preview-action-icon: var(--color-brown);
+  --c-preview-action-active-bg: var(--color-light-blue);
+  --c-preview-action-active-icon: var(--color-charcoal);
+  --c-preview-word-bg: var(--color-light-blue);
+  --c-preview-word-letter-bg: var(--color-charcoal);
+  --c-preview-word-letter-text: var(--color-light-blue);
+  --c-preview-pointer: var(--color-lime);
+  --c-preview-dot: var(--color-lime);
   /* Same grid as t2, knocked down to 10% alpha so it reads as a subtle
      pattern on the dark t3 wheel rather than bright white lines. */
   --c-grid: rgba(240, 237, 233, 0.1);
@@ -164,6 +206,10 @@
   --c-btn-default-icon: var(--color-brown);
   --c-btn-hover-bg: var(--color-light-blue);
   --c-btn-hover-icon: var(--color-navy);
+  --c-physical-bg: var(--color-lime);
+  --c-physical-pressed-bg: var(--color-light-blue);
+  --c-physical-icon: var(--color-brown);
+  --c-screen-text: var(--color-light-blue);
   --c-closing-bg: var(--color-near-black);
 }
 

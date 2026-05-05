@@ -6,7 +6,7 @@ pkgdesc="View, customize and share Hyprland rices"
 arch=('x86_64')
 url="https://github.com/amarsbar/rice-cooker"
 license=('BSD-3-Clause')
-depends=('electron41' 'git' 'hyprland' 'polkit' 'quickshell')
+depends=('electron41' 'git' 'hicolor-icon-theme' 'hyprland' 'polkit' 'quickshell')
 makedepends=('cargo' 'npm' 'rust')
 optdepends=(
     'paru: preferred AUR helper for installing rice dependencies'
@@ -55,9 +55,15 @@ package() {
         "$pkgdir/usr/share/rice-cooker/catalog.toml"
     install -Dm644 "backend/polkit/so.butterfly.ricecooker.policy" \
         "$pkgdir/usr/share/polkit-1/actions/so.butterfly.ricecooker.policy"
+    install -Dm644 "packaging/icons/rice-cooker.svg" \
+        "$pkgdir/usr/share/icons/hicolor/scalable/apps/rice-cooker.svg"
+    install -Dm644 "packaging/icons/rice-cooker.png" \
+        "$pkgdir/usr/share/icons/hicolor/512x512/apps/rice-cooker.png"
 
     install -dm755 "$pkgdir/usr/share/rice-cooker"
     cp -a out/main out/preload out/renderer package.json "$pkgdir/usr/share/rice-cooker/"
+    install -Dm644 "packaging/icons/rice-cooker.png" \
+        "$pkgdir/usr/share/rice-cooker/rice-cooker.png"
 
     install -Dm755 "$srcdir/rice-cooker.sh" "$pkgdir/usr/bin/rice-cooker"
     install -Dm644 "$srcdir/rice-cooker.desktop" \

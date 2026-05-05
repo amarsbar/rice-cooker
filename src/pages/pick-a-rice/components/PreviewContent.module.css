@@ -10,11 +10,12 @@
   font-family: var(--font-pill);
   font-size: 14px;
   font-weight: 400;
-  color: var(--color-yellow);
+  color: var(--c-preview-nav);
   line-height: normal;
   letter-spacing: -0.28px;
   text-align: center;
   white-space: nowrap;
+  transition: color var(--theme-color-transition);
 }
 
 .prevLabel {
@@ -36,8 +37,8 @@
   border: 0;
   padding: 10px;
   border-radius: 200px;
-  background: var(--color-yellow);
-  color: var(--color-brown);
+  background: var(--c-preview-action-bg);
+  color: var(--c-preview-action-icon);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -62,8 +63,8 @@
   width: 48px;
   height: 48px;
   padding: 12px;
-  background: var(--color-green);
-  color: var(--color-lime);
+  background: var(--c-preview-action-active-bg);
+  color: var(--c-preview-action-active-icon);
 }
 
 .action_leave {
@@ -105,6 +106,8 @@
   position: absolute;
   pointer-events: none;
   transform-origin: center;
+  color: var(--c-preview-pointer);
+  transition: color var(--theme-color-transition);
 }
 
 .pointerLeave {
@@ -145,11 +148,15 @@
   padding: 10px;
   border: 0;
   border-radius: 130px;
-  background: var(--color-green);
+  background: var(--c-preview-word-bg);
   color: var(--color-brown);
   cursor: pointer;
   font: inherit;
-  transition: left 140ms ease-out, top 140ms ease-out;
+  transition:
+    left 140ms ease-out,
+    top 140ms ease-out,
+    background-color var(--theme-color-transition),
+    color var(--theme-color-transition);
 }
 
 .word_leave {
@@ -200,7 +207,7 @@
   height: 44px;
   margin-right: -10px;
   border-radius: 100px;
-  background: var(--color-lime);
+  background: var(--c-preview-word-letter-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -208,9 +215,12 @@
   font-family: var(--font-pill);
   font-size: 22px;
   font-weight: 400;
-  color: var(--color-brown);
+  color: var(--c-preview-word-letter-text);
   line-height: 1;
   text-align: center;
+  transition:
+    background-color var(--theme-color-transition),
+    color var(--theme-color-transition);
 }
 
 .metaLabel {
@@ -221,7 +231,7 @@
   font-family: var(--font-display);
   font-size: 15px;
   font-weight: 400;
-  color: var(--c-card-border);
+  color: var(--c-preview-meta);
   line-height: normal;
   text-align: center;
   white-space: nowrap;

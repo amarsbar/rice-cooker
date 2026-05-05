@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import styles from './MenuScreen.module.css';
 import holdStyles from './HoldPaint.module.css';
-import riceCookerText from '@/assets/menu/rice-cooker-text.svg';
+import menuLogo from '@/assets/menu/menu-logo.svg';
 import backIcon from '@/assets/icons/back.svg';
 import externalIcon from '@/assets/menu/external.svg';
 import KeyUp from '@/assets/menu/arrow-key.svg?react';
@@ -399,8 +399,7 @@ export function MenuScreen({
 
   return (
     <div className={styles.menu} onClick={(event) => event.stopPropagation()}>
-      <div className={styles.version}>V0.1</div>
-      <img src={riceCookerText} alt="" className={styles.logoImage} />
+      <img src={menuLogo} alt="" className={styles.logoImage} />
 
       <div className={styles.backGroup} onMouseEnter={() => onActiveChange('back')} onClick={onBack}>
         <span className={cx(styles.backCircle, backVisualActive && styles.backCircleActive)}>

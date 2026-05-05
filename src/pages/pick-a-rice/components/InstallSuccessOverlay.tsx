@@ -1,7 +1,7 @@
 import { motion, type Transition } from 'framer-motion';
 import styles from './InstallSuccessOverlay.module.css';
 import MenuDotsSvg from '@/assets/screen/four-dots.svg?react';
-import escIcon from '@/assets/screen/esc.svg';
+import EscIcon from '@/assets/screen/esc.svg?react';
 import riceInstalled from '@/assets/install-success/rice-installed.svg';
 import revertAnytime from '@/assets/install-success/revert-anytime.svg';
 import { StarSvg } from './PreviewStars';
@@ -45,7 +45,7 @@ export function InstallSuccessOverlay() {
       >
         <MenuDotsSvg className={styles.menuIcon} />
         <p className={styles.menuLabel}>Menu</p>
-        <img src={escIcon} alt="" className={styles.escIcon} />
+        <EscIcon aria-hidden="true" className={styles.escIcon} />
       </motion.div>
       <motion.img
         src={revertAnytime}
