@@ -13,29 +13,13 @@
   color: #e8ff76;
 }
 
-.version {
-  position: absolute;
-  left: 154px;
-  top: 66px;
-  padding: 6px;
-  border: 1px solid #7d6e64;
-  border-radius: 110px;
-  color: #7d6e64;
-  font-size: 12px;
-  letter-spacing: -0.24px;
-  line-height: 1;
-  animation:
-    left-float-in 400ms cubic-bezier(0.16, 0.885, 0.25, 1.14) both,
-    guide-fade-in 100ms linear both;
-}
-
 .logoImage {
   position: absolute;
-  left: 14px;
-  top: 4px;
+  left: 12px;
+  top: 10px;
   display: block;
-  width: 131px;
-  height: 100px;
+  width: 190px;
+  height: 90px;
   max-width: none;
   animation:
     left-float-in 400ms cubic-bezier(0.16, 0.885, 0.25, 1.14) both,

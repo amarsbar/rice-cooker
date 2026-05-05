@@ -4,11 +4,13 @@ import styles from './ScrollWheel.module.css';
 import { OutlinedText } from './OutlinedText';
 import RimSvg from '@/assets/scroll-wheel/rim.svg?react';
 import GridSvg from '@/assets/scroll-wheel/grid.svg?react';
-import installRiceSvg from '@/assets/scroll-wheel/install-rice.svg';
-import dotfilesSvg from '@/assets/scroll-wheel/dotfiles.svg';
-import tryAnotherSvg from '@/assets/scroll-wheel/try-another.svg';
-import previewReadySvg from '@/assets/scroll-wheel/preview-ready.svg';
-import lookingGoodSvg from '@/assets/scroll-wheel/looking-good.svg';
+import InstallRiceGraphic from '@/assets/scroll-wheel/install-rice.svg?react';
+import DotfilesGraphic from '@/assets/scroll-wheel/dotfiles.svg?react';
+import TryAnotherGraphic from '@/assets/scroll-wheel/try-another.svg?react';
+import PreviewReadyGraphic from '@/assets/scroll-wheel/preview-ready.svg?react';
+import LookingGoodGraphic from '@/assets/scroll-wheel/looking-good.svg?react';
+import InstallingGraphic from '@/assets/scroll-wheel/installing.svg?react';
+import LoadingPreviewGraphic from '@/assets/scroll-wheel/loading-preview.svg?react';
 import BootEnterMessage from '@/assets/scroll-wheel/boot-enter.svg?react';
 import BootCloseMessage from '@/assets/scroll-wheel/boot-close.svg?react';
 import BootGithubMessage from '@/assets/scroll-wheel/boot-github.svg?react';
@@ -19,6 +21,7 @@ import {
   RICE_ITEM_PITCH,
   type PreviewOption,
   type ScrollState,
+  type View,
   SCREEN_FADE_TRANSITION,
   SHRUNKEN_TEXT_VARIANTS,
   usePreviewOption,
@@ -63,17 +66,28 @@ const BOOT_MESSAGES = {
   close: BootCloseMessage,
   github: BootGithubMessage,
 } as const;
+const PREVIEW_GRAPHICS = {
+  dots: DotfilesGraphic,
+  install: InstallRiceGraphic,
+  installing: InstallingGraphic,
+  leave: TryAnotherGraphic,
+  loadingPreview: LoadingPreviewGraphic,
+  lookingGood: LookingGoodGraphic,
+  ready: PreviewReadyGraphic,
+} as const;
 
 export function ScrollWheel({
   menuItem = null,
   bootItem = null,
   installIntroActive = false,
   installSuccessActive = false,
+  downloadDoneView = null,
 }: {
   menuItem?: MenuItem | null;
   bootItem?: BootItem | null;
   installIntroActive?: boolean;
   installSuccessActive?: boolean;
+  downloadDoneView?: View | null;
 }) {
   const view = useView();
   const previewOption = usePreviewOption();
@@ -86,23 +100,31 @@ export function ScrollWheel({
   const bootActive = bootIndex >= 0;
   const introActive = installIntroActive && view === 'preview' && !menuActive && !bootActive;
   const successActive = installSuccessActive && view === 'picking' && !menuActive && !bootActive;
+  const downloadingActive = view === 'downloading' && !menuActive && !bootActive;
   const previewActive = previewIndex >= 0 && !menuActive && !bootActive && !introActive;
   const previewWheelActive = previewActive || introActive;
   const activeScroll = menuActive
     ? { offset: menuIndex * RICE_ITEM_PITCH, index: menuIndex, total: MENU_ITEMS.length }
     : bootActive
       ? { offset: bootIndex * RICE_ITEM_PITCH, index: bootIndex, total: BOOT_WHEEL_ITEMS.length }
+      : downloadingActive
+        ? { offset: 0, index: 0, total: 1 }
       : previewWheelActive
         ? { offset: previewIndex * RICE_ITEM_PITCH, index: previewIndex, total: PREVIEW_OPTIONS.length }
         : successActive
           ? { offset: 0, index: 0, total: 1 }
           : scroll;
-  const controlledWheel = menuActive || bootActive || previewWheelActive || successActive;
+  const controlledWheel = menuActive || bootActive || downloadingActive || previewWheelActive || successActive;
   const pickingContentVisible = menuActive || (!bootActive && view === 'picking' && !successActive);
   const bootContentVisible = bootActive;
-  const previewContentVisible = previewWheelActive || successActive;
+  const previewContentVisible = downloadingActive || previewWheelActive || successActive;
   const dotsVisible = previewActive || bootContentVisible;
   const dotOption = bootItem ? BOOT_DOT_OPTION[bootItem] : previewOption;
+  const previewGraphic = successActive
+    ? 'lookingGood'
+    : downloadingActive
+      ? downloadDoneView === 'picking' ? 'installing' : 'loadingPreview'
+      : introActive ? 'ready' : previewOption;
 
   return (
     <motion.div
@@ -144,7 +166,7 @@ export function ScrollWheel({
           animate={previewContentVisible ? 'visible' : 'hidden'}
           variants={SHRUNKEN_TEXT_VARIANTS}
         >
-          <PreviewWheelGraphic option={successActive ? 'lookingGood' : introActive ? 'ready' : previewOption} />
+          <PreviewWheelGraphic option={previewGraphic} />
         </motion.div>
 
         <motion.div
@@ -170,24 +192,18 @@ export function ScrollWheel({
 }
 
 function BootWheelGraphic({ item }: { item: BootItem }) {
-  const cls = `${styles.bootGraphic} ${styles[`bootGraphic_${item}`]}`;
   const Message = BOOT_MESSAGES[item];
-  return <Message className={cls} aria-hidden="true" />;
+  return <Message className={styles.bootGraphic} aria-hidden="true" />;
 }
 
-function PreviewWheelGraphic({ option }: { option: PreviewOption | 'ready' | 'lookingGood' }) {
+function PreviewWheelGraphic({
+  option,
+}: {
+  option: PreviewOption | 'ready' | 'lookingGood' | 'loadingPreview' | 'installing';
+}) {
   const cls = `${styles.previewGraphic} ${styles[`previewGraphic_${option}`]}`;
-  const src =
-    option === 'lookingGood'
-      ? lookingGoodSvg
-      : option === 'ready'
-      ? previewReadySvg
-      : option === 'leave'
-        ? tryAnotherSvg
-        : option === 'dots'
-          ? dotfilesSvg
-          : installRiceSvg;
-  return <img className={cls} src={src} alt="" aria-hidden="true" />;
+  const Graphic = PREVIEW_GRAPHICS[option];
+  return <Graphic className={cls} aria-hidden="true" />;
 }
 
 const PREVIEW_DOTS: Record<

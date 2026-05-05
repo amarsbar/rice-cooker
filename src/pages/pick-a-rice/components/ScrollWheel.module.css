@@ -161,7 +161,8 @@
 .previewDot {
   position: absolute;
   border-radius: 50%;
-  background: var(--color-yellow);
+  background: var(--c-preview-dot);
+  transition: background-color var(--theme-color-transition);
 }
 
 .previewGraphic {
@@ -170,6 +171,15 @@
   transform: translate(-50%, -50%);
   overflow: visible;
   pointer-events: none;
+  --preview-graphic-fill: var(--c-preview-dot);
+  --preview-graphic-text: var(--color-brown);
+}
+
+.previewGraphic *,
+.bootGraphic * {
+  transition:
+    fill var(--theme-color-transition),
+    stroke var(--theme-color-transition);
 }
 
 .previewGraphic_install {
@@ -207,6 +217,20 @@
   height: 77px;
 }
 
+.previewGraphic_loadingPreview {
+  left: calc(50% + 0.5px);
+  top: 50%;
+  width: 137px;
+  height: 78px;
+}
+
+.previewGraphic_installing {
+  left: 50%;
+  top: calc(50% + 0.5px);
+  width: 136px;
+  height: 43px;
+}
+
 .bootGraphic {
   position: absolute;
   left: 50%;
@@ -216,20 +240,5 @@
   transform: translate(-50%, -50%);
   pointer-events: none;
   color: var(--color-brown);
-}
-
-.bootGraphic_enter {
-  width: 91px;
-  height: 64px;
-}
-
-.bootGraphic_close {
-  width: 126px;
-  height: 93px;
-}
-
-.bootGraphic_github {
-  width: 92px;
-  height: 80px;
 }
 

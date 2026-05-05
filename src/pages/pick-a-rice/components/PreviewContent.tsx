@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import BackIcon from '@/assets/icons/back.svg?react';
 import DownloadIcon from '@/assets/preview-actions/download.svg?react';
 import GithubIcon from '@/assets/icons/github.svg?react';
-import pointer from '@/assets/icons/pointer.svg';
+import PointerIcon from '@/assets/icons/pointer.svg?react';
 import styles from './PreviewContent.module.css';
 import { SHRUNKEN_TEXT_VARIANTS, usePreviewOption, useView, type PreviewOption } from '../view';
 
@@ -112,23 +112,20 @@ function OptionPointers({ option }: { option: PreviewOption }) {
   if (option === 'install') {
     return (
       <>
-        <img
-          alt=""
-          src={pointer}
+        <PointerIcon
+          aria-hidden="true"
           className={`${styles.pointer} ${styles.pointerInstallTop}`}
         />
-        <img
-          alt=""
-          src={pointer}
+        <PointerIcon
+          aria-hidden="true"
           className={`${styles.pointer} ${styles.pointerInstallBottom}`}
         />
       </>
     );
   }
   return (
-    <img
-      alt=""
-      src={pointer}
+    <PointerIcon
+      aria-hidden="true"
       className={`${styles.pointer} ${
         option === 'leave' ? styles.pointerLeave : styles.pointerDots
       }`}

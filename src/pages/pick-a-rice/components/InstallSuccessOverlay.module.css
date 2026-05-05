@@ -20,7 +20,7 @@
   top: 3px;
   width: 19.999px;
   height: 19.999px;
-  --c-primary: var(--color-yellow);
+  --c-primary: var(--c-header-accent);
 }
 
 .menuLabel {
@@ -32,7 +32,8 @@
   font-size: 14px;
   font-weight: 400;
   line-height: normal;
-  color: var(--color-yellow);
+  color: var(--c-header-accent);
+  transition: color var(--theme-color-transition);
   white-space: nowrap;
 }
 
@@ -42,6 +43,12 @@
   top: 0;
   width: 22px;
   height: 14px;
+  --esc-bg: var(--c-header-accent);
+  --esc-text: var(--c-screen-text-on-pill);
+}
+
+.escIcon * {
+  transition: fill var(--theme-color-transition);
 }
 
 .revertAnytime {

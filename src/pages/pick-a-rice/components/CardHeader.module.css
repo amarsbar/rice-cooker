@@ -30,6 +30,12 @@
   top: 11px;
   width: 22px;
   height: 14px;
+  --esc-bg: var(--c-header-accent);
+  --esc-text: var(--c-screen-text-on-pill);
+}
+
+.escIcon * {
+  transition: fill var(--theme-color-transition);
 }
 
 .navLabel {
