@@ -29,9 +29,11 @@ rice cooker is best experienced with the keyboard and sound on.
 
 **keys**
 
-↑ &nbsp;&nbsp; move selection up
-↓ &nbsp;&nbsp; move selection down
-↵ &nbsp;&nbsp; apply selection
+```
+↑   move selection up
+↓   move selection down
+↵   apply selection
+```
 
 rice cooker has two modes: (1) browse and (2) preview.
 
@@ -39,7 +41,7 @@ rice cooker has two modes: (1) browse and (2) preview.
 
 explore rices from the community.
 
-- **1.1 menu**
+- **1.1 menu (ESC)**
   - revert (hold ↵ to confirm)
   - submit a rice
   - credits
@@ -65,7 +67,7 @@ the rice cooker catalog is built from dotfiles openly shared by the community. s
 
 a good rice is organized and complete. every submission is reviewed before it lands in the catalog.
 
-[submit a rice →]((https://rumbling-turret-acd.notion.site/3502d6c6b1b280c6887ac95c786c2285?pvs=105))
+[→ submit a rice](https://rumbling-turret-acd.notion.site/3502d6c6b1b280c6887ac95c786c2285?pvs=105)
 
 ## credits
 
