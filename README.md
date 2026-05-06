@@ -24,18 +24,10 @@ yay -S rice-cooker
 ```
 
 ## user guide
-rice cooker is best experienced with the keyboard and sound on.
+rice cooker has two modes: (1) browse and (2) preview.
 <img src="src/assets/readme/blueprint.png">
 
-**keys**
 
-```
-↑   move selection up
-↓   move selection down
-↵   apply selection
-```
-
-rice cooker has two modes: (1) browse and (2) preview.
 
 ### 1. browse mode (expanded)
 
@@ -60,6 +52,12 @@ selecting a rice shows a live preview on your actual desktop. during this mode r
 - **2.4 dot** — opens the rice's dotfiles on github
 
 preview and install times depend on the size of the rice. you may be prompted for a password when installing dependencies.
+
+### rice cooker is best experienced with the keyboard and sound on.
+- ↑   move selection up
+- ↓   move selection down
+- ↵   apply selection
+
 
 ## submitting a rice
 
