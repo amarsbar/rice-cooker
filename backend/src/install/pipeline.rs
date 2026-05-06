@@ -363,20 +363,12 @@ fn uninstall_locked<W: Write>(
         }
     }
     if !record.pacman_diff.removed.is_empty() {
-        let missing = try_stage!(
+        try_stage!(
             events,
             "deps",
-            "filter_removed",
-            deps::missing(&record.pacman_diff.removed)
+            "restore_removed",
+            deps::install_packages(&record.pacman_diff.removed)
         );
-        if !missing.is_empty() {
-            try_stage!(
-                events,
-                "deps",
-                "restore_removed",
-                deps::install_packages(&missing)
-            );
-        }
     }
     step(events, Step::Deps, StepState::Done)?;
 
