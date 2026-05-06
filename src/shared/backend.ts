@@ -2,11 +2,9 @@ export interface RiceListRow {
   name: string;
   display_name: string;
   creator_name: string;
-  description: string;
   repo: string;
   install_supported: boolean;
   installed: boolean;
-  documented_system_effects: string[];
 }
 
 export type BackendCommand = 'preview' | 'install' | 'uninstall';

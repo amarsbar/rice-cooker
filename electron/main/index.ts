@@ -79,6 +79,7 @@ const BASE_SIZE = { width: 666, height: 574 } as const;
 const FIGMA_HEIGHT_RATIO = 600 / 1080;
 const RAW_TAIL_LIMIT = 100;
 let activeBackendChild: ChildProcessWithoutNullStreams | null = null;
+let backendRunLogInitialized = false;
 
 function executableInPath(name: string): boolean {
   for (const dir of (process.env['PATH'] ?? '').split(':')) {
@@ -187,7 +188,9 @@ function createBackendRunLog(runId: string): {
     const dir = join(cacheHome, 'rice-cooker');
     mkdirSync(dir, { recursive: true });
 
-    const stream = createWriteStream(join(dir, 'last-run.ndjson'), { flags: 'w' });
+    const logPath = join(dir, 'last-run.ndjson');
+    const stream = createWriteStream(logPath, { flags: backendRunLogInitialized ? 'a' : 'w' });
+    backendRunLogInitialized = true;
     let writable = true;
     let ended = false;
     stream.on('error', () => {

@@ -450,6 +450,7 @@ dependencies = [
  "assert_cmd",
  "clap",
  "fs4",
+ "indexmap",
  "insta",
  "regex",
  "serde",

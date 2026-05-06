@@ -153,19 +153,27 @@ symlink_dst_for() {
     echo "${raw/#\~/$HOME}"
 }
 
-install_supported_for() {
+install_available_for() {
     local name=$1
-    local raw
-    raw=$(awk -v n="[$name]" '
+    awk -v n="[$name]" '
+        function has_item(s) {
+            sub(/#.*/, "", s)
+            return s ~ /"[^"]+"/
+        }
         $0 == n { in_block=1; next }
         /^\[/ { in_block=0 }
-        in_block && /^install_supported/ {
-            sub(/^install_supported *= */, ""); print; exit
+        in_block && /^install_deps[[:space:]]*=/ {
+            found=1
+            line=$0
+            sub(/^[^[]*\[/, "", line)
+            while (1) {
+                if (has_item(line)) { print 1; exit }
+                if (line ~ /\]/) { print 0; exit }
+                if ((getline line) <= 0) { print 0; exit }
+            }
         }
-    ' "$CAT")
-    raw=${raw%%#*}
-    raw=${raw%%[[:space:]]*}
-    [ "$raw" = "true" ] && echo 1 || echo 0
+        END { if (!found) print 0 }
+    ' "$CAT"
 }
 
 pgrep_count() {
@@ -280,9 +288,9 @@ for name in "${RICES[@]}"; do
     fi
 
     printf '\n%s is active. Inspect it now.\n' "$name"
-    can_install=$(install_supported_for "$name")
+    can_install=$(install_available_for "$name")
     if [ "$can_install" -eq 0 ]; then
-        printf 'install unavailable: catalog marks this rice preview-only\n'
+        printf 'install unavailable: catalog has no install_deps for this rice\n'
     fi
     action=$(prompt_preview_action "$can_install")
     if [ "$action" = "stop" ]; then

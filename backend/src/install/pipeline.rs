@@ -1,5 +1,6 @@
 //! preview / install / uninstall / list / status pipeline.
 
+use std::collections::HashSet;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -8,7 +9,7 @@ use std::process::Command;
 use anyhow::{Context, Result, anyhow};
 use serde::Serialize;
 
-use crate::catalog::{Catalog, RiceEntry, is_placeholder_commit};
+use crate::catalog::{Catalog, RiceEntry};
 use crate::deps;
 use crate::events::{Event, EventWriter, SCHEMA_VERSION as EVENT_SCHEMA_VERSION, Step, StepState};
 use crate::git;
@@ -32,11 +33,9 @@ pub struct ListRow {
     pub name: String,
     pub display_name: String,
     pub creator_name: String,
-    pub description: String,
     pub repo: String,
     pub install_supported: bool,
     pub installed: bool,
-    pub documented_system_effects: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -58,15 +57,11 @@ impl ActivateMode {
         }
     }
 
-    fn deps_for(self, entry: &RiceEntry) -> Vec<String> {
-        let (pacman, aur) = match self {
-            ActivateMode::Install => (entry.pacman_deps.as_slice(), entry.aur_deps.as_slice()),
-            ActivateMode::Preview => (
-                entry.preview_pacman_deps.as_slice(),
-                entry.preview_aur_deps.as_slice(),
-            ),
-        };
-        [pacman, aur].concat()
+    fn deps_for(self, entry: &RiceEntry) -> &[String] {
+        match self {
+            ActivateMode::Install => &entry.install_deps,
+            ActivateMode::Preview => &entry.preview_deps,
+        }
     }
 }
 
@@ -131,19 +126,7 @@ fn run_activate<W: Write>(
     try_stage!(events, "deps", reconcile_pending_deps(paths));
 
     let entry = match cat.get(name) {
-        Some(e) if !is_placeholder_commit(&e.commit) => e,
-        Some(e) => {
-            emit_fail(
-                events,
-                "preflight",
-                &format!(
-                    "{name}: commit is a placeholder ({}); pin a real SHA in catalog.toml",
-                    e.commit
-                ),
-                None,
-            )?;
-            return Ok(false);
-        }
+        Some(e) => e,
         None => {
             emit_fail(
                 events,
@@ -155,7 +138,7 @@ fn run_activate<W: Write>(
         }
     };
 
-    if mode == ActivateMode::Install && !entry.install_supported {
+    if mode == ActivateMode::Install && entry.install_deps.is_empty() {
         emit_fail(
             events,
             "preflight",
@@ -351,30 +334,41 @@ fn uninstall_locked<W: Write>(
             "filter_installed",
             deps::installed(&record.pacman_diff.added_explicit)
         );
-        if !still.is_empty() {
+        let removed: HashSet<&str> = record
+            .pacman_diff
+            .removed
+            .iter()
+            .map(String::as_str)
+            .collect();
+        let mut remove_first = Vec::new();
+        for pkg in still {
+            let is_replacement = !removed.is_empty()
+                && try_stage!(
+                    events,
+                    "deps",
+                    "classify_replacement",
+                    pacman_relations_overlap_removed(&pkg, &removed)
+                );
+            if !is_replacement {
+                remove_first.push(pkg);
+            }
+        }
+        if !remove_first.is_empty() {
             try_stage!(
                 events,
                 "deps",
                 "remove_packages",
-                deps::remove_packages(&still)
+                deps::remove_packages(&remove_first)
             );
         }
     }
     if !record.pacman_diff.removed.is_empty() {
-        let missing = try_stage!(
+        try_stage!(
             events,
             "deps",
-            "filter_removed",
-            deps::missing(&record.pacman_diff.removed)
+            "restore_removed",
+            deps::install_packages(&record.pacman_diff.removed)
         );
-        if !missing.is_empty() {
-            try_stage!(
-                events,
-                "deps",
-                "restore_removed",
-                deps::install_packages(&missing)
-            );
-        }
     }
     step(events, Step::Deps, StepState::Done)?;
 
@@ -497,11 +491,9 @@ pub fn list(cat: &Catalog, paths: &Paths) -> Result<Vec<ListRow>> {
             name: name.clone(),
             display_name: entry.display_name.clone(),
             creator_name: entry.creator_name.clone(),
-            description: entry.description.clone(),
             repo: entry.repo.clone(),
-            install_supported: entry.install_supported,
+            install_supported: !entry.install_deps.is_empty(),
             installed: current.as_deref() == Some(name.as_str()),
-            documented_system_effects: entry.documented_system_effects.clone(),
         })
         .collect())
 }
@@ -745,6 +737,32 @@ fn pacman_all() -> Result<Vec<String>> {
     pacman_query(&["-Qq"])
 }
 
+fn pacman_relations_overlap_removed(pkg: &str, removed: &HashSet<&str>) -> Result<bool> {
+    let out = Command::new("pacman")
+        .env("LC_ALL", "C")
+        .args(["-Qi", pkg])
+        .output()
+        .with_context(|| format!("running pacman -Qi {pkg}"))?;
+    if !out.status.success() {
+        return Err(anyhow!("pacman -Qi {pkg} exited {:?}", out.status.code()));
+    }
+
+    Ok(String::from_utf8_lossy(&out.stdout).lines().any(|line| {
+        let Some((key, value)) = line.split_once(':') else {
+            return false;
+        };
+        matches!(key.trim(), "Provides" | "Conflicts With" | "Replaces")
+            && value
+                .split_whitespace()
+                .filter(|name| *name != "None")
+                .map(|name| {
+                    name.split_once(['=', '<', '>'])
+                        .map_or(name, |(base, _)| base)
+                })
+                .any(|name| removed.contains(name))
+    }))
+}
+
 fn pacman_query(args: &[&str]) -> Result<Vec<String>> {
     let out = Command::new("pacman")
         .args(args)
@@ -888,19 +906,14 @@ mod tests {
         RiceEntry {
             display_name: "X".into(),
             creator_name: "x".into(),
-            description: String::new(),
             repo: "https://x".into(),
             commit: "0123456789abcdef0123456789abcdef01234567".into(),
             symlink_src: ".".into(),
             symlink_dst: "~/.config/quickshell/x".into(),
             package_managed: false,
-            install_supported: true,
-            aur_deps: vec!["aur-install".into()],
-            pacman_deps: vec!["repo-install".into()],
-            preview_aur_deps: vec!["aur-preview".into()],
-            preview_pacman_deps: vec!["repo-preview".into()],
+            preview_deps: vec!["preview-a".into(), "preview-b".into()],
+            install_deps: vec!["install-a".into(), "install-b".into()],
             interactive: false,
-            documented_system_effects: vec![],
         }
     }
 
@@ -909,11 +922,11 @@ mod tests {
         let entry = entry_with_deps();
         assert_eq!(
             ActivateMode::Install.deps_for(&entry),
-            vec!["repo-install".to_string(), "aur-install".to_string()]
+            &["install-a".to_string(), "install-b".to_string()]
         );
         assert_eq!(
             ActivateMode::Preview.deps_for(&entry),
-            vec!["repo-preview".to_string(), "aur-preview".to_string()]
+            &["preview-a".to_string(), "preview-b".to_string()]
         );
     }
 

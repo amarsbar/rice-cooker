@@ -1,11 +1,11 @@
 import placeholderRice from '@/assets/rices/placeholder-rice.webp';
-import caelestiaScreenshot from '@/assets/rice-screenshots/caelestia.png';
-import dmsScreenshot from '@/assets/rice-screenshots/dankmaterialshell.png';
-import linuxRetroismScreenshot from '@/assets/rice-screenshots/linux-retroism.png';
-import nandoroidScreenshot from '@/assets/rice-screenshots/nandoroid.png';
-import noctaliaScreenshot from '@/assets/rice-screenshots/noctalia.png';
-import whiskerScreenshot from '@/assets/rice-screenshots/whisker.png';
-import zephyrScreenshot from '@/assets/rice-screenshots/zephyr.png';
+import caelestiaScreenshot from '@/assets/rices/caelestia.png';
+import dmsScreenshot from '@/assets/rices/dankmaterialshell.png';
+import linuxRetroismScreenshot from '@/assets/rices/linux-retroism.png';
+import nandoroidScreenshot from '@/assets/rices/nandoroid.png';
+import noctaliaScreenshot from '@/assets/rices/noctalia.png';
+import whiskerScreenshot from '@/assets/rices/whisker.png';
+import zephyrScreenshot from '@/assets/rices/zephyr.png';
 
 const SCREENSHOTS: Record<string, string> = {
   caelestia: caelestiaScreenshot,

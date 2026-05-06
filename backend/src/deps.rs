@@ -102,7 +102,7 @@ pub fn install_packages(pkgs: &[String]) -> Result<()> {
             ]);
         }
     }
-    cmd.args(["--useask", "-S", "--needed", "--noconfirm"]);
+    cmd.args(["--useask", "-S", "--needed", "--noconfirm", "--ask", "4"]);
     cmd.args(pkgs);
     cmd.stdin(Stdio::null())
         .stdout(Stdio::inherit())
@@ -161,7 +161,7 @@ fn pkexec_error(status: ExitStatus, label: &str) -> anyhow::Error {
 }
 
 /// Defense-in-depth. The catalog validator already gates what reaches
-/// `pacman_deps`/`aur_deps`; this ensures a future catalog-bypassing caller
+/// dependency installation; this ensures a future catalog-bypassing caller
 /// still can't feed arbitrary argv into pkexec-privileged pacman.
 fn validate_pkg_names(pkgs: &[String]) -> Result<()> {
     for p in pkgs {
