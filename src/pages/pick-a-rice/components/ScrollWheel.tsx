@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { motion } from 'framer-motion';
 import styles from './ScrollWheel.module.css';
 import { OutlinedText } from './OutlinedText';
@@ -55,6 +55,10 @@ const CREAM_CENTER = 88;
 const PILL_Y_BASE = 18.5;
 const PILL_Y_STEP = 0;
 const RIM_ROTATE_PER_PX = 0.1;
+const MAX_RICE_NAME_CHARS = 20;
+const RICE_NAME_BASE_SIZE = 27.65;
+const RICE_NAME_TARGET_CHARS = 9.5;
+const RICE_NAME_MIN_SIZE = 13;
 const BOOT_WHEEL_ITEMS: BootItem[] = ['enter', 'close', 'github'];
 const BOOT_DOT_OPTION: Record<BootItem, PreviewOption> = {
   enter: 'leave',
@@ -79,12 +83,14 @@ const PREVIEW_GRAPHICS = {
 export function ScrollWheel({
   menuItem = null,
   bootItem = null,
+  riceName = '',
   installIntroActive = false,
   installSuccessActive = false,
   downloadDoneView = null,
 }: {
   menuItem?: MenuItem | null;
   bootItem?: BootItem | null;
+  riceName?: string;
   installIntroActive?: boolean;
   installSuccessActive?: boolean;
   downloadDoneView?: View | null;
@@ -125,6 +131,10 @@ export function ScrollWheel({
     : downloadingActive
       ? downloadDoneView === 'picking' ? 'installing' : 'loadingPreview'
       : introActive ? 'ready' : previewOption;
+  const wheelRiceName = fitRiceName(riceName);
+  const riceNameStyle = {
+    '--rice-name-size': `${riceNameFontSize(wheelRiceName)}px`,
+  } as CSSProperties;
 
   return (
     <motion.div
@@ -154,9 +164,9 @@ export function ScrollWheel({
           transition={SCREEN_FADE_TRANSITION}
         >
           <BeadIndicator scroll={activeScroll} />
-          <OutlinedText className={`${styles.tag} ${styles.tagTop}`}>niri</OutlinedText>
-          <OutlinedText className={`${styles.tag} ${styles.tagBottom}`}>dms</OutlinedText>
-          <OutlinedText className={`${styles.tag} ${styles.tagPlus}`}>+</OutlinedText>
+          <OutlinedText className={`${styles.tag} ${styles.riceName}`} style={riceNameStyle}>
+            {wheelRiceName}
+          </OutlinedText>
           <KeyIndicator pressed={pressed} />
         </motion.div>
 
@@ -189,6 +199,15 @@ export function ScrollWheel({
       </motion.div>
     </motion.div>
   );
+}
+
+function fitRiceName(name: string): string {
+  return Array.from(name.trim()).slice(0, MAX_RICE_NAME_CHARS).join('');
+}
+
+function riceNameFontSize(name: string): number {
+  if (name.length <= RICE_NAME_TARGET_CHARS) return RICE_NAME_BASE_SIZE;
+  return Math.max(RICE_NAME_MIN_SIZE, RICE_NAME_BASE_SIZE * RICE_NAME_TARGET_CHARS / name.length);
 }
 
 function BootWheelGraphic({ item }: { item: BootItem }) {

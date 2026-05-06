@@ -567,6 +567,7 @@ export function PickARice() {
               <ScrollWheel
                 menuItem={menuOpen ? menuItem : null}
                 bootItem={bootOpen ? bootItem : null}
+                riceName={selectedRice?.display_name}
                 installIntroActive={installIntroActive}
                 installSuccessActive={installSuccessActive}
                 downloadDoneView={view === 'downloading' ? downloadDoneViewRef.current : null}

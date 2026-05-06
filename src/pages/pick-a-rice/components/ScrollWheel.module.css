@@ -102,19 +102,19 @@
   --outline-width: 6px;
 }
 
-.tagTop {
-  left: 70px;
-  top: 59px;
-}
-
-.tagBottom {
-  left: 52px;
-  top: 81px;
-}
-
-.tagPlus {
-  left: 108px;
-  top: 78px;
+.riceName {
+  left: 50%;
+  top: 64px;
+  width: 142px;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--rice-name-size, var(--fs-tag));
+  text-align: center;
+  line-height: 0.9;
+  white-space: nowrap;
+  transform: translateX(-50%);
 }
 
 .key {
@@ -241,4 +241,3 @@
   pointer-events: none;
   color: var(--color-brown);
 }
-

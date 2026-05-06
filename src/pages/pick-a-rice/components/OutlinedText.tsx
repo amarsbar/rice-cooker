@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type CSSProperties } from 'react';
 import { useTheme } from '../view';
 
 /** Renders `children` into a DPR-scaled canvas with a round-joined stroke
@@ -9,9 +9,11 @@ import { useTheme } from '../view';
 export function OutlinedText({
   children,
   className,
+  style,
 }: {
   children: string;
   className?: string;
+  style?: CSSProperties;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
   const { theme } = useTheme();
@@ -39,7 +41,7 @@ export function OutlinedText({
   }, [children, theme]);
 
   return (
-    <span ref={ref} className={className} aria-label={children}>
+    <span ref={ref} className={className} style={style} aria-label={children}>
       {children}
     </span>
   );
