@@ -1,11 +1,11 @@
 # Maintainer: amarsbar <ammarhossain10@gmail.com>
 pkgname=rice-cooker
-pkgver=0.1.0.r0.g98e7d3d0
+pkgver=0.1.0.r0.g369950de
 pkgrel=1
 pkgdesc="View, customize and share Hyprland rices"
 arch=('x86_64')
 url="https://github.com/amarsbar/rice-cooker"
-_commit=98e7d3d0bed91538959c0cd21cce8fcf068042f7
+_commit=369950de0126813d574536dceb3aa29ee0c23297
 _srcdir="$pkgname-$_commit"
 license=('BSD-3-Clause')
 depends=('electron41' 'git' 'hicolor-icon-theme' 'hyprland' 'polkit' 'qt6-5compat' 'qt6-multimedia' 'quickshell-git')
