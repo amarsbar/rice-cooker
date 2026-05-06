@@ -3,6 +3,7 @@
 
 <img src="src/assets/readme/readme-heroimg.png">
 
+## rice cooker
 a visual (toy) tool for ricing hyprland.
 
 browse rices, try them live on your desktop, and install them with a keyboard click. if you don't like what you see, _revert_ returns you to the original rice you started with.
@@ -22,7 +23,7 @@ yay -S rice-cooker
 # or paru
 ```
 
-## features
+## user guide
 rice cooker is best experienced with the keyboard and sound on.
 <img src="src/assets/readme/blueprint.png">
 
@@ -38,13 +39,13 @@ rice cooker has two modes: (1) browse and (2) preview.
 
 explore rices from the community.
 
-- **1.1 sound** — toggle sound on and off
-- **1.2 close** — exit rice cooker
-- **1.3 theme** — switch between 3 themes
-- **1.4 menu**
+- **1.1 menu**
   - revert (hold ↵ to confirm)
   - submit a rice
   - credits
+- **1.2 close** — exit rice cooker
+- **1.3 sound** — toggle sound on and off
+- **1.4 theme** — switch between 3 colour themes
 - **1.5 HUD** — provides context like rice name, rice number, keyboard press indicators
 
 ### 2. preview mode (mini)
@@ -64,10 +65,10 @@ the rice cooker catalog is built from dotfiles openly shared by the community. s
 
 a good rice is organized and complete. every submission is reviewed before it lands in the catalog.
 
-[submit a rice →](https://butterfly.so/rice-cooker/submit)
+[submit a rice →]((https://rumbling-turret-acd.notion.site/3502d6c6b1b280c6887ac95c786c2285?pvs=105))
 
 ## credits
 
 made for fun by two brothers at butterfly.
 
-[website](https://butterfly.so) &nbsp;|&nbsp; [x](https://twitter.com/butterfly) &nbsp;|&nbsp; [instagram](https://instagram.com/butterfly)
+[website](https://butterfly.so) &nbsp;|&nbsp; [x](https://x.com/bflycomputer) &nbsp;|&nbsp; [instagram](https://x.com/bflycomputer)
