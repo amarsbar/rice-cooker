@@ -31,16 +31,8 @@ pub fn clone_at_commit(repo_url: &str, commit: &str, dest: &Path) -> anyhow::Res
     if commit.starts_with('-') {
         anyhow::bail!("refusing commit starting with '-': {commit}");
     }
-    // Defense-in-depth if a future caller bypasses the catalog validator.
-    let is_hex_sha = commit.len() >= 7 && commit.chars().all(|c| c.is_ascii_hexdigit());
-    let is_placeholder = commit.contains("PLACEHOLDER");
-    if !is_hex_sha && !is_placeholder {
-        anyhow::bail!(
-            "refusing commit that is neither a hex SHA (≥7 chars) nor PLACEHOLDER: {commit}"
-        );
-    }
     // Full clone (shallow can't reach arbitrary historical SHAs); --no-checkout
-    // lets us check out the pinned commit explicitly below.
+    // lets us check out the catalog ref explicitly below.
     if let Some(parent) = dest.parent() {
         fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
     }
@@ -149,10 +141,10 @@ mod tests {
     }
 
     #[test]
-    fn clone_at_commit_refuses_non_hex_non_placeholder_commit() {
+    fn clone_at_commit_refuses_dash_prefixed_commit() {
         let dest_dir = tempdir().expect("dest tempdir");
         let dest = dest_dir.path().join("clone");
-        let err = clone_at_commit("/does/not/matter", "HEAD", &dest).unwrap_err();
+        let err = clone_at_commit("/does/not/matter", "--help", &dest).unwrap_err();
         assert!(err.to_string().contains("refusing commit"), "got: {err:#}");
     }
 }

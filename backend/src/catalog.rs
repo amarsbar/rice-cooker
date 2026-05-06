@@ -2,20 +2,20 @@
 //!
 //! Hand-maintained in Rice Cooker's repo. Each entry: upstream repo at
 //! a pinned commit, a symlink src/dst that points into the clone, and
-//! optional dependency lists (paru resolves transitive AUR deps — we only
-//! list top-level names).
+//! optional dependency lists (yay/paru resolve repo vs AUR packages and
+//! transitive deps — we only list top-level names).
 
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Component, Path};
 
 use anyhow::{Context, Result, ensure};
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Catalog {
     #[serde(flatten)]
-    pub rices: BTreeMap<String, RiceEntry>,
+    pub rices: IndexMap<String, RiceEntry>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -23,11 +23,8 @@ pub struct Catalog {
 pub struct RiceEntry {
     pub display_name: String,
     pub creator_name: String,
-    #[serde(default)]
-    pub description: String,
     pub repo: String,
-    /// Full commit SHA — pinned for reproducibility. Placeholder values
-    /// containing "PLACEHOLDER" are refused at install time.
+    /// Ref passed to `git checkout --detach`.
     pub commit: String,
     /// Source path installed by the symlink step, relative to the clone dir.
     pub symlink_src: String,
@@ -36,32 +33,16 @@ pub struct RiceEntry {
     /// True when the package installs a Quickshell config discoverable by `-c`.
     #[serde(default)]
     pub package_managed: bool,
-    /// Default false; flip to true after auditing the upstream install.
+    /// Minimal deps needed even for dependency-light preview.
     #[serde(default)]
-    pub install_supported: bool,
-    /// Top-level AUR dep names. Paru resolves transitive deps. No
-    /// commit pins — paru builds whatever the AUR maintainer published.
+    pub preview_deps: Vec<String>,
+    /// Full install deps. Empty means install is unavailable.
     #[serde(default)]
-    pub aur_deps: Vec<String>,
-    /// Repo-only packages the rice needs that paru wouldn't pick up
-    /// from aur_deps' own depends lists. Usually empty.
-    #[serde(default)]
-    pub pacman_deps: Vec<String>,
-    /// Minimal AUR deps needed even for dependency-light preview.
-    #[serde(default)]
-    pub preview_aur_deps: Vec<String>,
-    /// Minimal repo deps needed even for dependency-light preview.
-    #[serde(default)]
-    pub preview_pacman_deps: Vec<String>,
+    pub install_deps: Vec<String>,
     /// Reserved for future interactive-installer support. Set to true ⇒
     /// install refuses (see `docs/issues/interactive-installs.md`).
     #[serde(default)]
     pub interactive: bool,
-    /// Purely informational — shown in `list` / `status` for effects
-    /// outside Rice Cooker's control (system services, root-owned
-    /// configs, etc.).
-    #[serde(default)]
-    pub documented_system_effects: Vec<String>,
 }
 
 impl Catalog {
@@ -85,13 +66,6 @@ impl Catalog {
     }
 }
 
-/// Install-time refusal: commit contains "PLACEHOLDER" (uncurated
-/// catalog entry). Catches catalog bring-up errors before paru does
-/// network work.
-pub fn is_placeholder_commit(commit: &str) -> bool {
-    commit.contains("PLACEHOLDER")
-}
-
 pub fn validate_name(name: &str) -> Result<()> {
     let bad = name.is_empty()
         || name == "."
@@ -113,16 +87,6 @@ fn validate_entry(name: &str, entry: &RiceEntry) -> Result<()> {
     );
     ensure!(!entry.repo.is_empty(), "{name}: repo is empty");
     ensure!(!entry.commit.is_empty(), "{name}: commit is empty");
-
-    // Placeholder parses through so `list`/`status` can inspect unreleased
-    // entries; install refuses at runtime via `is_placeholder_commit`.
-    let is_valid_hex =
-        entry.commit.len() >= 7 && entry.commit.chars().all(|c| c.is_ascii_hexdigit());
-    ensure!(
-        is_valid_hex || is_placeholder_commit(&entry.commit),
-        "{name}: commit must be a hex SHA (≥7 chars) or contain \"PLACEHOLDER\", got {:?}",
-        entry.commit
-    );
 
     ensure!(
         !entry.interactive,
@@ -187,12 +151,9 @@ mod tests {
         let e = c.get("dms").unwrap();
         assert_eq!(e.display_name, "DMS");
         assert_eq!(e.creator_name, "AvengeMedia");
-        assert!(e.aur_deps.is_empty());
-        assert!(e.pacman_deps.is_empty());
-        assert!(e.preview_aur_deps.is_empty());
-        assert!(e.preview_pacman_deps.is_empty());
+        assert!(e.preview_deps.is_empty());
+        assert!(e.install_deps.is_empty());
         assert!(!e.package_managed);
-        assert!(!e.install_supported);
         assert!(!e.interactive);
     }
 
@@ -210,49 +171,6 @@ mod tests {
         "#;
         let err = Catalog::parse(t).unwrap_err().to_string();
         assert!(err.contains("interactive"), "got: {err}");
-    }
-
-    #[test]
-    fn accepts_placeholder_commit_at_parse() {
-        // Parser accepts placeholder; install refuses via
-        // is_placeholder_commit. list/status still works.
-        let t = r#"
-            [x]
-            display_name = "X"
-            creator_name = "x"
-            repo = "https://x"
-            commit = "PLACEHOLDER0123"
-            symlink_src = "."
-            symlink_dst = "~/.config/quickshell/x"
-        "#;
-        assert!(Catalog::parse(t).is_ok());
-    }
-
-    #[test]
-    fn is_placeholder_detects_placeholder_text() {
-        assert!(is_placeholder_commit("PLACEHOLDER..."));
-        assert!(is_placeholder_commit("abcPLACEHOLDERdef"));
-        assert!(!is_placeholder_commit(
-            "0123456789abcdef0123456789abcdef01234567"
-        ));
-    }
-
-    #[test]
-    fn rejects_non_sha_commit() {
-        for bad in ["main", "HEAD", "v1.0", "abc"] {
-            let t = format!(
-                r#"
-                [x]
-                display_name = "X"
-                creator_name = "x"
-                repo = "https://x"
-                commit = "{bad}"
-                symlink_src = "."
-                symlink_dst = "~/.config/quickshell/x"
-                "#
-            );
-            assert!(Catalog::parse(&t).is_err(), "accepted {bad:?}");
-        }
     }
 
     #[test]
@@ -327,18 +245,13 @@ mod tests {
             symlink_src = "."
             symlink_dst = "~/.config/quickshell/caelestia"
             package_managed = true
-            install_supported = true
-            aur_deps = ["quickshell-git", "caelestia-shell"]
-            preview_aur_deps = ["quickshell-git", "caelestia-shell"]
+            install_deps = ["quickshell-git", "caelestia-shell"]
+            preview_deps = ["quickshell-git", "caelestia-shell"]
         "#;
         let c = Catalog::parse(t).unwrap();
         let e = c.get("caelestia").unwrap();
-        assert!(e.install_supported);
         assert!(e.package_managed);
-        assert_eq!(e.aur_deps, vec!["quickshell-git", "caelestia-shell"]);
-        assert_eq!(
-            e.preview_aur_deps,
-            vec!["quickshell-git", "caelestia-shell"]
-        );
+        assert_eq!(e.install_deps, vec!["quickshell-git", "caelestia-shell"]);
+        assert_eq!(e.preview_deps, vec!["quickshell-git", "caelestia-shell"]);
     }
 }

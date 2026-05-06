@@ -70,19 +70,14 @@ mod tests {
         RiceEntry {
             display_name: "X".into(),
             creator_name: "x".into(),
-            description: "".into(),
             repo: "https://x".into(),
             commit: "0123456789abcdef0123456789abcdef01234567".into(),
             symlink_src: src.into(),
             symlink_dst: dst.into(),
             package_managed: false,
-            install_supported: false,
-            aur_deps: vec![],
-            pacman_deps: vec![],
-            preview_aur_deps: vec![],
-            preview_pacman_deps: vec![],
+            preview_deps: vec![],
+            install_deps: vec![],
             interactive: false,
-            documented_system_effects: vec![],
         }
     }
 

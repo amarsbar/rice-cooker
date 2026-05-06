@@ -17,13 +17,11 @@ const CATALOG: &str = r#"
 [one]
 display_name = "One"
 creator_name = "author-one"
-description = "first rice"
 repo = "https://example.invalid/one"
 commit = "0123456789abcdef0123456789abcdef01234567"
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/one"
-install_supported = true
-documented_system_effects = ["writes /etc/thing"]
+install_deps = ["one-package"]
 
 [two]
 display_name = "Two"

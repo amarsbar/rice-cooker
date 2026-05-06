@@ -6,193 +6,83 @@
 # any commit string containing the literal "PLACEHOLDER" substring
 # is treated as a placeholder.
 #
-# Preview = clone, install `preview_*_deps`, symlink, launch Quickshell.
-# Install requires `install_supported = true`.
-#
-# paru resolves transitive AUR deps; aur_deps lists top-level names only,
-# no commit pins.
-
-[caelestia]
-display_name = "Caelestia"
-creator_name = "soramenew"
-description = "Caelestia Quickshell. Ships as caelestia-shell AUR."
-repo = "https://github.com/caelestia-dots/shell"
-commit = "efc08759ceaeddc2c571d868c623995270ac365d"
-symlink_src = "."
-symlink_dst = "~/.config/quickshell/caelestia"
-package_managed = true
-pacman_deps = [
-  "hyprland",
-  "xdg-desktop-portal-hyprland",
-  "xdg-desktop-portal-gtk",
-  "hyprpicker",
-  "wl-clipboard",
-  "cliphist",
-  "wireplumber",
-  "trash-cli",
-  "foot",
-  "fish",
-  "jq",
-]
-aur_deps = ["quickshell-git", "caelestia-shell"]
-preview_aur_deps = ["quickshell-git", "caelestia-shell"]
+# Preview = clone, preview_deps, symlink, launch Quickshell.
+# Installation fully installs the rice.
 
 [noctalia]
 display_name = "Noctalia"
 creator_name = "noctalia-dev"
-description = "Minimal dark Quickshell"
 repo = "https://github.com/noctalia-dev/noctalia-shell"
 commit = "d7b68652e79bce5813dc4fea7e51636a5da3e1b7"
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/noctalia"
-install_supported = true
-pacman_deps = [
+install_deps = [
   "noctalia-shell",
   "cliphist",
   "wlsunset",
   "power-profiles-daemon",
   "ddcutil",
   "wl-clipboard",
-  "wtype",
+  "wtype"
 ]
-preview_aur_deps = ["noctalia-shell", "noctalia-qs"]
-
-[dms]
-display_name = "DankMaterialShell"
-creator_name = "AvengeMedia"
-description = "Material-design Quickshell"
-repo = "https://github.com/AvengeMedia/DankMaterialShell"
-commit = "c6ed64b24e414cd4b9588b645a6345b15fa697f4"
-symlink_src = "quickshell"
-symlink_dst = "~/.config/quickshell/dms"
-pacman_deps = [
-  "dms-shell",
-  "cava",
-  "matugen",
-  "networkmanager",
-  "power-profiles-daemon",
-  "qt6-multimedia",
-  "qt6ct",
-  "wtype",
-]
-aur_deps = ["dsearch-bin"]
+preview_deps = ["noctalia-qs"]
 
 [linux-retroism]
 display_name = "linux-retroism"
 creator_name = "diinki"
-description = "Diinki's Quickshell"
 repo = "https://github.com/diinki/linux-retroism"
 commit = "255eb6a7b5a0d26413eea8dc5f47e8d67bb4b1ff"
 symlink_src = "configs/quickshell"
 symlink_dst = "~/.config/quickshell/linux-retroism"
-pacman_deps = [
-  "hyprland",
-  "hyprpaper",
-  "swaybg",
-  "nemo",
-  "kitty",
-  "nwg-look",
-  "grim",
-  "slurp",
-  "swappy",
-  "hyprshot",
-  "wl-clipboard",
-  "mako",
-  "dconf",
-  "jq",
-  "socat",
-  "qt6-5compat",
-]
+
+[dms]
+display_name = "DankMaterialShell"
+creator_name = "AvengeMedia"
+repo = "https://github.com/AvengeMedia/DankMaterialShell"
+commit = "c6ed64b24e414cd4b9588b645a6345b15fa697f4"
+symlink_src = "quickshell"
+symlink_dst = "~/.config/quickshell/dms"
+
+[zephyr]
+display_name = "Zephyr"
+creator_name = "flickowoa"
+repo = "https://github.com/flickowoa/dotfiles"
+commit = "92a33e776a844070bab67cd4a4a1a688b3ea6730"
+symlink_src = "quickshell"
+symlink_dst = "~/.config/quickshell/zephyr"
+
+[caelestia]
+display_name = "Caelestia"
+creator_name = "soramenew"
+repo = "https://github.com/caelestia-dots/shell"
+commit = "stable"
+symlink_src = "."
+symlink_dst = "~/.config/quickshell/caelestia"
+package_managed = true
+preview_deps = ["quickshell-git", "caelestia-shell"]
 
 [whisker]
 display_name = "whisker"
 creator_name = "corecathx"
-description = "corecathx's Quickshell"
 repo = "https://github.com/corecathx/whisker"
 commit = "ab1edb84b7b8cf1c0514d12f1c639f8c863e3900"
 symlink_src = "."
 symlink_dst = "~/.config/quickshell/whisker"
-install_supported = true
-pacman_deps = [
+install_deps = [
   "cliphist",
   "wl-clipboard",
   "ffmpeg",
   "gpu-screen-recorder",
   "pipewire",
+  "whisker-shell-git"
 ]
-aur_deps = ["whisker-shell-git"]
-preview_pacman_deps = ["ttf-material-symbols-variable"]
-preview_aur_deps = ["ttf-outfit"]
+preview_deps = ["ttf-material-symbols-variable", "ttf-outfit"]
 
 [nandoroid]
 display_name = "Nandoroid"
 creator_name = "na-ive"
-description = "na-ive's Android-inspired Quickshell shell"
 repo = "https://github.com/na-ive/nandoroid-shell"
 commit = "c24bda36581fe7a34c692f2798a9296dcfca6f93"
 symlink_src = "dotfiles/.config/quickshell/nandoroid"
 symlink_dst = "~/.config/quickshell/nandoroid"
-pacman_deps = [
-  "hyprland",
-  "qt6-declarative",
-  "qt6-svg",
-  "qt6-wayland",
-  "python",
-  "jq",
-  "dgop",
-  "pipewire",
-  "networkmanager",
-  "bluez",
-  "libnotify",
-  "polkit",
-  "brightnessctl",
-  "playerctl",
-  "xdg-desktop-portal-hyprland",
-  "xdg-desktop-portal-gtk",
-  "grim",
-  "slurp",
-  "wf-recorder",
-  "imagemagick",
-  "ffmpeg",
-  "songrec",
-  "cava",
-  "easyeffects",
-  "hyprpicker",
-  "hyprlock",
-  "hyprsunset",
-  "wl-clipboard",
-  "cliphist",
-  "zenity",
-  "ttf-jetbrains-mono-nerd",
-  "ttf-material-symbols-variable",
-  "noto-fonts-emoji",
-  "noto-fonts-cjk",
-]
-aur_deps = [
-  "quickshell-git",
-  "matugen-bin",
-]
-preview_pacman_deps = ["ttf-material-symbols-variable"]
-documented_system_effects = [
-  "only the Quickshell config is installed; matugen templates, Hyprland source block/keybinds, terminal/fish/starship injection, Google Sans Flex, and Nandoroid CLI are not installed",
-]
-
-[zephyr]
-display_name = "Zephyr"
-creator_name = "flickowoa"
-description = "flickowoa's Zephyr Quickshell"
-repo = "https://github.com/flickowoa/dotfiles"
-commit = "92a33e776a844070bab67cd4a4a1a688b3ea6730"
-symlink_src = "quickshell"
-symlink_dst = "~/.config/quickshell/zephyr"
-pacman_deps = [
-  "qt6-multimedia",
-  "qt6-multimedia-ffmpeg",
-  "qt6-5compat",
-  "cava",
-  "ffmpeg",
-  "matugen",
-]
-documented_system_effects = [
-  "only the Quickshell config is installed; Hyprland, terminal, shell, and theme glue are not installed",
-]
+preview_deps = ["ttf-material-symbols-variable"]
