@@ -18,6 +18,7 @@ import { ScreenContent } from './components/ScreenContent';
 import { PreviewContent } from './components/PreviewContent';
 import { PreviewInstallIntro, PREVIEW_INSTALL_INTRO_MS } from './components/PreviewInstallIntro';
 import { InstallSuccessOverlay, INSTALL_SUCCESS_MS } from './components/InstallSuccessOverlay';
+import { FailureOverlay, FAILURE_OVERLAY_MS } from './components/FailureOverlay';
 import { ClosePin } from './components/ClosePin';
 import { SoundButton } from './components/SoundButton';
 import { ThemeKnob } from './components/ThemeKnob';
@@ -66,8 +67,10 @@ export function PickARice() {
   const launchFallbackRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const installIntroTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const installSuccessTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const failureTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const [installIntroActive, setInstallIntroActive] = useState(false);
   const [installSuccessActive, setInstallSuccessActive] = useState(false);
+  const [failureActive, setFailureActive] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pickerExiting, setPickerExiting] = useState(false);
   const [pickerEntering, setPickerEntering] = useState(false);
@@ -226,6 +229,15 @@ export function PickARice() {
     setView(doneView);
   }, []);
 
+  const showFailure = useCallback(() => {
+    if (failureTimeoutRef.current !== null) window.clearTimeout(failureTimeoutRef.current);
+    setFailureActive(true);
+    failureTimeoutRef.current = window.setTimeout(() => {
+      failureTimeoutRef.current = null;
+      setFailureActive(false);
+    }, FAILURE_OVERLAY_MS);
+  }, []);
+
   const runBackend = useCallback(async (request: BackendRunRequest, afterSuccess?: () => void) => {
     if (backendRunningRef.current) return;
     backendRunningRef.current = true;
@@ -236,16 +248,18 @@ export function PickARice() {
         afterSuccess?.();
       } else {
         if (downloadActiveRef.current) finishDownload(false);
+        showFailure();
         console.error('[rice-cooker] backend command failed:', result);
       }
     } catch (error) {
       if (downloadActiveRef.current) finishDownload(false);
+      showFailure();
       console.error('[rice-cooker] backend command failed:', error);
     } finally {
       backendRunningRef.current = false;
       setBackendRunning(false);
     }
-  }, [finishDownload]);
+  }, [finishDownload, showFailure]);
 
   const revertRice = useCallback(() => {
     playRiceSound('revert');
@@ -278,8 +292,9 @@ export function PickARice() {
 
     if (event.type === 'fail') {
       finishDownload(false);
+      showFailure();
     }
-  }), [finishDownload]);
+  }), [finishDownload, showFailure]);
 
   const requestFocusedRice = useCallback((nextIndex: number) => {
     const index = clampRiceIndex(nextIndex, rices.length);
@@ -294,7 +309,7 @@ export function PickARice() {
       return;
     }
     if (menuOpen || pickerTransitioning) return;
-    if (installIntroActive || installSuccessActive) return;
+    if (installIntroActive || installSuccessActive || failureActive) return;
     if (view === 'preview') {
       playRiceSound('moveUp');
       setPreviewOption((option) => cyclePreviewOption(option, -1));
@@ -302,7 +317,7 @@ export function PickARice() {
     }
     if (view === 'downloading') return;
     requestFocusedRice(requestedRiceIndexRef.current - 1);
-  }, [bootOpen, installIntroActive, installSuccessActive, menuOpen, moveBootItem, pickerTransitioning, requestFocusedRice, view]);
+  }, [bootOpen, failureActive, installIntroActive, installSuccessActive, menuOpen, moveBootItem, pickerTransitioning, requestFocusedRice, view]);
 
   const focusNextRice = useCallback(() => {
     if (bootOpen) {
@@ -310,7 +325,7 @@ export function PickARice() {
       return;
     }
     if (menuOpen || pickerTransitioning) return;
-    if (installIntroActive || installSuccessActive) return;
+    if (installIntroActive || installSuccessActive || failureActive) return;
     if (view === 'preview') {
       playRiceSound('moveDown');
       setPreviewOption((option) => cyclePreviewOption(option, 1));
@@ -318,7 +333,7 @@ export function PickARice() {
     }
     if (view === 'downloading') return;
     requestFocusedRice(requestedRiceIndexRef.current + 1);
-  }, [bootOpen, installIntroActive, installSuccessActive, menuOpen, moveBootItem, pickerTransitioning, requestFocusedRice, view]);
+  }, [bootOpen, failureActive, installIntroActive, installSuccessActive, menuOpen, moveBootItem, pickerTransitioning, requestFocusedRice, view]);
 
   const syncRiceScroll = useCallback((offset: number) => {
     const index = clampRiceIndex(Math.round(offset / RICE_ITEM_PITCH), rices.length);
@@ -330,9 +345,9 @@ export function PickARice() {
   const startRiceHold = useCallback((direction: -1 | 1) => {
     if (bootOpen) return;
     if (menuOpen || pickerTransitioning) return;
-    if (installSuccessActive) return;
+    if (installSuccessActive || failureActive) return;
     if (view === 'picking') setRiceHoldDirection(direction);
-  }, [bootOpen, installSuccessActive, menuOpen, pickerTransitioning, view]);
+  }, [bootOpen, failureActive, installSuccessActive, menuOpen, pickerTransitioning, view]);
 
   const stopRiceHold = useCallback(() => setRiceHoldDirection(0), []);
 
@@ -363,7 +378,7 @@ export function PickARice() {
         return;
       }
       if (pickerTransitioning) return;
-      if (installSuccessActive) return;
+      if (installSuccessActive || failureActive) return;
       if (view !== 'picking') return;
       setMenuItem(MENU_ITEMS[0]);
       playRiceSound('enterMenu');
@@ -378,7 +393,7 @@ export function PickARice() {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [bootOpen, closeMenu, installSuccessActive, menuOpen, pickerTransitioning, view]);
+  }, [bootOpen, closeMenu, failureActive, installSuccessActive, menuOpen, pickerTransitioning, view]);
 
   useEffect(() => {
     if (!pickerEntering || menuOpen) return;
@@ -391,6 +406,7 @@ export function PickARice() {
     if (launchFallbackRef.current !== null) window.clearTimeout(launchFallbackRef.current);
     if (installIntroTimeoutRef.current !== null) window.clearTimeout(installIntroTimeoutRef.current);
     if (installSuccessTimeoutRef.current !== null) window.clearTimeout(installSuccessTimeoutRef.current);
+    if (failureTimeoutRef.current !== null) window.clearTimeout(failureTimeoutRef.current);
     bootEnterHoldTimeoutRefs.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
   }, []);
 
@@ -439,6 +455,11 @@ export function PickARice() {
     downloadDoneViewRef.current = doneView;
     setInstallIntroActive(false);
     setInstallSuccessActive(false);
+    if (failureTimeoutRef.current !== null) {
+      window.clearTimeout(failureTimeoutRef.current);
+      failureTimeoutRef.current = null;
+    }
+    setFailureActive(false);
     setDownloadsComplete(false);
     setPreviewOption('install');
     setView('downloading');
@@ -450,7 +471,7 @@ export function PickARice() {
       return;
     }
     if (menuOpen || pickerTransitioning) return;
-    if (installIntroActive || installSuccessActive) return;
+    if (installIntroActive || installSuccessActive || failureActive) return;
     const { backendRunning, previewOption, selectedRice, view } = latestApplyStateRef.current;
     if (backendRunning || !selectedRice) return;
 
@@ -480,12 +501,12 @@ export function PickARice() {
         window.open(selectedRice.repo, '_blank', 'noopener,noreferrer');
       }
     }
-  }, [applyBootItem, bootOpen, installIntroActive, installSuccessActive, menuOpen, pickerTransitioning, runBackend, startDownload]);
+  }, [applyBootItem, bootOpen, failureActive, installIntroActive, installSuccessActive, menuOpen, pickerTransitioning, runBackend, startDownload]);
 
   const cycleOnBareStage = (e: React.MouseEvent<HTMLDivElement>) => {
     if (bootOpen) return;
     if (menuOpen || pickerTransitioning) return;
-    if (installIntroActive || installSuccessActive) return;
+    if (installIntroActive || installSuccessActive || failureActive) return;
     if (e.target !== e.currentTarget) return;
     applyFocusedRice();
   };
@@ -534,7 +555,7 @@ export function PickARice() {
                   <>
                     <div
                       className={`${styles.pickerContent} ${
-                        pickerTransitioning || installSuccessActive ? styles.pickerContentHidden : ''
+                        pickerTransitioning || installSuccessActive || failureActive ? styles.pickerContentHidden : ''
                       }`}
                     >
                       <ScreenContent
@@ -558,6 +579,7 @@ export function PickARice() {
                       <ClosingCircles active={view === 'downloading'} riceName={selectedRice?.name} />
                     </div>
                     {installSuccessActive && <InstallSuccessOverlay />}
+                    {failureActive && <FailureOverlay />}
                   </>
                 )}
               </RiceCard>
