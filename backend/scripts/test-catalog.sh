@@ -156,12 +156,21 @@ symlink_dst_for() {
 install_available_for() {
     local name=$1
     awk -v n="[$name]" '
+        function has_item(s) {
+            sub(/#.*/, "", s)
+            return s ~ /"[^"]+"/
+        }
         $0 == n { in_block=1; next }
         /^\[/ { in_block=0 }
-        in_block && /^install_deps/ {
+        in_block && /^install_deps[[:space:]]*=/ {
             found=1
-            print ($0 ~ /\[[[:space:]]*\]/ ? 0 : 1)
-            exit
+            line=$0
+            sub(/^[^[]*\[/, "", line)
+            while (1) {
+                if (has_item(line)) { print 1; exit }
+                if (line ~ /\]/) { print 0; exit }
+                if ((getline line) <= 0) { print 0; exit }
+            }
         }
         END { if (!found) print 0 }
     ' "$CAT"

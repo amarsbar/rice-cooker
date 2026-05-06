@@ -1,10 +1,9 @@
 # rice-cooker catalog: one file keyed by rice name.
 # Filename stem of each [table] is the CLI id: `rice-cooker install <stem>`.
 #
-# `commit` is a hex SHA (min 7 chars, all hex); full 40-char SHAs
-# strongly preferred. Placeholder values are rejected on install:
-# any commit string containing the literal "PLACEHOLDER" substring
-# is treated as a placeholder.
+# `commit` is any Git ref accepted by `git checkout --detach`:
+# branch name (e.g. `commit = "stable"`), tag, full SHA, or short SHA.
+# Non-hex refs are valid and are resolved by Git at clone time.
 #
 # Preview = clone, preview_deps, symlink, launch Quickshell.
 # Installation fully installs the rice.
