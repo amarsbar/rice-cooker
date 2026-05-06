@@ -2,17 +2,16 @@
 
 
 <img src="src/assets/readme/readme-heroimg.png">
-<p align="center"> a visual (toy) tool for ricing hyprland. </p>
 
-## overview
+a visual (toy) tool for ricing hyprland.
 
-browse rices, try them live on your desktop, and install them. if you don't like what you see, revert returns you to the original rice you started with.
+browse rices, try them live on your desktop, and install them with a keyboard click. if you don't like what you see, _revert_ returns you to the original rice you started with.
 
 rice cooker writes to your hyprland and quickshell config directories. it does not touch your home folder, your dotfiles repo, or anything outside the supported config paths.
 
 ## notice
 
-rice cooker is built for one stack: arch linux, hyprland on wayland, and quickshell.
+rice cooker is currently only built for arch linux, hyprland on wayland, and quickshell.
 
 you can force it to run on other setups, but rices are not guaranteed to apply cleanly and may break your existing config. rice at your own risk.
 
