@@ -1,9 +1,8 @@
-<h1 align="center"><img src="src/assets/menu/menu-logo.svg" alt="Rice Cooker" width="600"></h1>
-<p align="center">{insert caption here, what rice cooker does, e.g share rices}</p>
 
-# rice cooker
 
-a visual (toy) tool for ricing hyprland.
+
+<img src="src/assets/readme/readme-heroimg.png">
+<p align="center"> a visual (toy) tool for ricing hyprland. </p>
 
 ## overview
 
@@ -27,8 +26,6 @@ yay -S rice-cooker
 ## features
 rice cooker is best experienced with the keyboard and sound on.
 <img src="src/assets/readme/blueprint.png">
-
-[image]
 
 **keys**
 
