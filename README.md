@@ -1,31 +1,28 @@
-
-
-
-<img src="src/assets/readme/readme-heroimg.png">
+<img src="src/assets/readme/readme-heroimg.png" alt="Rice Cooker hero image">
 
 ## rice cooker
 a visual (toy) tool for ricing hyprland.
 
 browse rices, try them live on your desktop, and install them with a keyboard click. if you don't like what you see, _revert_ returns you to the original rice you started with.
 
-rice cooker writes to your hyprland and quickshell config directories. it does not touch your home folder, your dotfiles repo, or anything outside the supported config paths.
+rice cooker only points quickshell at your selected rice. it does not overwrite your existing files or directories, and does not modify your dotfiles.
 
 ## notice
 
-rice cooker is currently only built for arch linux, hyprland on wayland, and quickshell.
+rice cooker currently only works on arch + hyprland and only contains quickshell rices. close any non-quickshell rice when using.
 
-you can force it to run on other setups, but rices are not guaranteed to apply cleanly and may break your existing config. rice at your own risk.
+rice cooker's boot screen automatically rejects non-supported setups. forcible entry is possible but rice at your own risk.
 
 ## install
 
-```
+```bash
 yay -S rice-cooker
 # or paru
 ```
 
 ## user guide
 rice cooker has two modes: (1) browse and (2) preview.
-<img src="src/assets/readme/blueprint.png">
+<img src="src/assets/readme/blueprint.png" alt="Rice Cooker interface blueprint showing browse and preview modes">
 
 
 
