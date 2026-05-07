@@ -7,6 +7,8 @@ browse rices, try them live on your desktop, and install them with a keyboard cl
 
 rice cooker only points quickshell at your selected rice. it does not overwrite your existing files or directories, and does not modify your dotfiles.
 
+https://github.com/user-attachments/assets/e5a63109-de89-48cc-a703-f249222df6f6
+
 ## notice
 
 rice cooker currently only works on arch + hyprland and only contains quickshell rices. close any non-quickshell rice when using.
@@ -68,4 +70,4 @@ a good rice is organized and complete. every submission is reviewed before it la
 
 made for fun by two brothers at butterfly.
 
-[website](https://butterfly.so) &nbsp;|&nbsp; [x](https://x.com/bflycomputer) &nbsp;|&nbsp; [instagram](https://x.com/bflycomputer)
+[website](https://butterfly.so) &nbsp;|&nbsp; [x](https://x.com/bflycomputer) &nbsp;|&nbsp; [instagram](https://www.instagram.com/bflycomputer/)
