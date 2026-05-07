@@ -13,6 +13,7 @@ declare global {
   interface Window {
     rice: {
       closeWindow(): void;
+      openExternal(url: string): Promise<boolean>;
       backend: {
         list(): Promise<RiceListRow[]>;
         run(request: BackendRunRequest): Promise<BackendRunResult>;

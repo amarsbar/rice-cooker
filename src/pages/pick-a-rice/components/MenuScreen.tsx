@@ -50,6 +50,9 @@ const rows = {
 
 const cx = (...classes: Array<string | false | undefined>) => classes.filter(Boolean).join(' ');
 const backIconStyle = { '--back-icon': `url("${backIcon}")` } as CSSProperties;
+const openExternal = (url: string) => {
+  void window.rice.openExternal(url);
+};
 
 function Letters({
   text,
@@ -333,14 +336,14 @@ export function MenuScreen({
       if (control === 'enter' && active === 'submit') {
         event.preventDefault();
         if (event.repeat) return;
-        window.open(SUBMIT_RICE_URL, '_blank', 'noopener,noreferrer');
+        openExternal(SUBMIT_RICE_URL);
         return;
       }
 
       if (control === 'enter' && active === 'credits') {
         event.preventDefault();
         if (event.repeat) return;
-        window.open(creditUrls[creditIndex], '_blank', 'noopener,noreferrer');
+        openExternal(creditUrls[creditIndex]);
         return;
       }
 
@@ -435,7 +438,7 @@ export function MenuScreen({
         active={active === 'submit'}
         top={top.submit}
         onHover={() => onActiveChange('submit')}
-        onClick={() => window.open(SUBMIT_RICE_URL, '_blank', 'noopener,noreferrer')}
+        onClick={() => openExternal(SUBMIT_RICE_URL)}
       />
       <MenuRow
         item="credits"

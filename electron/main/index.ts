@@ -312,6 +312,19 @@ function runBackend(request: BackendRunRequest, sender?: WebContents): Promise<B
   });
 }
 
+function openHttpExternal(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+    void shell.openExternal(parsed.toString()).catch((err) => {
+      console.warn('[rice-cooker] openExternal failed:', parsed.origin + parsed.pathname, err);
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function createWindow(): void {
   const icon = appIconPath();
   const scale =
@@ -465,17 +478,7 @@ function createWindow(): void {
     // Only hand off http(s) URLs to the OS handler. Any other scheme
     // (file:, javascript:, chrome:, data:, etc.) could be abused to reach
     // outside the app's trust boundary, so refuse outright.
-    try {
-      const { origin, pathname, protocol } = new URL(url);
-      if (protocol === 'http:' || protocol === 'https:') {
-        const safeUrl = `${origin}${pathname}`;
-        void shell.openExternal(url).catch((err) => {
-          console.warn('[rice-cooker] openExternal failed:', safeUrl, err);
-        });
-      }
-    } catch {
-      return { action: 'deny' };
-    }
+    openHttpExternal(url);
     return { action: 'deny' };
   });
 
@@ -513,6 +516,8 @@ ipcMain.handle('backend:list', () => backendList());
 ipcMain.handle('backend:run', (event, request: BackendRunRequest) => runBackend(request, event.sender));
 
 ipcMain.handle('environment:check', () => environmentCheck());
+
+ipcMain.handle('app:openExternal', (_event, url: unknown) => typeof url === 'string' && openHttpExternal(url));
 
 app.whenReady()
   .then(() => {

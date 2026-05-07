@@ -9,6 +9,7 @@ import type {
 
 const api = {
   closeWindow: () => ipcRenderer.send('window:close'),
+  openExternal: (url: string) => ipcRenderer.invoke('app:openExternal', url) as Promise<boolean>,
   backend: {
     list: () => ipcRenderer.invoke('backend:list') as Promise<RiceListRow[]>,
     run: (request: BackendRunRequest) =>

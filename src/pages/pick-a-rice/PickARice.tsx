@@ -91,6 +91,9 @@ export function PickARice() {
   const advance = useCallback(() => setCycleIdx((i) => (i + 1) % THEME_CYCLE.length), []);
   const themeValue = useMemo(() => ({ theme, advance }), [advance, theme]);
   const selectedRice = rices[focusedRiceIndex];
+  const openExternal = useCallback((url: string) => {
+    void window.rice.openExternal(url);
+  }, []);
   const latestApplyStateRef = useRef({ backendRunning, previewOption, selectedRice, view });
   latestApplyStateRef.current = { backendRunning, previewOption, selectedRice, view };
   const scroll = useMemo(
@@ -178,8 +181,8 @@ export function PickARice() {
       return;
     }
 
-    window.open('https://github.com/amarsbar/rice-cooker/', '_blank', 'noopener,noreferrer');
-  }, [bootItem]);
+    openExternal('https://github.com/amarsbar/rice-cooker/');
+  }, [bootItem, openExternal]);
 
   const stopBootEnterHold = useCallback(() => {
     bootEnterHoldTimeoutRefs.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
@@ -498,10 +501,10 @@ export function PickARice() {
       }
 
       if (previewOption === 'dots') {
-        window.open(selectedRice.repo, '_blank', 'noopener,noreferrer');
+        openExternal(selectedRice.repo);
       }
     }
-  }, [applyBootItem, bootOpen, failureActive, installIntroActive, installSuccessActive, menuOpen, pickerTransitioning, runBackend, startDownload]);
+  }, [applyBootItem, bootOpen, failureActive, installIntroActive, installSuccessActive, menuOpen, openExternal, pickerTransitioning, runBackend, startDownload]);
 
   const cycleOnBareStage = (e: React.MouseEvent<HTMLDivElement>) => {
     if (bootOpen) return;
