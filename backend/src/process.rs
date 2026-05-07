@@ -9,12 +9,12 @@ use anyhow::{Context, Result, anyhow};
 const NOTIFIERS: &[&str] = &["dunst", "mako", "swaync"];
 const KILL_POLL_MS: u64 = 50;
 const KILL_WAIT_MS: u64 = 500;
-// Observed rendering timings on a fast laptop (eDP-1 Hyprland):
+// Observed rendering timings on a fast laptop and VM harness (Hyprland):
 //   dms / linux-retroism: <1s to first layer
-//   noctalia:             ~3s to first layer
+//   noctalia / dms first launch in VMs: can exceed 5s
 // Fast rices return in one iteration; slow rices get enough runway.
 const VERIFY_POLL_MS: u64 = 250;
-const VERIFY_TIMEOUT_MS: u64 = 5000;
+const VERIFY_TIMEOUT_MS: u64 = 10_000;
 const LOG_TAIL_LINES: usize = 20;
 
 // Match both `quickshell` and its `qs` symlink, with or without a leading
