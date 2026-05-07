@@ -21,6 +21,7 @@ const creditUrls = [
   'https://www.instagram.com/bflycomputer/',
   'https://github.com/amarsbar/rice-cooker/',
 ] as const;
+const SUBMIT_RICE_URL = 'https://rumbling-turret-acd.notion.site/3502d6c6b1b280c6887ac95c786c2285';
 const creditItemCount = creditUrls.length;
 const BACK_TEXT = 'BACK';
 const REVERT_TEXT = 'REVERT';
@@ -95,6 +96,7 @@ function MenuRow({
   ghost,
   top,
   onHover,
+  onClick,
   creditIndex = 0,
   onCreditHover,
   revertHolding,
@@ -104,6 +106,7 @@ function MenuRow({
   ghost?: boolean;
   top: number;
   onHover: () => void;
+  onClick?: () => void;
   creditIndex?: number;
   onCreditHover?: (index: number) => void;
   revertHolding?: boolean;
@@ -112,7 +115,7 @@ function MenuRow({
 
   if (!active && !ghost) {
     return (
-      <div className={styles.row} style={{ top }} onMouseEnter={onHover}>
+      <div className={styles.row} style={{ top }} onMouseEnter={onHover} onClick={onClick}>
         <span className={styles.rowLabel}>{row.title}</span>
       </div>
     );
@@ -123,6 +126,7 @@ function MenuRow({
       className={cx(styles.row, styles.rowExpanded, active && styles.rowActive)}
       style={{ top }}
       onMouseEnter={onHover}
+      onClick={onClick}
     >
       <span className={styles.expandedTitle}>{row.title}</span>
       <span className={styles.expandedDescription}>{row.description}</span>
@@ -326,6 +330,13 @@ export function MenuScreen({
         return;
       }
 
+      if (control === 'enter' && active === 'submit') {
+        event.preventDefault();
+        if (event.repeat) return;
+        window.open(SUBMIT_RICE_URL, '_blank', 'noopener,noreferrer');
+        return;
+      }
+
       if (control === 'enter' && active === 'credits') {
         event.preventDefault();
         if (event.repeat) return;
@@ -424,6 +435,7 @@ export function MenuScreen({
         active={active === 'submit'}
         top={top.submit}
         onHover={() => onActiveChange('submit')}
+        onClick={() => window.open(SUBMIT_RICE_URL, '_blank', 'noopener,noreferrer')}
       />
       <MenuRow
         item="credits"
