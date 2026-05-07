@@ -130,14 +130,18 @@ pub fn launch_argv(argv: &[String], cwd: &Path, log_file: &Path) -> Result<()> {
         .ok_or_else(|| anyhow!("empty argv; nothing to launch"))?;
     let log = fs::File::create(log_file)
         .with_context(|| format!("opening log {}", log_file.display()))?;
+    let log_stdout = log
+        .try_clone()
+        .with_context(|| format!("cloning log handle {}", log_file.display()))?;
     // setsid's exit reflects spawn success only — `verify_by_name` checks child health.
     let status = Command::new("setsid")
         .arg("-f")
         .arg(argv0)
         .args(rest)
+        .env("QT_FORCE_STDERR_LOGGING", "1")
         .current_dir(cwd)
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
+        .stdout(log_stdout)
         .stderr(log)
         .status()
         .with_context(|| format!("spawning setsid {argv0}"))?;
