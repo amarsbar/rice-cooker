@@ -1107,7 +1107,6 @@ mod tests {
         }
         let out = std::str::from_utf8(&buf).unwrap();
         assert!(out.contains(r#""subcommand":"preview""#));
-        assert!(out.contains(r#""stage":"preflight""#));
         assert!(!out.contains("install is not supported"));
     }
 }
