@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=Rice Cooker
-Comment=View, customize and share Hyprland rices
+Comment=a visual (toy) tool for ricing
 Exec=rice-cooker %U
 Icon=rice-cooker
 Terminal=false

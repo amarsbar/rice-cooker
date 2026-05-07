@@ -1,6 +1,6 @@
 pkgbase = rice-cooker
-	pkgdesc = View, customize and share Hyprland rices
-	pkgver = 0.1.0.r0.g369950de
+	pkgdesc = a visual (toy) tool for ricing
+	pkgver = 0.1.0
 	pkgrel = 1
 	url = https://github.com/amarsbar/rice-cooker
 	arch = x86_64
@@ -21,11 +21,11 @@ pkgbase = rice-cooker
 	optdepends = hyprpolkitagent: polkit authentication agent (any polkit agent works)
 	optdepends = ttf-material-symbols-variable: icon font for Whisker and Nandoroid
 	optdepends = ttf-outfit: intended UI font for Whisker
-	source = rice-cooker-0.1.0.r0.g369950de.tar.gz::https://github.com/amarsbar/rice-cooker/archive/369950de0126813d574536dceb3aa29ee0c23297.tar.gz
+	source = rice-cooker-0.1.0.tar.gz::https://github.com/amarsbar/rice-cooker/archive/refs/tags/v0.1.0.tar.gz
 	source = rice-cooker.sh
 	source = rice-cooker.desktop
-	sha256sums = SKIP
-	sha256sums = SKIP
-	sha256sums = SKIP
+	sha256sums = f94168d587b01d8eff3c46a763223e98558770f632b98c004c3cd84fc60ef8e7
+	sha256sums = 1527354310806f2ae55a2629d2954f02efa6b4063d85233ef3ecc50f53887b91
+	sha256sums = 70b83cade8c33465d876b517e7291e29d9ac95c7f6d81eafe9b8dde6b7a45907
 
 pkgname = rice-cooker
