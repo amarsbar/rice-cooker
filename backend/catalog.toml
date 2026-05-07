@@ -3,10 +3,11 @@
 #
 # `commit` is any Git ref accepted by `git checkout --detach`:
 # branch name (e.g. `commit = "stable"`), tag, full SHA, or short SHA.
-# Non-hex refs are valid and are resolved by Git at clone time.
 #
-# Preview = clone, preview_deps, symlink, launch Quickshell.
-# Installation fully installs the rice.
+# You can submit a rice by adding it to the catalog & opening a PR, and/or submitting this form: 
+# Rice cooker v0.1 only applies quickshell configs & installs dependencies.
+# Preview dependencies are any dependencies that aren't in rice-cooker that the rice would fail to preview without.
+# We recommend packaging your rice with nix flakes. Rice cooker will be updated to support them soon.
 
 [noctalia]
 display_name = "Noctalia"
