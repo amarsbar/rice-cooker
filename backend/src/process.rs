@@ -1,8 +1,8 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
+use std::{env, fs};
 
 use anyhow::{Context, Result, anyhow};
 
@@ -21,6 +21,36 @@ const LOG_TAIL_LINES: usize = 20;
 // path. `( |$)` after the name guards against `qsfoo`/`quickshellx` false
 // positives; `(^|/)` before handles the path prefix case.
 pub const QS_MATCH_PATTERN: &str = r"(^|/)(quickshell|qs)( |$)";
+
+/// Prevent package-changing activations from running outside the compositor session
+/// that Quickshell must launch into. `XDG_RUNTIME_DIR` is also where qs writes its
+/// own runtime state, so probe it before touching deps.
+pub fn check_graphical_session() -> Result<()> {
+    let var = |key| env::var(key).ok().filter(|v| !v.is_empty());
+    for key in [
+        "XDG_RUNTIME_DIR",
+        "WAYLAND_DISPLAY",
+        "HYPRLAND_INSTANCE_SIGNATURE",
+    ] {
+        if var(key).is_none() {
+            return Err(anyhow!(
+                "not running inside a usable Hyprland session: missing {key}; \
+                 launch Rice Cooker from the Hyprland user session you want to rice"
+            ));
+        }
+    }
+    let runtime = PathBuf::from(var("XDG_RUNTIME_DIR").expect("checked above"));
+    if !runtime.is_absolute() || !runtime.is_dir() {
+        return Err(anyhow!(
+            "XDG_RUNTIME_DIR is not an absolute directory: {runtime:?}"
+        ));
+    }
+    let probe = runtime.join(format!(".rice-cooker-session-check-{}", std::process::id()));
+    fs::create_dir(&probe)
+        .with_context(|| format!("XDG_RUNTIME_DIR is not writable: {runtime:?}"))?;
+    let _ = fs::remove_dir(&probe);
+    Ok(())
+}
 
 /// True when `quickshell -c <name>` has a running process.
 pub fn rice_shell_alive(name: &str) -> Result<bool> {

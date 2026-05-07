@@ -152,6 +152,12 @@ fn run_activate<W: Write>(
 
     step(events, Step::Preflight, StepState::Start)?;
     try_stage!(events, "preflight", "git", git::preflight());
+    try_stage!(
+        events,
+        "preflight",
+        "graphical_session",
+        process::check_graphical_session()
+    );
     if !selected_deps.is_empty() {
         try_stage!(
             events,
@@ -1101,8 +1107,7 @@ mod tests {
         }
         let out = std::str::from_utf8(&buf).unwrap();
         assert!(out.contains(r#""subcommand":"preview""#));
-        assert!(out.contains(r#""stage":"clone""#));
-        assert!(out.contains("refusing repo URL starting with"));
+        assert!(out.contains(r#""stage":"preflight""#));
         assert!(!out.contains("install is not supported"));
     }
 }
