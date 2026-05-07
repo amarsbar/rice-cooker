@@ -21,6 +21,7 @@ pub struct OriginalShell {
 /// not the rice-cooker-prefixed XDG data dir.
 pub struct Paths {
     pub home: PathBuf,
+    pub config_home: PathBuf,
     pub cache_home: PathBuf,
     pub data_home: PathBuf,
     xdg: Option<BaseDirectories>,
@@ -29,6 +30,8 @@ pub struct Paths {
 impl Paths {
     pub fn from_env() -> Result<Self> {
         let home = resolve_home_from(std::env::var("HOME").ok().as_deref())?;
+        let config_home =
+            resolve_config_home_from(std::env::var("XDG_CONFIG_HOME").ok().as_deref(), &home)?;
         let xdg = BaseDirectories::with_prefix("rice-cooker");
         // RICE_COOKER_CACHE_DIR redirects the whole cache root without touching
         // XDG env vars — convenient for tests against the built binary.
@@ -43,6 +46,7 @@ impl Paths {
         })?;
         Ok(Self {
             home,
+            config_home,
             cache_home,
             data_home,
             xdg: Some(xdg),
@@ -51,8 +55,10 @@ impl Paths {
 
     /// Test-only. `find_catalog` and `searched_catalog_paths` return empty.
     pub fn at_roots(home: PathBuf, cache_home: PathBuf, data_home: PathBuf) -> Self {
+        let config_home = home.join(".config");
         Self {
             home,
+            config_home,
             cache_home,
             data_home,
             xdg: None,
@@ -165,6 +171,20 @@ pub fn resolve_home_from(home: Option<&str>) -> Result<PathBuf> {
     Ok(home)
 }
 
+pub fn resolve_config_home_from(config_home: Option<&str>, home: &Path) -> Result<PathBuf> {
+    match config_home.filter(|s| !s.is_empty()) {
+        Some(raw) => {
+            let path = PathBuf::from(raw);
+            if path.is_absolute() {
+                Ok(path)
+            } else {
+                Err(anyhow!("XDG_CONFIG_HOME must be absolute, got {raw:?}"))
+            }
+        }
+        None => Ok(home.join(".config")),
+    }
+}
+
 fn validate_name(name: &str) -> Result<()> {
     if name.is_empty()
         || name == "."
@@ -187,6 +207,16 @@ pub fn expand_home(raw: &str, home: &Path) -> PathBuf {
         home.to_path_buf()
     } else {
         PathBuf::from(raw)
+    }
+}
+
+pub fn expand_config_path(raw: &str, home: &Path, config_home: &Path) -> PathBuf {
+    if let Some(rest) = raw.strip_prefix("~/.config/") {
+        config_home.join(rest)
+    } else if raw == "~/.config" {
+        config_home.to_path_buf()
+    } else {
+        expand_home(raw, home)
     }
 }
 
@@ -247,6 +277,18 @@ mod tests {
     }
 
     #[test]
+    fn expand_config_path_uses_xdg_config_home_for_dot_config() {
+        assert_eq!(
+            expand_config_path(
+                "~/.config/quickshell/noctalia",
+                Path::new("/home/u"),
+                Path::new("/cfg")
+            ),
+            PathBuf::from("/cfg/quickshell/noctalia")
+        );
+    }
+
+    #[test]
     fn resolve_home_rejects_none_empty_and_root() {
         assert!(resolve_home_from(None).is_err());
         assert!(resolve_home_from(Some("")).is_err());
@@ -254,6 +296,19 @@ mod tests {
         assert_eq!(
             resolve_home_from(Some("/home/x")).unwrap(),
             PathBuf::from("/home/x")
+        );
+    }
+
+    #[test]
+    fn resolve_config_home_rejects_relative_xdg_config_home() {
+        assert!(resolve_config_home_from(Some("relative"), Path::new("/home/x")).is_err());
+        assert_eq!(
+            resolve_config_home_from(None, Path::new("/home/x")).unwrap(),
+            PathBuf::from("/home/x/.config")
+        );
+        assert_eq!(
+            resolve_config_home_from(Some("/cfg"), Path::new("/home/x")).unwrap(),
+            PathBuf::from("/cfg")
         );
     }
 

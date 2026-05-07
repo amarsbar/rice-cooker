@@ -7,14 +7,19 @@ use std::path::Path;
 use anyhow::{Context, Result, anyhow};
 
 use crate::catalog::RiceEntry;
-use crate::paths::expand_home;
+use crate::paths::expand_config_path;
 
 /// Create `symlink_dst` pointing at `<clone>/<symlink_src>`. Creates parent
 /// dirs. Overwrites stale rice-cooker symlinks. Refuses to replace a
 /// user-owned directory or regular file.
-pub fn create_symlink(clone_dir: &Path, entry: &RiceEntry, home: &Path) -> Result<()> {
+pub fn create_symlink(
+    clone_dir: &Path,
+    entry: &RiceEntry,
+    home: &Path,
+    config_home: &Path,
+) -> Result<()> {
     let src = clone_dir.join(&entry.symlink_src);
-    let dst = expand_home(&entry.symlink_dst, home);
+    let dst = expand_config_path(&entry.symlink_dst, home, config_home);
     let parent = dst
         .parent()
         .ok_or_else(|| anyhow!("{}: no parent dir", dst.display()))?;
@@ -87,7 +92,13 @@ mod tests {
         let home = t.path();
         let clone = home.join("clone");
         fs::create_dir_all(&clone).unwrap();
-        create_symlink(&clone, &mk_entry(".", "~/.config/qs/x"), home).unwrap();
+        create_symlink(
+            &clone,
+            &mk_entry(".", "~/.config/qs/x"),
+            home,
+            &home.join(".config"),
+        )
+        .unwrap();
         assert_eq!(fs::read_link(home.join(".config/qs/x")).unwrap(), clone);
     }
 
@@ -99,7 +110,13 @@ mod tests {
         fs::create_dir_all(&clone).unwrap();
         fs::create_dir_all(home.join(".config/qs")).unwrap();
         symlink("/nonexistent", home.join(".config/qs/x")).unwrap();
-        create_symlink(&clone, &mk_entry(".", "~/.config/qs/x"), home).unwrap();
+        create_symlink(
+            &clone,
+            &mk_entry(".", "~/.config/qs/x"),
+            home,
+            &home.join(".config"),
+        )
+        .unwrap();
         assert_eq!(fs::read_link(home.join(".config/qs/x")).unwrap(), clone);
     }
 
@@ -112,7 +129,13 @@ mod tests {
         let user_dir = home.join(".config/qs/x");
         fs::create_dir_all(&user_dir).unwrap();
         fs::write(user_dir.join("mine.conf"), "mine").unwrap();
-        let err = create_symlink(&clone, &mk_entry(".", "~/.config/qs/x"), home).unwrap_err();
+        let err = create_symlink(
+            &clone,
+            &mk_entry(".", "~/.config/qs/x"),
+            home,
+            &home.join(".config"),
+        )
+        .unwrap_err();
         assert!(err.to_string().contains("exists as a directory"));
         assert!(user_dir.join("mine.conf").exists());
     }
@@ -126,7 +149,13 @@ mod tests {
         let user_file = home.join(".config/qs/x");
         fs::create_dir_all(user_file.parent().unwrap()).unwrap();
         fs::write(&user_file, "mine").unwrap();
-        let err = create_symlink(&clone, &mk_entry(".", "~/.config/qs/x"), home).unwrap_err();
+        let err = create_symlink(
+            &clone,
+            &mk_entry(".", "~/.config/qs/x"),
+            home,
+            &home.join(".config"),
+        )
+        .unwrap_err();
         assert!(err.to_string().contains("exists as a regular file"));
         assert_eq!(fs::read_to_string(&user_file).unwrap(), "mine");
     }
@@ -137,7 +166,30 @@ mod tests {
         let home = t.path();
         let clone = home.join("clone");
         fs::create_dir_all(&clone).unwrap();
-        create_symlink(&clone, &mk_entry(".", "~/.config/deeply/nested/x"), home).unwrap();
+        create_symlink(
+            &clone,
+            &mk_entry(".", "~/.config/deeply/nested/x"),
+            home,
+            &home.join(".config"),
+        )
+        .unwrap();
         assert!(home.join(".config/deeply/nested/x").is_symlink());
+    }
+
+    #[test]
+    fn writes_symlink_into_xdg_config_home() {
+        let t = tempdir().unwrap();
+        let home = t.path().join("home");
+        let config_home = t.path().join("cfg");
+        let clone = t.path().join("clone");
+        fs::create_dir_all(&clone).unwrap();
+        create_symlink(
+            &clone,
+            &mk_entry(".", "~/.config/qs/x"),
+            &home,
+            &config_home,
+        )
+        .unwrap();
+        assert_eq!(fs::read_link(config_home.join("qs/x")).unwrap(), clone);
     }
 }

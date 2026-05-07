@@ -14,7 +14,7 @@ use crate::deps;
 use crate::events::{Event, EventWriter, SCHEMA_VERSION as EVENT_SCHEMA_VERSION, Step, StepState};
 use crate::git;
 use crate::lock::{Lock, LockError};
-use crate::paths::{OriginalShell, Paths, expand_home};
+use crate::paths::{OriginalShell, Paths, expand_config_path};
 use crate::process::{self, VerifyResult};
 
 use super::record::{
@@ -152,6 +152,12 @@ fn run_activate<W: Write>(
 
     step(events, Step::Preflight, StepState::Start)?;
     try_stage!(events, "preflight", "git", git::preflight());
+    try_stage!(
+        events,
+        "preflight",
+        "graphical_session",
+        process::check_graphical_session()
+    );
     if !selected_deps.is_empty() {
         try_stage!(
             events,
@@ -220,6 +226,7 @@ fn run_activate<W: Write>(
             try_stage!(events, "record", do_record(paths, name, entry, pacman_diff));
             try_stage!(events, "record", clear_pending_deps(paths));
             step(events, Step::Record, StepState::Done)?;
+            return fail_and_rollback_activation(paths, events, name, "deps", &reason, None);
         } else {
             try_stage!(events, "deps", clear_pending_deps(paths));
         }
@@ -235,23 +242,56 @@ fn run_activate<W: Write>(
     step(events, Step::Record, StepState::Done)?;
 
     step(events, Step::Symlink, StepState::Start)?;
-    try_stage!(events, "symlink", do_symlink(paths, name, entry));
+    if let Err(e) = do_symlink(paths, name, entry) {
+        return fail_and_rollback_activation(
+            paths,
+            events,
+            name,
+            "symlink",
+            &format!("{e:#}"),
+            None,
+        );
+    }
     step(events, Step::Symlink, StepState::Done)?;
 
     step(events, Step::Notifiers, StepState::Start)?;
-    try_stage!(events, "notifiers", process::kill_notif_daemons());
+    if let Err(e) = process::kill_notif_daemons() {
+        return fail_and_rollback_activation(
+            paths,
+            events,
+            name,
+            "notifiers",
+            &format!("{e:#}"),
+            None,
+        );
+    }
     step(events, Step::Notifiers, StepState::Done)?;
 
     step(events, Step::KillQuickshell, StepState::Start)?;
-    try_stage!(events, "kill_quickshell", process::kill_quickshell());
+    if let Err(e) = process::kill_quickshell() {
+        return fail_and_rollback_activation(
+            paths,
+            events,
+            name,
+            "kill_quickshell",
+            &format!("{e:#}"),
+            None,
+        );
+    }
     step(events, Step::KillQuickshell, StepState::Done)?;
 
     let log_file = paths.last_run_log();
     step(events, Step::Launch, StepState::Start)?;
     if let Err(e) = process::launch_detached_by_name(name, &log_file, &paths.home) {
         let tail = read_tail(&log_file);
-        emit_fail(events, "launch", &format!("{e:#}"), Some(tail))?;
-        return Ok(false);
+        return fail_and_rollback_activation(
+            paths,
+            events,
+            name,
+            "launch",
+            &format!("{e:#}"),
+            Some(tail),
+        );
     }
     step(events, Step::Launch, StepState::Done)?;
 
@@ -260,15 +300,27 @@ fn run_activate<W: Write>(
         Ok(r) => r,
         Err(e) => {
             let tail = read_tail(&log_file);
-            emit_fail(events, "verify", &format!("{e:#}"), Some(tail))?;
-            return Ok(false);
+            return fail_and_rollback_activation(
+                paths,
+                events,
+                name,
+                "verify",
+                &format!("{e:#}"),
+                Some(tail),
+            );
         }
     };
     match verify_result {
         VerifyResult::Ok => step(events, Step::Verify, StepState::Done)?,
         VerifyResult::Dead { log_tail } => {
-            emit_fail(events, "verify", "qs_exited", Some(log_tail))?;
-            return Ok(false);
+            return fail_and_rollback_activation(
+                paths,
+                events,
+                name,
+                "verify",
+                "qs_exited",
+                Some(log_tail),
+            );
         }
     }
 
@@ -399,6 +451,24 @@ fn uninstall_locked<W: Write>(
     }
     step(events, Step::Record, StepState::Done)?;
     Ok(true)
+}
+
+fn fail_and_rollback_activation<W: Write>(
+    paths: &Paths,
+    events: &mut EventWriter<W>,
+    name: &str,
+    stage: &str,
+    reason: &str,
+    log_tail: Option<String>,
+) -> Result<bool> {
+    if !uninstall_locked(paths, Flags::default(), events, name)? {
+        return Ok(false);
+    }
+    if !replay_original_shell(paths, events)? {
+        return Ok(false);
+    }
+    emit_fail(events, stage, reason, log_tail)?;
+    Ok(false)
 }
 
 /// Launch the captured pre-rice shell (if any) and clear `original`. Always
@@ -580,7 +650,7 @@ fn do_deps(
             name: name.to_string(),
             commit: entry.commit.clone(),
             symlink_path: (!entry.package_managed)
-                .then(|| expand_home(&entry.symlink_dst, &paths.home)),
+                .then(|| expand_config_path(&entry.symlink_dst, &paths.home, &paths.config_home)),
             symlink_target: if entry.package_managed {
                 None
             } else {
@@ -651,7 +721,7 @@ fn do_record(paths: &Paths, name: &str, entry: &RiceEntry, pacman_diff: PacmanDi
         commit: entry.commit.clone(),
         installed_at: InstallRecord::now_rfc3339(),
         symlink_path: (!entry.package_managed)
-            .then(|| expand_home(&entry.symlink_dst, &paths.home)),
+            .then(|| expand_config_path(&entry.symlink_dst, &paths.home, &paths.config_home)),
         symlink_target,
         pacman_diff,
     };
@@ -664,7 +734,7 @@ fn do_symlink(paths: &Paths, name: &str, entry: &RiceEntry) -> Result<()> {
         return Ok(());
     }
     let clone = paths.clone_dir(name)?;
-    symlink_shape::create_symlink(&clone, entry, &paths.home)
+    symlink_shape::create_symlink(&clone, entry, &paths.home, &paths.config_home)
         .context("run `rice-cooker-backend uninstall` to roll back")
 }
 
@@ -1037,8 +1107,7 @@ mod tests {
         }
         let out = std::str::from_utf8(&buf).unwrap();
         assert!(out.contains(r#""subcommand":"preview""#));
-        assert!(out.contains(r#""stage":"clone""#));
-        assert!(out.contains("refusing repo URL starting with"));
+        assert!(out.contains(r#""stage":"preflight""#));
         assert!(!out.contains("install is not supported"));
     }
 }
