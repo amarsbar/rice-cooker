@@ -59,9 +59,20 @@ pub fn check_polkit_agent() -> Result<()> {
     }
     match status.code() {
         Some(0) => Ok(()),
-        Some(1) => Err(anyhow!(
-            "no polkit authentication agent running. Start one (e.g. `systemctl --user start hyprpolkitagent`) and retry."
-        )),
+        Some(1) => {
+            let start = Command::new("systemctl")
+                .args(["--user", "start", "hyprpolkitagent.service"])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .context("starting hyprpolkitagent.service")?;
+            if !start.success() {
+                return Err(anyhow!(
+                    "no polkit authentication agent running, and starting hyprpolkitagent.service failed"
+                ));
+            }
+            Ok(())
+        }
         Some(n) => Err(anyhow!(
             "pgrep returned unexpected exit {n} while checking for a polkit agent; cannot verify authorization environment"
         )),
