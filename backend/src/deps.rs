@@ -47,7 +47,23 @@ impl Helper {
 pub fn check_polkit_agent() -> Result<()> {
     let status = Command::new("pgrep")
         .arg("-f")
-        .arg("polkit.*agent|hyprpolkitagent|polkit-gnome|polkit-kde|lxpolkit|lxqt-policykit|mate-polkit")
+        .arg(concat!(
+            "(^|[/[:space:]])(",
+            "hyprpolkitagent",
+            "|lxqt-policykit-agent",
+            "|lxpolkit",
+            "|polkit-mate-authentication-agent-1",
+            "|polkit-gnome-authentication-agent-1",
+            "|polkit-kde-authentication-agent-1",
+            "|io\\.elementary\\.desktop\\.agent-polkit",
+            "|soteria",
+            "|xfce-polkit",
+            "|dde-polkit-agent",
+            "|gnome-shell",
+            "|gnome-flashback-polkit",
+            "|cinnamon",
+            ")([[:space:]]|$)",
+        ))
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
