@@ -81,8 +81,8 @@ preview_deps = ["ttf-material-symbols-variable", "ttf-outfit"]
 [ryu-shell]
 display_name = "Ryu Shell"
 creator_name = "RyuZinOh"
-repo = "https://github.com/amarsbar/ryu-dotfiles"
-commit = "f6cfe6b9c1a1d67524a1bdb4d48f90b8377a4192"
+repo = "https://github.com/RyuZinOh/.dotfiles"
+commit = "9380b0232e69a847459c35d0e7c417dead0cb3be"
 symlink_src = "quickshell"
 symlink_dst = "~/.config/quickshell/ryu-shell"
 preview_deps = ["ttf-cascadia-code-nerd", "noto-fonts-cjk"]
