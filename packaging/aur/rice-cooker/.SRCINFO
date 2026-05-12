@@ -1,6 +1,6 @@
 pkgbase = rice-cooker
 	pkgdesc = a visual (toy) tool for ricing
-	pkgver = 0.1.1
+	pkgver = 0.1.2
 	pkgrel = 1
 	url = https://github.com/amarsbar/rice-cooker
 	arch = x86_64
@@ -21,10 +21,10 @@ pkgbase = rice-cooker
 	optdepends = yay: alternative AUR helper for installing rice dependencies
 	optdepends = ttf-material-symbols-variable: icon font for Whisker and Nandoroid
 	optdepends = ttf-outfit: intended UI font for Whisker
-	source = rice-cooker-0.1.1.tar.gz::https://github.com/amarsbar/rice-cooker/releases/download/v0.1.1/rice-cooker-0.1.1.tar.gz
+	source = rice-cooker-0.1.2.tar.gz::https://github.com/amarsbar/rice-cooker/releases/download/v0.1.2/rice-cooker-0.1.2.tar.gz
 	source = rice-cooker.sh
 	source = rice-cooker.desktop
-	sha256sums = 0ed16e8193cc9b1f3493c536149ac50621aca915e94d152f26bcec666ba6c385
+	sha256sums = d1a9b99df2b5a34c37e388d73602a0f7968dff08f5a5585d6501c947518d1752
 	sha256sums = 1527354310806f2ae55a2629d2954f02efa6b4063d85233ef3ecc50f53887b91
 	sha256sums = ed4a26ab693d922de7392f4020a61d75c723c5dfaaa3b828ea5f4c870fb4933d
 
