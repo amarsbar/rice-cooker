@@ -61,14 +61,6 @@ symlink_dst = "~/.config/quickshell/caelestia"
 package_managed = true
 preview_deps = ["quickshell-git", "caelestia-shell"]
 
-[top-bar] # this is bad
-display_name = "surface-dots"
-creator_name = "snes19xx"
-repo = "https://github.com/snes19xx/surface-dots"
-commit = "4e76ef776353c734faaee75b6bdda1466d96b826"
-symlink_src = ".config/quickshell/top-bar"
-symlink_dst = "~/.config/quickshell/top-bar"
-
 [whisker]
 display_name = "whisker"
 creator_name = "corecathx"
@@ -85,6 +77,15 @@ install_deps = [
   "whisker-shell-git"
 ]
 preview_deps = ["ttf-material-symbols-variable", "ttf-outfit"]
+
+[ryu-shell]
+display_name = "Ryu Shell"
+creator_name = "RyuZinOh"
+repo = "https://github.com/amarsbar/ryu-dotfiles"
+commit = "f6cfe6b9c1a1d67524a1bdb4d48f90b8377a4192"
+symlink_src = "quickshell"
+symlink_dst = "~/.config/quickshell/ryu-shell"
+preview_deps = ["ttf-cascadia-code-nerd", "noto-fonts-cjk"]
 
 [nandoroid]
 display_name = "Nandoroid"
