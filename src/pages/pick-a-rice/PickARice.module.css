@@ -1,9 +1,9 @@
-/* Matches the Figma frame 509:34632 - 666 x 574. */
+/* Keeps the 666px Figma stage but clips the unused 16px left gutter in the Electron window. */
 .stage {
   position: relative;
   width: 666px;
   height: 574px;
-  margin: 0 auto;
+  transform: translateX(-16px);
 }
 
 .pickerContent {

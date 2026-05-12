@@ -75,7 +75,7 @@ async function applyHyprlandWindowProps(): Promise<void> {
   }
 }
 
-const BASE_SIZE = { width: 666, height: 574 } as const;
+const BASE_SIZE = { width: 650, height: 574 } as const;
 const FIGMA_HEIGHT_RATIO = 600 / 1080;
 const RAW_TAIL_LIMIT = 100;
 let activeBackendChild: ChildProcessWithoutNullStreams | null = null;
