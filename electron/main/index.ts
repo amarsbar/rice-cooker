@@ -26,6 +26,7 @@ const HYPRLAND_WINDOW_EFFECTS = [
   ['border_size', '0'],
 ] as const;
 
+process.title = APP_TITLE;
 app.setName('rice-cooker');
 
 if (process.env['XDG_SESSION_TYPE'] === 'wayland') {
@@ -75,7 +76,7 @@ async function applyHyprlandWindowProps(): Promise<void> {
   }
 }
 
-const BASE_SIZE = { width: 650, height: 574 } as const;
+const BASE_SIZE = { width: 666, height: 574 } as const;
 const FIGMA_HEIGHT_RATIO = 600 / 1080;
 const RAW_TAIL_LIMIT = 100;
 let activeBackendChild: ChildProcessWithoutNullStreams | null = null;
