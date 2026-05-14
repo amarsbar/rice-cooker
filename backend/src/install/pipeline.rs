@@ -183,7 +183,7 @@ fn run_activate<W: Write>(
         // current.json can be stale (crash, manual kill) — only short-circuit
         // if the process is actually running and the requested deps are present.
         let alive = try_stage!(events, "liveness", process::rice_shell_alive(name));
-        if alive && try_stage!(events, "deps", deps_are_satisfied(&selected_deps)) {
+        if alive && try_stage!(events, "deps", deps::missing(&selected_deps)).is_empty() {
             events.emit(&Event::Success {
                 active: Some(name.to_string()),
             })?;
@@ -636,7 +636,7 @@ fn do_deps(
             install_error: None,
         });
     }
-    if deps_are_satisfied(all_deps)? {
+    if deps::missing(all_deps)?.is_empty() {
         return Ok(DepsOutcome {
             pacman_diff: PacmanDiff::default(),
             install_error: None,
@@ -696,10 +696,6 @@ fn reconcile_pending_deps(paths: &Paths) -> Result<()> {
         write_current(paths, &pending.name)?;
     }
     clear_pending_deps(paths)
-}
-
-fn deps_are_satisfied(all_deps: &[String]) -> Result<bool> {
-    Ok(deps::missing(all_deps)?.is_empty())
 }
 
 fn union_sorted(mut prior: Vec<String>, next: Vec<String>) -> Vec<String> {
