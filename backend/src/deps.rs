@@ -76,6 +76,7 @@ pub fn check_polkit_agent() -> Result<()> {
     match status.code() {
         Some(0) => Ok(()),
         Some(1) => {
+            eprintln!("starting hyprpolkitagent");
             let start = Command::new("systemctl")
                 .args(["--user", "start", "hyprpolkitagent.service"])
                 .stdout(Stdio::null())
@@ -105,6 +106,7 @@ pub fn install_packages(pkgs: &[String]) -> Result<()> {
         return Ok(());
     }
     validate_pkg_names(pkgs)?;
+    eprintln!("install_packages: {}", pkgs.join(" "));
     check_polkit_agent()?;
     let helper = Helper::detect()
         .ok_or_else(|| anyhow!("neither paru nor yay found in PATH — install one first"))?;
@@ -150,6 +152,7 @@ pub fn remove_packages(pkgs: &[String]) -> Result<()> {
         return Ok(());
     }
     validate_pkg_names(pkgs)?;
+    eprintln!("remove_packages: {}", pkgs.join(" "));
     check_polkit_agent()?;
     let status = Command::new("pkexec")
         .args(["pacman", "-Rns", "--noconfirm"])
